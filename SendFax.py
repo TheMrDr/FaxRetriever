@@ -1,14 +1,14 @@
 import os
 
-import requests
-
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
-                             QMessageBox, QComboBox, QListWidget, QGridLayout)
 from PyQt5.QtGui import QIntValidator
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
+                             QComboBox, QListWidget, QGridLayout, QMessageBox, QStyledItemDelegate)
 
-from SaveManager import EncryptionKeyManager
+import requests
+
+from SaveManager import SaveManager
 from SystemLog import SystemLog
 
 
@@ -18,12 +18,13 @@ class SendFax(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.encryption_manager = EncryptionKeyManager()
+        self.encryption_manager = SaveManager()
         self.setWindowIcon(QtGui.QIcon(".\\images\\logo.ico"))
         self.setWindowTitle("Send Fax")
         self.log_system = SystemLog()
-        self.cover_sheet = None
-        self.documents = []
+        self.cover_sheet_path = None  # Store the full path to the cover sheet
+        self.documents_paths = []  # List to store full paths of attached documents
+
 
         self.setWindowTitle('Send Fax')
         self.setup_ui()
@@ -150,6 +151,7 @@ class SendFax(QDialog):
         options = QFileDialog.Options()
         filename, _ = QFileDialog.getOpenFileName(self, "Select a cover sheet", "", "Documents (*.pdf *.doc *.docx);;Images (*.jpg *.png *.tiff);;Text Files (*.txt)", options=options)
         if filename:
+            self.cover_sheet_path = filename  # Store the full path
             self.cover_sheet_list.clear()
             self.cover_sheet_list.addItem(self.format_display_name(filename))
 
@@ -161,44 +163,39 @@ class SendFax(QDialog):
         files, _ = QFileDialog.getOpenFileNames(self, "Select one or more files to fax", "", "Documents (*.pdf *.doc *.docx);;Images (*.jpg *.png *.tiff);;Text Files (*.txt)", options=options)
         if files:
             for file in files:
+                self.documents_paths.append(file)  # Store full path
                 self.document_list.addItem(self.format_display_name(file))
-
     def remove_document(self):
         selected_items = self.document_list.selectedItems()
         if not selected_items:
             return
         for item in selected_items:
-            self.document_list.takeItem(self.document_list.row(item))
+            index = self.document_list.row(item)
+            del self.documents_paths[index]  # Remove the corresponding full path
+            self.document_list.takeItem(index)
 
     def send_fax(self):
         self.fax_user = self.encryption_manager.get_config_value('Account', 'fax_user')
         self.token = self.encryption_manager.get_config_value('Token', 'access_token')
         self.caller_id = self.caller_id_combo.currentText().strip()
         destination = '1' + self.area_code_input.text() + self.first_three_input.text() + self.last_four_input.text()
-
-        # Prepare headers
-        headers = {
-            "authorization": f"Bearer {self.token}"
-        }
         url = f"https://telco-api.skyswitch.com/users/{self.fax_user}/faxes/send"
 
         # Prepare multipart/form-data payload
+        headers = {"Authorization": f"Bearer {self.token}"}
         files = {}
-        data = {
-            "caller_id": self.caller_id,
-            "destination": destination
-        }
+        data = {"caller_id": self.caller_id, "destination": destination}
 
-        # Adding the cover sheet if selected
-        if self.cover_sheet:
-            files['raw_files'] = ('cover_sheet', open(self.cover_sheet, 'rb'), 'application/pdf')
+        # Add the cover sheet if selected
+        if self.cover_sheet_path:
+            files['filename[0]'] = (os.path.basename(self.cover_sheet_path), open(self.cover_sheet_path, 'rb'), 'application/pdf')
 
-        # Adding other documents
-        for idx, doc in enumerate(self.documents):
-            file_extension = os.path.splitext(doc)[1]
+        # Add other documents
+        for idx, doc_path in enumerate(self.documents_paths):
+            file_extension = os.path.splitext(doc_path)[1]
             mime_type = 'application/pdf' if file_extension == '.pdf' else 'image/' + file_extension.strip('.')
-            file_key = f'raw_files_{idx + 1}'
-            files[file_key] = (os.path.basename(doc), open(doc, 'rb'), mime_type)
+            file_key = f'filename[{idx + 1}]' if self.cover_sheet_path else f'filename[{idx}]'
+            files[file_key] = (os.path.basename(doc_path), open(doc_path, 'rb'), mime_type)
 
         # Send the request with files and data
         try:
@@ -210,13 +207,8 @@ class SendFax(QDialog):
                 QMessageBox.critical(self, "Sending Failed", f"Failed to send fax: {response.text}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+            self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
         finally:
             # Make sure to close all files opened for sending
-            for file in files.values():
-                file[1].close()
-
-# if __name__ == '__main__':
-#     app = QApplication(sys.argv)
-#     ex = SendFax()
-#     ex.exec()  # Use exec_ to open the QDialog modally
-#     sys.exit(app.exec_())
+            for _, file_tuple in files.items():
+                file_tuple[1].close()

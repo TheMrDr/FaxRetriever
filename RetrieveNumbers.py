@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 import requests
-from SaveManager import EncryptionKeyManager
+from SaveManager import SaveManager
 from SystemLog import SystemLog
 
 
@@ -10,11 +10,11 @@ class RetrieveNumbers(QThread):
 
     def __init__(self):
         super().__init__()
-        self.encryption_manager = EncryptionKeyManager()
+        self.save_manager = SaveManager()
         self.log_system = SystemLog()
 
-        self.access_token = self.encryption_manager.get_config_value('Token', 'access_token')
-        self.user_id = self.encryption_manager.get_config_value('Account', 'fax_user')
+        self.access_token = self.save_manager.get_config_value('Token', 'access_token')
+        self.user_id = self.save_manager.get_config_value('Account', 'fax_user')
 
     def run(self):
         self.log_system.log_message('info', "Starting fax number retrieval thread.")

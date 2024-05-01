@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QWidget, QLabel, QProgressBar, QGridLayout
 
 from RetrieveFax import RetrieveFaxes
 from RetrieveToken import RetrieveToken
-from SaveManager import EncryptionKeyManager
+from SaveManager import SaveManager
 from SystemLog import SystemLog  # Make sure to import the logging class
 
 
@@ -16,7 +16,7 @@ class TokenLifespanProgressBar(QWidget):
         self.main_window = main_window  # Use the passed-in MainWindow instance
         self.token_is_valid = False  # Initialize the token validity flag
         self.log_system = SystemLog()
-        self.encryption_manager = EncryptionKeyManager()
+        self.save_manager = SaveManager()
         self.retrieve_token = RetrieveToken()
         self.setupUI()
         self.setupTimer()
@@ -42,24 +42,47 @@ class TokenLifespanProgressBar(QWidget):
         self.layout.setHorizontalSpacing(10)
 
     def setupTimer(self):
-        token_expiration_str = self.encryption_manager.get_config_value('Token', 'token_expiration')
-        token_expiration = datetime.strptime(token_expiration_str, '%Y-%m-%d %H:%M:%S')
+        token_expiration_str = self.save_manager.get_config_value('Token', 'token_expiration')
+
+        try:
+            # Convert the string to a datetime object
+            token_expiration = datetime.strptime(token_expiration_str, '%Y-%m-%d %H:%M:%S')
+        except ValueError as e:
+            # Handle the error appropriately, maybe set a default expiration or notify the user
+            return
+
         current_time = datetime.now()
+        print(f"Current Time: {current_time}")
+
+        # Now that both are datetime objects, you can subtract them
         self.total_duration = (token_expiration - current_time).total_seconds()
         self.endTime = token_expiration  # Store the end time based on the new token
+
         self.updateTimer = QTimer(self)
         self.updateTimer.timeout.connect(self.updateProgressBar)
         self.updateTimer.start(1000)  # Restart the timer to update every second
         self.updateProgressBar()  # Immediate update to reflect new time
+
     def updateProgressBar(self):
         current_time = datetime.now()
-        token_expiration_str = self.encryption_manager.get_config_value('Token', 'token_expiration')
-        token_expiration = datetime.strptime(token_expiration_str, '%Y-%m-%d %H:%M:%S')
+        token_expiration_str = self.save_manager.get_config_value('Token', 'token_expiration')
+
+        try:
+            # Convert the string to a datetime object
+            token_expiration = datetime.strptime(token_expiration_str, '%Y-%m-%d %H:%M:%S')
+        except ValueError as e:
+            self.log_system.log_message('error', f"Error converting token expiration to datetime: {e}")
+            # Here you might want to handle the error, perhaps disabling the progress bar if the date is invalid
+            self.token_lifespan_bar.setValue(0)
+            self.time_remaining_label.setText("Error in token date")
+            return
+
+        # Calculate the remaining duration in seconds
         remaining_duration = (token_expiration - current_time).total_seconds()
 
         self.token_is_valid = remaining_duration > 0
 
-        if remaining_duration > 0:
+        if self.token_is_valid:
             progress = int((remaining_duration / self.total_duration) * 100)
             self.token_lifespan_bar.setValue(progress)
             self.time_remaining_label.setText(str(timedelta(seconds=int(remaining_duration))))  # Format as HH:MM:SS
@@ -68,6 +91,7 @@ class TokenLifespanProgressBar(QWidget):
             self.time_remaining_label.setText("00:00:00")
             self.token_lifespan_text.setText("Token Expired. Please Update Credentials or Renew Token.")
             self.log_system.log_message('info', "Token lifespan has reached zero; no action taken.")
+            self.updateTimer.stop()  # Stop the timer since the token is no longer valid
 
     def is_token_valid(self):
         return self.token_is_valid
@@ -79,16 +103,17 @@ class TokenLifespanProgressBar(QWidget):
 
 # noinspection PyUnresolvedReferences
 class FaxPollTimerProgressBar(QWidget):
-    def __init__(self, token_progress_bar=None, parent=None):
+    def __init__(self, main_window=None, token_progress_bar=None, parent=None):
         super().__init__(parent)
-        self.token_progress_bar = token_progress_bar  # Reference to TokenLifespanProgressBar
+        self.main_window = main_window  # Reference to the main window for status updates
+        self.token_progress_bar = token_progress_bar  # Reference to TokenLifespanProgressBar for token checks
         self.log_system = SystemLog()  # Initialize logging
-        self.encryption_manager = EncryptionKeyManager()
+        self.encryption_manager = SaveManager()
         self.setupUI()
         self.setupTimer()
 
     def setupUI(self):
-        auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'autoretrieve')
+        auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'auto_retrieve')
 
         self.layout = QGridLayout(self)
         self.layout.setSpacing(0)
@@ -128,31 +153,35 @@ class FaxPollTimerProgressBar(QWidget):
         auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'autoretrieve')
 
         if auto_retrieve_enabled == 'Disabled':
-            self.faxPollTimer_bar.setValue(0)  # Set to 0 if auto retrieve is Disabled
-            self.log_system.log_message('info', "Auto retrieve is disabled, halting fax poll timer")
-            return  # Do not decrement if the service is disabled
+            self.faxPollTimer_bar.setValue(0)
+            self.log_system.log_message('info', "Auto retrieve is disabled, halting fax poll timer.")
+            self.updateTimer.stop()  # Stop the timer if auto-retrieve is disabled
+            return
 
         if not self.token_progress_bar or not self.token_progress_bar.is_token_valid():
+            self.faxPollTimer_bar.setValue(0)
+            self.main_window.update_status_bar("Token is invalid, halting fax poll timer.", 5000)
             self.log_system.log_message('info', "Token is invalid, halting fax poll timer.")
-            self.faxPollTimer_bar.setValue(0)  # Set to 0 if token is invalid
-            return  # Do not decrement if the token is invalid
+            self.updateTimer.stop()  # Stop the timer if the token is invalid
+            return
 
         remaining_time = self.endTime - datetime.now()
         seconds_left = int(remaining_time.total_seconds())
         self.faxPollTimer_bar.setValue(seconds_left)
-        # Update label to show time in MM:SS format
         self.time_remaining_label.setText(str(timedelta(seconds=seconds_left))[2:7])
 
         if seconds_left <= 0:
             self.retrieveFaxes()
 
     def retrieveFaxes(self):
-        if not self.token_progress_bar or not self.token_progress_bar.is_token_valid():
+        if not self.token_progress_bar.is_token_valid():
+            self.main_window.update_status_bar("Token is invalid, cannot retrieve faxes.", 5000)
             self.log_system.log_message('info', "Token is invalid, cannot retrieve faxes.")
             return  # Do not retrieve faxes if the token is invalid
 
+        self.main_window.update_status_bar("Checking for new faxes...", 5000)
         self.setupTimer()  # Reset and restart the fax poll timer
-        self.faxRetrieval = RetrieveFaxes()
+        self.faxRetrieval = RetrieveFaxes(self.main_window)
         self.faxRetrieval.run()
         self.log_system.log_message('info', "Fax retrieval initiated.")
 

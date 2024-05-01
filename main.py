@@ -16,17 +16,19 @@ from Customizations import CustomPushButton, SelectInboxDialog
 from Options import OptionsDialog
 from ProgressBars import TokenLifespanProgressBar, FaxPollTimerProgressBar
 from RetrieveToken import RetrieveToken
-from SaveManager import EncryptionKeyManager
+from SaveManager import SaveManager
 from SendFax import SendFax
 from SystemLog import SystemLog
 from RetrieveNumbers import RetrieveNumbers
+from Version import __version__
 
 
 # noinspection PyUnresolvedReferences
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.encryption_manager = EncryptionKeyManager()
+        self.version = __version__
+        self.save_manager = SaveManager()
         self.retrieve_numbers = RetrieveNumbers()
         self.retrieve_token = RetrieveToken()
         self.send_fax_dialog = SendFax()
@@ -35,7 +37,7 @@ class MainWindow(QMainWindow):
 
         # Load the app log services and set logging level.
         self.log_system = SystemLog()
-        self.logging_level = self.encryption_manager.get_config_value('Debug', 'debug_level').upper()
+        self.logging_level = self.save_manager.get_config_value('Log', 'logging_level')
         self.log_system.refresh_logging_level(self.logging_level)
 
         # Title the app window, set width, and set the app icon.
@@ -43,11 +45,10 @@ class MainWindow(QMainWindow):
         self.setFixedWidth(600)
         self.setWindowIcon(QtGui.QIcon(".\\images\\logo.ico"))
 
-        self.encryption_key = self.encryption_manager.check_encryption_key()
-
         # Initialize UI components that might display or utilize the data
         self.tokenLifespanProgressBar = TokenLifespanProgressBar(main_window=self)
-        self.faxPollTimerProgressBar = FaxPollTimerProgressBar(token_progress_bar=self.tokenLifespanProgressBar)
+        self.faxPollTimerProgressBar = FaxPollTimerProgressBar(main_window=self,
+                                                               token_progress_bar=self.tokenLifespanProgressBar)
 
         # Initialize signals and slots
         self.retrieve_token.token_retrieved.connect(self.tokenLifespanProgressBar.restart_progress)
@@ -104,6 +105,7 @@ class MainWindow(QMainWindow):
         self.log_system.log_message('debug', 'Status Bar Initialized')
         self.create_central_widget()
         self.log_system.log_message('debug', 'Main UI Initialized')
+        self.update_status_bar(f"App Version: {self.version}", 30000)
 
     def create_menu(self):
         self.file_menu = self.menuBar().addMenu("&File")
@@ -114,6 +116,11 @@ class MainWindow(QMainWindow):
         self.populate_help_menu()
 
     def populate_file_menu(self):
+        self.options_button = QAction("Options", self)
+        self.options_button.triggered.connect(self.show_options_dialog)
+        self.file_menu.addAction(self.options_button)
+        self.options_button.setEnabled(True)
+
         self.minimize_app_button = QAction("Minimize", self)
         self.minimize_app_button.triggered.connect(self.minimize_to_tray)
         self.file_menu.addAction(self.minimize_app_button)
@@ -123,11 +130,6 @@ class MainWindow(QMainWindow):
         self.file_menu.addAction(self.close_app_button)
 
     def populate_tools_menu(self):
-        self.options_button = QAction("Options", self)
-        self.options_button.triggered.connect(self.show_options_dialog)
-        self.tools_menu.addAction(self.options_button)
-        self.options_button.setEnabled(True)
-
         self.retrieve_token_button = QAction("Retrieve Token", self)
         self.retrieve_token_button.triggered.connect(self.startTokenRetrieval)
         self.tools_menu.addAction(self.retrieve_token_button)
@@ -164,7 +166,7 @@ class MainWindow(QMainWindow):
         saveLocationLayout = QGridLayout()
         self.saveLocationDisplay = QLineEdit()
         self.saveLocationDisplay.setPlaceholderText("No folder selected...")
-        auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'autoretrieve')
+        auto_retrieve_enabled = self.save_manager.get_config_value('Retrieval', 'autoretrieve')
 
         select_folder_button = QPushButton("Select Save Location")
         select_folder_button.clicked.connect(self.select_folder)
@@ -202,19 +204,18 @@ class MainWindow(QMainWindow):
         self.send_fax_dialog.show()
 
     def refresh_data_from_config(self):
-        self.api_username = self.encryption_manager.get_config_value('API', 'username')
-        self.api_pass = self.encryption_manager.get_config_value('API', 'password')
-        self.client_id = self.encryption_manager.get_config_value('Client', 'client_id')
-        self.client_pass = self.encryption_manager.get_config_value('Client', 'client_secret')
-        self.fax_user_info = self.encryption_manager.get_config_value('Account', 'account_id')
-        self.fax_extension = self.encryption_manager.get_config_value('Fax', 'fax_extension')
-        self.access_token = self.encryption_manager.get_config_value('Token', 'access_token')
-        self.token_expiration = self.encryption_manager.get_config_value('Token', 'token_expiration')
-        self.save_path = self.encryption_manager.get_config_value('Path', 'save_path')
-        self.account_uuid = self.encryption_manager.get_config_value('Account', 'account_uuid')
-        caller_ids = self.encryption_manager.get_config_value('Retrieval', 'fax_caller_id')
+        self.api_username = self.save_manager.get_config_value('API', 'username')
+        self.api_pass = self.save_manager.get_config_value('API', 'password')
+        self.client_id = self.save_manager.get_config_value('Client', 'client_id')
+        self.client_pass = self.save_manager.get_config_value('Client', 'client_secret')
+        self.fax_user_info = self.save_manager.get_config_value('Account', 'account_id')
+        self.fax_extension = self.save_manager.get_config_value('Fax', 'fax_extension')
+        self.access_token = self.save_manager.get_config_value('Token', 'access_token')
+        self.token_expiration = self.save_manager.get_config_value('Token', 'token_expiration')
+        self.save_path = self.save_manager.get_config_value('Path', 'save_path')
+        self.account_uuid = self.save_manager.get_config_value('Account', 'account_uuid')
+        caller_ids = self.save_manager.get_config_value('Retrieval', 'fax_caller_id')
         self.populate_caller_ids(caller_ids)
-
 
     def populate_data(self):
         self.refresh_data_from_config()
@@ -225,27 +226,28 @@ class MainWindow(QMainWindow):
     def select_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
         self.saveLocationDisplay.setText(folder_path)
-        self.encryption_manager.write_encrypted_ini('Path', 'save_path', folder_path)
+        self.save_manager.config.set('Path', 'save_path', folder_path)
 
     def minimize_to_tray(self):
         self.hide()  # Hide the main window
         self.tray_icon.show()  # Show the tray icon
 
     def retrieve_faxes(self):
+        self.update_status_bar("Retrieving Faxes...", 5000)
         self.faxPollTimerProgressBar.retrieveFaxes()
 
     def startTokenRetrieval(self):
-        self.update_status_bar("Retrieving access token...")
+        self.update_status_bar("Retrieving access token...", 5000)
         self.token_thread = RetrieveToken()
         self.token_thread.finished.connect(self.handle_token_response)
         self.token_thread.start()
 
     def handle_token_response(self, status, message):
         if status == "Success":
-            self.update_status_bar("Access token retrieved successfully.")
+            self.update_status_bar("Access token retrieved successfully.", 5000)
             QMessageBox.information(self, "Success", message)
         else:
-            self.update_status_bar("Failed to retrieve access token.")
+            self.update_status_bar("Failed to retrieve access token.", 5000)
             QMessageBox.critical(self, "Failure", message)
 
     def open_select_inbox_dialog(self):
@@ -259,23 +261,42 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted:
             selected_inboxes = dialog.selected_inboxes()
             all_numbers = ','.join(numbers)  # Join all numbers into a single string separated by commas
-            if len(selected_inboxes) == 1:
-                self.inbox_button.setText(selected_inboxes[0])
-                self.encryption_manager.write_encrypted_ini('Retrieval', 'fax_caller_id', selected_inboxes[0])
-            elif len(selected_inboxes) > 1:
-                self.inbox_button.setText(f"{len(selected_inboxes)} Inboxes")
-                # Save multiple numbers by joining them with a delimiter (e.g., comma)
+
+            # Determine the button text and save the appropriate settings
+            if selected_inboxes:
+                if len(selected_inboxes) == 1:
+                    button_text = selected_inboxes[0]
+                else:
+                    button_text = f"{len(selected_inboxes)} Inboxes"
                 inbox_ids = ','.join(selected_inboxes)
-                self.encryption_manager.write_encrypted_ini('Retrieval', 'fax_caller_id', inbox_ids)
-            elif len(selected_inboxes) == 0:
-                self.inbox_button.setText("Choose an Inbox")
-                self.encryption_manager.write_encrypted_ini('Retrieval', 'fax_caller_id', '')  # Clear the setting
-            if len(numbers) == 1:  # Auto-select if only one inbox
-                self.inbox_button.setText(numbers[0])
-                self.encryption_manager.write_encrypted_ini('Retrieval', 'fax_caller_id', numbers[0])
+                self.save_manager.config.set('Retrieval', 'fax_caller_id', inbox_ids)
+            else:
+                button_text = "Choose an Inbox"
+                self.save_manager.config.set('Retrieval', 'fax_caller_id',
+                                             '')  # Clear the setting if no inboxes selected
+
+            # Update the button text
+            self.inbox_button.setText(button_text)
 
             # Save all available numbers to the config, regardless of selection
-            self.encryption_manager.write_encrypted_ini('Account', 'all_numbers', all_numbers)
+            self.save_manager.config.set('Account', 'all_numbers', all_numbers)
+
+            # Attempt to save the changes using the save manager
+            try:
+                self.save_manager.save_changes()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+
+        # Auto-select if only one inbox is available
+        if len(numbers) == 1:
+            self.inbox_button.setText(numbers[0])
+            self.save_manager.config.set('Retrieval', 'fax_caller_id', numbers[0])
+            try:
+                self.save_manager.save_changes()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
     def populate_caller_ids(self, caller_ids):
         if caller_ids:
@@ -287,9 +308,10 @@ class MainWindow(QMainWindow):
         else:
             self.inbox_button.setText("Choose an Inbox")
 
-    def update_status_bar(self, message):
+    def update_status_bar(self, message, timeout):
+        self.timeout = int(timeout)
         self.message = message
-        self.status_bar.showMessage(f"{self.message}", 5000)
+        self.status_bar.showMessage(f"{self.message}", self.timeout)
 
 
     def restart_application(self):

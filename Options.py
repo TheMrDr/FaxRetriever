@@ -2,7 +2,7 @@ from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
 
-from SaveManager import EncryptionKeyManager
+from SaveManager import SaveManager
 
 
 # noinspection PyUnresolvedReferences
@@ -10,7 +10,7 @@ class OptionsDialog(QDialog):
     def __init__(self, main_window):
         super().__init__(parent=main_window)
         self.main_window = main_window
-        self.encryption_manager = EncryptionKeyManager()
+        self.save_manager = SaveManager()
         self.setWindowIcon(QtGui.QIcon(".\\images\\logo.ico"))
         self.setWindowTitle("Options")
         self.layout = QVBoxLayout()
@@ -96,10 +96,13 @@ class OptionsDialog(QDialog):
         download_layout = QHBoxLayout()
         self.pdf_radio = QRadioButton("PDF")
         self.jpg_radio = QRadioButton("JPG")
+        self.both_radio = QRadioButton("Both")
         self.download_method_button_group.addButton(self.pdf_radio)
         self.download_method_button_group.addButton(self.jpg_radio)
+        self.download_method_button_group.addButton(self.both_radio)
         download_layout.addWidget(self.pdf_radio)
         download_layout.addWidget(self.jpg_radio)
+        download_layout.addWidget(self.both_radio)
         self.download_method_group.setLayout(download_layout)
         parent_layout.addWidget(self.download_method_group)
 
@@ -139,42 +142,37 @@ class OptionsDialog(QDialog):
 
     def populate_settings(self):
         # Populate settings from config file
-        self.username_input.setText(self.encryption_manager.get_config_value('API', 'username'))
-        self.password_input.setText(self.encryption_manager.get_config_value('API', 'password'))
-        self.client_id_input.setText(self.encryption_manager.get_config_value('Client', 'client_id'))
-        self.client_secret_input.setText(self.encryption_manager.get_config_value('Client', 'client_secret'))
-        self.fax_user_input.setText(self.encryption_manager.get_config_value('Account', 'fax_user'))
+        self.username_input.setText(self.save_manager.get_config_value('API', 'username'))
+        self.password_input.setText(self.save_manager.get_config_value('API', 'password'))
+        self.client_id_input.setText(self.save_manager.get_config_value('Client', 'client_id'))
+        self.client_secret_input.setText(self.save_manager.get_config_value('Client', 'client_secret'))
+        self.fax_user_input.setText(self.save_manager.get_config_value('Account', 'fax_user'))
 
         # Set Retrieval Enabled/Disabled
-        retrieve_faxes = self.encryption_manager.get_config_value('Retrieval', 'AutoRetrieve')
+        retrieve_faxes = self.save_manager.get_config_value('Retrieval', 'AutoRetrieve')
         if retrieve_faxes == 'Enabled':
             self.disable_fax_retrieval_checkbox.setChecked(False)
         elif retrieve_faxes == 'Disabled':
             self.disable_fax_retrieval_checkbox.setChecked(True)
 
         # Set download method
-        download_method = self.encryption_manager.get_config_value('Fax Options', 'download_method')
+        download_method = self.save_manager.get_config_value('Fax Options', 'download_method')
         if download_method == 'PDF':
             self.pdf_radio.setChecked(True)
         elif download_method == 'JPG':
             self.jpg_radio.setChecked(True)
+        elif download_method == 'Both':
+            self.both_radio.setChecked(True)
 
         # Set delete faxes option
-        delete_faxes = self.encryption_manager.get_config_value('Fax Options', 'delete_faxes')
+        delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
         if delete_faxes == 'Yes':
             self.delete_yes_radio.setChecked(True)
         else:
             self.delete_no_radio.setChecked(True)
 
-        # # Set mark read option
-        # mark_read = self.encryption_manager.get_config_value('Fax Options', 'mark_read')
-        # if mark_read == 'Yes':
-        #     self.mark_read_yes_radio.setChecked(True)
-        # else:
-        #     self.mark_read_no_radio.setChecked(True)
-
         # Set Debug Level
-        debug_level = self.encryption_manager.get_config_value('Debug', 'debug_level')
+        debug_level = self.save_manager.get_config_value('Debug', 'debug_level')
         self.logging_level_combo.setCurrentText(debug_level)
 
     def toggle_sensitive_settings(self, checked):
@@ -205,35 +203,47 @@ class OptionsDialog(QDialog):
         fax_user = self.fax_user_input.text().strip()
         retrieval_disabled = self.disable_fax_retrieval_checkbox.isChecked()
         download_method = self.download_method_button_group.checkedButton().text() if (
-            self.download_method_button_group.checkedButton()) else None
+            self.download_method_button_group.checkedButton()) else ""
         delete_faxes = self.delete_faxes_button_group.checkedButton().text() if (
-            self.delete_faxes_button_group.checkedButton()) else None
+            self.delete_faxes_button_group.checkedButton()) else ""
         # mark_read = self.mark_read_button_group.checkedButton().text() if (
-        #     self.mark_read_button_group.checkedButton()) else None
+        #     self.mark_read_button_group.checkedButton()) else ""
         debug_level = self.logging_level_combo.currentText()
 
-        self.encryption_manager.write_encrypted_ini('API', 'username', username)
-        self.encryption_manager.write_encrypted_ini('API', 'password', password)
-        self.encryption_manager.write_encrypted_ini('Client', 'client_id', client_id)
-        self.encryption_manager.write_encrypted_ini('Client', 'client_secret', client_secret)
-        self.encryption_manager.write_encrypted_ini('Account', 'fax_user', fax_user)
-        self.encryption_manager.write_encrypted_ini('Fax Options', 'download_method', download_method)
-        self.encryption_manager.write_encrypted_ini('Fax Options', 'delete_faxes', delete_faxes)
-        # self.encryption_manager.write_encrypted_ini('Fax Options', 'mark_read', mark_read)
-        self.encryption_manager.write_encrypted_ini('Debug', 'debug_level', debug_level)
+        for section in ['API', 'Client', 'Account', 'Fax Options', 'Debug']:
+            if not self.save_manager.config.has_section(section):
+                self.save_manager.config.add_section(section)
 
-        if retrieval_disabled:
-            self.encryption_manager.write_encrypted_ini('Retrieval', 'autoretrieve', 'Disabled')
-        else:
-            self.encryption_manager.write_encrypted_ini('Retrieval', 'autoretrieve', 'Enabled')
+        self.save_manager.config.set('API', 'username', username)
+        self.save_manager.config.set('API', 'password', password)
+        self.save_manager.config.set('Client', 'client_id', client_id)
+        self.save_manager.config.set('Client', 'client_secret', client_secret)
+        self.save_manager.config.set('Account', 'fax_user', fax_user)
+        self.save_manager.config.set('Fax Options', 'download_method', download_method)
+        self.save_manager.config.set('Fax Options', 'delete_faxes', delete_faxes)
+        # self.encryption_manager.config.set('Fax Options', 'mark_read', mark_read)
+        self.save_manager.config.set('Debug', 'debug_level', debug_level)
+
+        retrieval_status = 'Disabled' if retrieval_disabled else 'Enabled'
+        self.save_manager.config.set('Retrieval', 'auto_retrieve', retrieval_status)
+
+        try:
+            self.save_manager.save_changes()
+            self.save_manager.read_encrypted_ini()  # Reload configuration after saving
+            QMessageBox.information(self, "Settings Updated", "Settings have been updated successfully.")
+            self.main_window.update_status_bar("Settings saved successfully.", 5000)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
+            self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+            return
 
         self.accept()  # Close the dialog
 
-        # Show message box asking the user to restart the application
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Information)
-        msg_box.setText("Settings changed. Please restart the application for changes to take effect.")
-        msg_box.setWindowTitle("Restart Required")
-        msg_box.setStandardButtons(QMessageBox.Ok)
-        msg_box.buttonClicked.connect(lambda: self.main_window.restart_application())
-        msg_box.exec()
+        # # Show message box asking the user to restart the application
+        # msg_box = QMessageBox()
+        # msg_box.setIcon(QMessageBox.Information)
+        # msg_box.setText("Settings changed. Please restart the application for changes to take effect.")
+        # msg_box.setWindowTitle("Restart Required")
+        # msg_box.setStandardButtons(QMessageBox.Ok)
+        # msg_box.buttonClicked.connect(lambda: self.main_window.restart_application())
+        # msg_box.exec()
