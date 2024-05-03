@@ -3,6 +3,7 @@ import os
 from logging.handlers import RotatingFileHandler
 
 from PyQt5.QtWidgets import QAction
+import os
 
 
 class SystemLog(QAction):
