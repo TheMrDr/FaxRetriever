@@ -4,18 +4,21 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButto
 
 from SaveManager import SaveManager
 
+from ProgressBars import FaxPollTimerProgressBar
+
 
 # noinspection PyUnresolvedReferences
 class OptionsDialog(QDialog):
     def __init__(self, main_window):
         super().__init__(parent=main_window)
         self.main_window = main_window
-        self.save_manager = SaveManager()
-        self.setWindowIcon(QtGui.QIcon(".\\images\\logo.ico"))
+        self.save_manager = SaveManager(self.main_window)
+        self.setWindowIcon(QtGui.QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
         self.setWindowTitle("Options")
         self.layout = QVBoxLayout()
         self.setup_ui()
         self.populate_settings()
+        self.fax_timer_progress_bar = FaxPollTimerProgressBar(self.main_window)
 
     def setup_ui(self):
         form_layout = QFormLayout()
@@ -149,7 +152,7 @@ class OptionsDialog(QDialog):
         self.fax_user_input.setText(self.save_manager.get_config_value('Account', 'fax_user'))
 
         # Set Retrieval Enabled/Disabled
-        retrieve_faxes = self.save_manager.get_config_value('Retrieval', 'AutoRetrieve')
+        retrieve_faxes = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
         if retrieve_faxes == 'Enabled':
             self.disable_fax_retrieval_checkbox.setChecked(False)
         elif retrieve_faxes == 'Disabled':
@@ -232,6 +235,8 @@ class OptionsDialog(QDialog):
             self.save_manager.read_encrypted_ini()  # Reload configuration after saving
             QMessageBox.information(self, "Settings Updated", "Settings have been updated successfully.")
             self.main_window.update_status_bar("Settings saved successfully.", 5000)
+            self.main_window.populate_data()
+            self.fax_timer_progress_bar.restart_progress()
         except Exception as e:
             QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)

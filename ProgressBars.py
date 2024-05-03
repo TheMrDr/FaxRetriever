@@ -1,3 +1,4 @@
+
 from datetime import datetime, timedelta
 
 from PyQt5.QtCore import QTimer
@@ -16,8 +17,8 @@ class TokenLifespanProgressBar(QWidget):
         self.main_window = main_window  # Use the passed-in MainWindow instance
         self.token_is_valid = False  # Initialize the token validity flag
         self.log_system = SystemLog()
-        self.save_manager = SaveManager()
-        self.retrieve_token = RetrieveToken()
+        self.save_manager = SaveManager(self.main_window)
+        self.retrieve_token = RetrieveToken(self.main_window)
         self.setupUI()
         self.setupTimer()
 
@@ -66,13 +67,24 @@ class TokenLifespanProgressBar(QWidget):
     def updateProgressBar(self):
         current_time = datetime.now()
         token_expiration_str = self.save_manager.get_config_value('Token', 'token_expiration')
+        fax_user = self.save_manager.get_config_value('Account', 'fax_user')
+        client_id = self.save_manager.get_config_value('Client', 'client_id')
+        # api_username = self.save_manager.get_config_value('API', 'api_username')
+
+        # Check if any variable except current_time is None or "None Set"
+        for var in [token_expiration_str, fax_user, client_id]:
+            if var in [None, "None Set"]:
+                self.token_lifespan_bar.setValue(0)
+                self.time_remaining_label.setText("00:00:00")
+                self.log_system.log_message('error', "Invalid configuration value detected.")
+                self.updateTimer.stop()  # Stop the timer if configuration is invalid
+                return
 
         try:
             # Convert the string to a datetime object
             token_expiration = datetime.strptime(token_expiration_str, '%Y-%m-%d %H:%M:%S')
         except ValueError as e:
             self.log_system.log_message('error', f"Error converting token expiration to datetime: {e}")
-            # Here you might want to handle the error, perhaps disabling the progress bar if the date is invalid
             self.token_lifespan_bar.setValue(0)
             self.time_remaining_label.setText("Error in token date")
             return
@@ -86,8 +98,16 @@ class TokenLifespanProgressBar(QWidget):
             progress = int((remaining_duration / self.total_duration) * 100)
             self.token_lifespan_bar.setValue(progress)
             self.time_remaining_label.setText(str(timedelta(seconds=int(remaining_duration))))  # Format as HH:MM:SS
+            self.main_window.send_fax_button.setEnabled(True)
+            self.is_token_valid()
+
+            # Check if the token's lifespan is less than 10%
+            if progress < 10:
+                self.retrieve_token()  # Automatically call self.retrieve_token()
+
         else:
             self.token_lifespan_bar.setValue(0)
+            self.main_window.send_fax_button.setEnabled(False)
             self.time_remaining_label.setText("00:00:00")
             self.token_lifespan_text.setText("Token Expired. Please Update Credentials or Renew Token.")
             self.log_system.log_message('info', "Token lifespan has reached zero; no action taken.")
@@ -108,7 +128,7 @@ class FaxPollTimerProgressBar(QWidget):
         self.main_window = main_window  # Reference to the main window for status updates
         self.token_progress_bar = token_progress_bar  # Reference to TokenLifespanProgressBar for token checks
         self.log_system = SystemLog()  # Initialize logging
-        self.encryption_manager = SaveManager()
+        self.encryption_manager = SaveManager(self.main_window)
         self.setupUI()
         self.setupTimer()
 
@@ -120,11 +140,7 @@ class FaxPollTimerProgressBar(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
 
         self.faxPollTimer_text = QLabel()
-        if auto_retrieve_enabled == "Enabled":
-            self.faxPollTimer_text = QLabel("Automatically Polling for New Faxes every 5 minutes.")
-        elif auto_retrieve_enabled == "Disabled":
-            self.faxPollTimer_text = QLabel("Fax Retrieval Disabled - Check Settings to Enable.")
-
+        # self.faxPollTimer_text = QLabel("")
         self.layout.addWidget(self.faxPollTimer_text, 0, 0, 1, 2)  # Span across all columns for alignment
 
         self.faxPollTimer_bar = QProgressBar()
@@ -150,17 +166,21 @@ class FaxPollTimerProgressBar(QWidget):
         self.updateTimer.start(1000)  # Updates every second
 
     def updateProgressBar(self):
-        auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'autoretrieve')
+        auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'auto_retrieve')
 
-        if auto_retrieve_enabled == 'Disabled':
+        if auto_retrieve_enabled == "Enabled":
+            self.faxPollTimer_text.setText("Automatically Polling for New Faxes every 5 minutes.")
+        elif auto_retrieve_enabled == "Disabled":
             self.faxPollTimer_bar.setValue(0)
-            self.log_system.log_message('info', "Auto retrieve is disabled, halting fax poll timer.")
+            self.faxPollTimer_text.setText("Fax Retrieval Disabled - Check Settings to Enable.")
+            self.time_remaining_label.setText("00:00:00")
             self.updateTimer.stop()  # Stop the timer if auto-retrieve is disabled
             return
 
         if not self.token_progress_bar or not self.token_progress_bar.is_token_valid():
             self.faxPollTimer_bar.setValue(0)
-            self.main_window.update_status_bar("Token is invalid, halting fax poll timer.", 5000)
+            self.main_window.update_status_bar("Invalid or Missing Token - "
+                                               "Request New Token in Tools, or Check Settings.", 5000)
             self.log_system.log_message('info', "Token is invalid, halting fax poll timer.")
             self.updateTimer.stop()  # Stop the timer if the token is invalid
             return
@@ -180,11 +200,12 @@ class FaxPollTimerProgressBar(QWidget):
             return  # Do not retrieve faxes if the token is invalid
 
         self.main_window.update_status_bar("Checking for new faxes...", 5000)
+        self.log_system.log_message('info', "Fax retrieval initiated.")
         self.setupTimer()  # Reset and restart the fax poll timer
         self.faxRetrieval = RetrieveFaxes(self.main_window)
         self.faxRetrieval.run()
-        self.log_system.log_message('info', "Fax retrieval initiated.")
 
     def restart_progress(self):
         self.setupTimer()  # Reset and restart the fax poll timer
+        self.updateProgressBar()
         self.faxPollTimer_bar.setValue(300)  # Reset the progress bar to full

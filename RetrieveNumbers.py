@@ -8,9 +8,10 @@ class RetrieveNumbers(QThread):
     finished = pyqtSignal(str, str)
     numbers_retrieved = pyqtSignal(list)
 
-    def __init__(self):
+    def __init__(self, main_window):
         super().__init__()
-        self.save_manager = SaveManager()
+        self.main_window = main_window
+        self.save_manager = SaveManager(self.main_window)
         self.log_system = SystemLog()
 
         self.access_token = self.save_manager.get_config_value('Token', 'access_token')
@@ -40,6 +41,7 @@ class RetrieveNumbers(QThread):
                 self.numbers_retrieved.emit(numbers)
                 self.finished.emit("Success", "Successfully retrieved fax numbers.")
                 self.log_system.log_message('info', f"Successfully retrieved fax numbers: {numbers}")
+                self.main_window.populate_data()
             else:
                 self.finished.emit("Failure", f"HTTP Error {response.status_code}: {response.text}")
                 self.log_system.log_message('error',

@@ -11,14 +11,15 @@ from SystemLog import SystemLog
 class SaveManager:
     _instance = None  # Singleton pattern implementation
 
-    def __new__(cls, application_name="CN-FaxRetriever"):
+    def __new__(cls, main_window=None, application_name="CN-FaxRetriever"):
         if cls._instance is None:
             cls._instance = super(SaveManager, cls).__new__(cls)
-            cls._instance.init(application_name)
+            cls._instance.init(main_window, application_name)
         return cls._instance
 
-    def init(self, application_name):
+    def init(self, main_window, application_name):
         self.log_system = SystemLog()
+        self.main_window = main_window
         self.application_name = application_name
         self.config = configparser.ConfigParser()
         self.registry_path = fr"Software\Clinic Networking, LLC"
@@ -65,7 +66,7 @@ class SaveManager:
                     self.log_system.log_message('debug', f"  {option}: {decrypted_value}")
                 except Exception as e:
                     self.log_system.log_message('error', f"Error decrypting {option} in section {section}: {e}")
-                    self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+                    # self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
                     decrypted_config.set(section, option, encrypted_value)
 
         self.config = decrypted_config
@@ -79,7 +80,7 @@ class SaveManager:
         fernet = Fernet(encryption_key.encode())
         encrypted_config = configparser.ConfigParser()
 
-        # Ensure all current sections and options are processed
+        # Ensure all required sections and options are processed, even if they are missing
         for section in self.config.sections():
             if not encrypted_config.has_section(section):
                 encrypted_config.add_section(section)  # Create the section if it does not exist
@@ -93,7 +94,8 @@ class SaveManager:
                     encrypted_config.set(section, option, encrypted_value)
                 except Exception as e:
                     self.log_system.log_message('error', f"Failed to encrypt {option} in {section}: {e}")
-                    self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+                    if self.main_window:
+                        self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
                     continue  # Skip this item or handle appropriately
 
         # Attempt to write the encrypted config to file
@@ -103,7 +105,8 @@ class SaveManager:
             self.log_system.log_message('info', "All configurations have been encrypted and saved.")
         except Exception as e:
             self.log_system.log_message('error', f"Failed to write configuration to file: {e}")
-            self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+            if self.main_window:
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
     def get_config_value(self, section, option):
         encryption_key = self.get_encryption_key()

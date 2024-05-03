@@ -16,8 +16,8 @@ class RetrieveFaxes(QThread):
     def __init__(self, main_window):
         super().__init__()
         self.log_system = SystemLog()
-        self.encryption_manager = SaveManager()
         self.main_window = main_window
+        self.encryption_manager = SaveManager(self.main_window)
         self.token = self.encryption_manager.get_config_value('Token', 'access_token')
         self.fax_account = self.encryption_manager.get_config_value('Account', 'fax_user')
         self.save_path = self.encryption_manager.get_config_value('Path', 'save_path')

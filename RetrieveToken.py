@@ -12,10 +12,11 @@ class RetrieveToken(QThread):
     finished = pyqtSignal(str, str)
     token_retrieved = pyqtSignal()  # Signal to indicate token was successfully retrieved
 
-    def __init__(self):
+    def __init__(self, main_window):
         super().__init__()
+        self.main_window = main_window
         self.log_system = SystemLog()  # Initialize the log system
-        self.save_manager = SaveManager()
+        self.save_manager = SaveManager(self.main_window)
         self.load_credentials()  # Load credentials during initialization
 
     def load_credentials(self):
@@ -33,7 +34,7 @@ class RetrieveToken(QThread):
     # noinspection PyUnresolvedReferences
     def retrieve_token(self):
         # Check if any essential parameter is '--' or None
-        essential_params = [self.key_client_id, self.key_client_pass, self.key_api_username, self.key_api_pass]
+        essential_params = [self.key_client_id, self.key_client_pass, self.key_api_pass]
         if any(param == "None Set" or param is None for param in essential_params):
             self.finished.emit("Failure", "Essential credentials are not properly set.")
             self.log_system.log_message('error', "Essential credentials are not set properly for token retrieval.")
@@ -70,11 +71,6 @@ class RetrieveToken(QThread):
                 self.save_manager.config.set('Token', 'access_token', self.key_access_token)
                 self.save_manager.config.set('Token', 'token_expiration', formatted_expiration)
                 self.save_manager.save_changes()
-
-                # Save token_info as a .json file
-                with open('token_info.json', 'w') as json_file:
-                    json.dump(token_info, json_file)
-                    self.log_system.log_message('info', "Token info saved to JSON.")
 
                 self.finished.emit("Success", "Token retrieved and saved successfully.")
                 self.log_system.log_message('info', "Token retrieved and saved successfully.")
