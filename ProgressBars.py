@@ -79,7 +79,6 @@ class TokenLifespanProgressBar(QWidget):
                 return
 
         try:
-            # Convert the string to a datetime object
             token_expiration = datetime.strptime(token_expiration_str, '%Y-%m-%d %H:%M:%S')
         except ValueError as e:
             self.log_system.log_message('error', f"Error converting token expiration to datetime: {e}")
@@ -87,42 +86,34 @@ class TokenLifespanProgressBar(QWidget):
             self.time_remaining_label.setText("Error in token date")
             return
 
-        # Calculate the remaining duration in seconds
         remaining_duration = (token_expiration - current_time).total_seconds()
-
         self.token_is_valid = remaining_duration > 0
 
         if self.token_is_valid:
             progress = int((remaining_duration / self.total_duration) * 100)
             self.token_lifespan_bar.setValue(progress)
-            self.time_remaining_label.setText(str(timedelta(seconds=int(remaining_duration))))  # Format as HH:MM:SS
+            self.time_remaining_label.setText(str(timedelta(seconds=int(remaining_duration))))
             self.main_window.send_fax_button.setEnabled(True)
-            self.is_token_valid()
 
             # Check if the token's lifespan is less than 10%
             if progress < 10:
-                self.retrieve_token()  # Automatically call self.retrieve_token()
-
+                self.retrieve_token.start()  # Automatically start token retrieval
+                self.retrieve_token.finished.connect(self.token_retrieved)  # Connect finish signal to a slot
         else:
-            # If token lifespan is zero, attempt to renew the token if valid entries are available
-            if (token_expiration_str != "None Set" or None and fax_user != "None Set" or None and
-                    client_id != "None Set" or None):
-                if self.retrieve_token():
-                    self.updateProgressBar()  # Retry updating the progress bar with the new token
-                else:
-                    self.token_lifespan_bar.setValue(0)
-                    self.main_window.send_fax_button.setEnabled(False)
-                    self.time_remaining_label.setText("00:00:00")
-                    self.token_lifespan_text.setText("Token Expired. Please Update Credentials or Renew Token.")
-                    self.log_system.log_message('info', "Token renewal attempt failed.")
-                    self.updateTimer.stop()  # Stop the timer since the token renewal attempt failed
-            else:
-                self.token_lifespan_bar.setValue(0)
-                self.main_window.send_fax_button.setEnabled(False)
-                self.time_remaining_label.setText("00:00:00")
-                self.token_lifespan_text.setText("Token Expired. Please Update Credentials or Renew Token.")
-                self.log_system.log_message('info', "Token lifespan has reached zero; no action taken.")
-                self.updateTimer.stop()  # Stop the timer since the token is no longer valid
+            self.token_expired_actions()
+
+    def token_retrieved(self):
+        """Handle after token retrieval completes."""
+        self.updateProgressBar()  # Update progress bar once new token is retrieved
+
+    def token_expired_actions(self):
+        """Actions to take when token is expired or invalid."""
+        self.token_lifespan_bar.setValue(0)
+        self.main_window.send_fax_button.setEnabled(False)
+        self.time_remaining_label.setText("00:00:00")
+        self.token_lifespan_text.setText("Token Expired. Please Update Credentials or Renew Token.")
+        self.log_system.log_message('info', "Token lifespan has reached zero; no action taken.")
+        self.updateTimer.stop()  # Stop the timer since the token is no longer valid
 
     def is_token_valid(self):
         return self.token_is_valid
