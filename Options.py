@@ -2,20 +2,22 @@ from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
 
+from ProgressBars import FaxPollTimerProgressBar
 from SaveManager import SaveManager
 
 
 # noinspection PyUnresolvedReferences
 class OptionsDialog(QDialog):
-    def __init__(self, main_window):
+    def __init__(self, main_window, token_progress_bar):
         super().__init__(parent=main_window)
         self.main_window = main_window
-        self.save_manager = SaveManager()
-        self.setWindowIcon(QtGui.QIcon(".\\images\\logo.ico"))
+        self.save_manager = SaveManager(self.main_window)
+        self.setWindowIcon(QtGui.QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
         self.setWindowTitle("Options")
         self.layout = QVBoxLayout()
         self.setup_ui()
         self.populate_settings()
+        self.fax_timer_progress_bar = FaxPollTimerProgressBar(self.main_window, token_progress_bar)
 
     def setup_ui(self):
         form_layout = QFormLayout()
@@ -149,7 +151,7 @@ class OptionsDialog(QDialog):
         self.fax_user_input.setText(self.save_manager.get_config_value('Account', 'fax_user'))
 
         # Set Retrieval Enabled/Disabled
-        retrieve_faxes = self.save_manager.get_config_value('Retrieval', 'AutoRetrieve')
+        retrieve_faxes = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
         if retrieve_faxes == 'Enabled':
             self.disable_fax_retrieval_checkbox.setChecked(False)
         elif retrieve_faxes == 'Disabled':
@@ -208,7 +210,7 @@ class OptionsDialog(QDialog):
             self.delete_faxes_button_group.checkedButton()) else ""
         # mark_read = self.mark_read_button_group.checkedButton().text() if (
         #     self.mark_read_button_group.checkedButton()) else ""
-        debug_level = self.logging_level_combo.currentText()
+        log_level = self.logging_level_combo.currentText()
 
         for section in ['API', 'Client', 'Account', 'Fax Options', 'Debug']:
             if not self.save_manager.config.has_section(section):
@@ -222,7 +224,7 @@ class OptionsDialog(QDialog):
         self.save_manager.config.set('Fax Options', 'download_method', download_method)
         self.save_manager.config.set('Fax Options', 'delete_faxes', delete_faxes)
         # self.encryption_manager.config.set('Fax Options', 'mark_read', mark_read)
-        self.save_manager.config.set('Debug', 'debug_level', debug_level)
+        self.save_manager.config.set('UserSettings', 'logging_level', log_level)
 
         retrieval_status = 'Disabled' if retrieval_disabled else 'Enabled'
         self.save_manager.config.set('Retrieval', 'auto_retrieve', retrieval_status)
@@ -232,6 +234,8 @@ class OptionsDialog(QDialog):
             self.save_manager.read_encrypted_ini()  # Reload configuration after saving
             QMessageBox.information(self, "Settings Updated", "Settings have been updated successfully.")
             self.main_window.update_status_bar("Settings saved successfully.", 5000)
+            self.main_window.populate_data()
+            self.fax_timer_progress_bar.restart_progress()
         except Exception as e:
             QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)

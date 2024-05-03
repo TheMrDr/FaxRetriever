@@ -1,6 +1,9 @@
 import logging
+import os
 from logging.handlers import RotatingFileHandler
+
 from PyQt5.QtWidgets import QAction
+
 
 class SystemLog(QAction):
     _instance = None
@@ -16,12 +19,24 @@ class SystemLog(QAction):
         self.setup_logger()
 
     def setup_logger(self):
+        log_directory = './log'
+        log_file_path = os.path.join(log_directory, 'ClinicFax.log')
+
+        # Ensure the log directory exists
+        if not os.path.exists(log_directory):
+            os.makedirs(log_directory)  # Create the directory if it does not exist
+
         self.logger = logging.getLogger('ClinicFax')
-        self.logger.setLevel(logging.INFO)  # Initial conservative default
+        self.logger.setLevel(logging.INFO)  # Set initial logging level
+
+        # Check if handlers already exist to avoid duplicate logging
         if not self.logger.handlers:
-            fh = RotatingFileHandler('.\\log\\ClinicFax.log', maxBytes=512 * 512, backupCount=3)
+            # Set up rotating file handler
+            fh = RotatingFileHandler(log_file_path, maxBytes=512 * 512, backupCount=3)
             fh.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
             self.logger.addHandler(fh)
+
+            # Optional: Set up stream handler to also echo logs to console
             ch = logging.StreamHandler()
             ch.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
             self.logger.addHandler(ch)

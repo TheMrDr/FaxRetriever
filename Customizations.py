@@ -1,23 +1,24 @@
-from PyQt5.QtWidgets import (QPushButton, QDialog, QVBoxLayout, QListView, QDialogButtonBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PyQt5.QtWidgets import (QPushButton, QDialog, QVBoxLayout, QListView, QDialogButtonBox)
 
 from SaveManager import SaveManager
+
 
 class CustomPushButton(QPushButton):
     def __init__(self, text='', parent=None):  # Ensure the text parameter is handled
         super().__init__(text, parent)  # Pass text to the QPushButton constructor
         self.setStyleSheet("""
             QPushButton {
-                background-color: #243954;
-                color: white;
-                font-size: 16px;  /* Make the font large and white for easy identification */
+                # background-color: #243954;
+                # color: white;
+                font-size: 24px;  /* Make the font large and white for easy identification */
                 font-weight: bold;
                 border: none;
-                padding: 8px;
+                # padding: 8px;
             }
-            QPushButton:hover {
-                background-color: #2d5066;  /* Lighter shade on hover */
+            # QPushButton:hover {
+                # background-color: #2d5066;  /* Lighter shade on hover */
             }
         """)
 
@@ -26,7 +27,7 @@ class CustomPushButton(QPushButton):
 class SelectInboxDialog(QDialog):
     def __init__(self, inboxes, parent=None):
         super().__init__(parent)
-        self.save_manager = SaveManager()
+        self.save_manager = SaveManager(self)
         self.setWindowTitle("Select Inboxes")
         self.layout = QVBoxLayout(self)
 

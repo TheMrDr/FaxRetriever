@@ -1,12 +1,11 @@
 import os
 
+import requests
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
-                             QComboBox, QListWidget, QGridLayout, QMessageBox, QStyledItemDelegate)
-
-import requests
+                             QComboBox, QListWidget, QGridLayout, QMessageBox)
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
@@ -16,15 +15,15 @@ from SystemLog import SystemLog
 class SendFax(QDialog):
     finished = pyqtSignal(str, str)  # Signal to indicate the fax send result
 
-    def __init__(self, parent=None):
+    def __init__(self, main_window=None, parent=None):
         super().__init__(parent)
-        self.encryption_manager = SaveManager()
-        self.setWindowIcon(QtGui.QIcon(".\\images\\logo.ico"))
+        self.main_window = main_window
+        self.encryption_manager = SaveManager(self.main_window)
+        self.setWindowIcon(QtGui.QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
         self.setWindowTitle("Send Fax")
         self.log_system = SystemLog()
         self.cover_sheet_path = None  # Store the full path to the cover sheet
         self.documents_paths = []  # List to store full paths of attached documents
-
 
         self.setWindowTitle('Send Fax')
         self.setup_ui()

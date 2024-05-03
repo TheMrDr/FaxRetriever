@@ -7,33 +7,39 @@ The purpose of this application is to retrieve faxes on the SkySwitch platform's
 import sys
 
 from PyQt5 import QtGui
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QAction, QLabel, QLineEdit, QPushButton, QFileDialog,
                              QGridLayout, QSystemTrayIcon, QMenu, QMessageBox, QDialog)
 
+from AboutDialog import AboutDialog
+from AutoUpdate import CheckForUpdate, UpgradeApplication
 from Customizations import CustomPushButton, SelectInboxDialog
 from Options import OptionsDialog
 from ProgressBars import TokenLifespanProgressBar, FaxPollTimerProgressBar
+from RetrieveNumbers import RetrieveNumbers
 from RetrieveToken import RetrieveToken
 from SaveManager import SaveManager
 from SendFax import SendFax
 from SystemLog import SystemLog
-from RetrieveNumbers import RetrieveNumbers
 from Version import __version__
 
 
 # noinspection PyUnresolvedReferences
 class MainWindow(QMainWindow):
+    settingsLoaded = pyqtSignal()  # Custom signal to load settings after GUI is shown
+
     def __init__(self):
         super().__init__()
         self.version = __version__
-        self.save_manager = SaveManager()
-        self.retrieve_numbers = RetrieveNumbers()
-        self.retrieve_token = RetrieveToken()
-        self.send_fax_dialog = SendFax()
-        self.sendFaxButton = CustomPushButton()
-        self.options_dialog = OptionsDialog(self)
+        self.save_manager = SaveManager(self)
+        self.retrieve_numbers = RetrieveNumbers(self)
+        self.retrieve_token = RetrieveToken(self)
+        self.send_fax_dialog = SendFax(self)
+        self.about_dialog = AboutDialog()
+        self.faxPollButton = CustomPushButton("Check for New Faxes")
+        self.send_fax_button = CustomPushButton("Send a Fax")
+        self.settingsLoaded.connect(self.populate_data)  # Connect signal to slot
 
         # Load the app log services and set logging level.
         self.log_system = SystemLog()
@@ -43,12 +49,13 @@ class MainWindow(QMainWindow):
         # Title the app window, set width, and set the app icon.
         self.setWindowTitle("Clinic Voice Instant Fax")
         self.setFixedWidth(600)
-        self.setWindowIcon(QtGui.QIcon(".\\images\\logo.ico"))
+        self.setWindowIcon(QtGui.QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
 
         # Initialize UI components that might display or utilize the data
         self.tokenLifespanProgressBar = TokenLifespanProgressBar(main_window=self)
         self.faxPollTimerProgressBar = FaxPollTimerProgressBar(main_window=self,
                                                                token_progress_bar=self.tokenLifespanProgressBar)
+        self.options_dialog = OptionsDialog(main_window=self, token_progress_bar=self.tokenLifespanProgressBar)
 
         # Initialize signals and slots
         self.retrieve_token.token_retrieved.connect(self.tokenLifespanProgressBar.restart_progress)
@@ -56,10 +63,12 @@ class MainWindow(QMainWindow):
 
         # Tray icon setup should ideally not depend on data loading
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon(".\\images\\logo.ico"))
+        self.tray_icon.setIcon(QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
         self.initialize_tray_menu()
 
         self.initialize_ui()
+        self.check_for_updates()  # Check for updates at startup
+
 
         # Refresh data from configuration before initializing components that might depend on this data
         self.refresh_data_from_config()
@@ -67,6 +76,11 @@ class MainWindow(QMainWindow):
         required_height = (self.centralWidget.sizeHint().height() + self.statusBar().sizeHint().height() +
                            self.menuBar().sizeHint().height() + 10)
         self.setFixedSize(600, required_height)  # Set width to 600 and height dynamically
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.settingsLoaded.emit()  # Emit signal after dialog is shown
+        self.update_status_bar('System Started Successfully', 1000)
 
     def closeEvent(self, event):
         messageBox = QMessageBox(self)
@@ -90,6 +104,18 @@ class MainWindow(QMainWindow):
         else:
             event.ignore()  # Ignore the close event, the application remains fully open
 
+    def check_for_updates(self):
+        self.update_checker = CheckForUpdate()
+        self.update_checker.new_version_available.connect(self.upgrade_application)
+        self.update_checker.start()
+
+    def upgrade_application(self, version, download_url):
+        reply = QMessageBox.question(self, 'Application Update', f"An update to version {version} is available. The application will now restart to apply this update.",
+                                     QMessageBox.Ok, QMessageBox.Ok)
+        if reply == QMessageBox.Ok:
+            self.upgrader = UpgradeApplication(download_url)
+            self.upgrader.start()
+
     def initialize_tray_menu(self):
         self.tray_menu = QMenu()
         self.tray_menu.addAction("Open Fax Manager", self.show)
@@ -105,22 +131,16 @@ class MainWindow(QMainWindow):
         self.log_system.log_message('debug', 'Status Bar Initialized')
         self.create_central_widget()
         self.log_system.log_message('debug', 'Main UI Initialized')
-        self.update_status_bar(f"App Version: {self.version}", 30000)
 
     def create_menu(self):
-        self.file_menu = self.menuBar().addMenu("&File")
-        self.populate_file_menu()
+        self.file_menu = self.menuBar().addMenu("&System")
+        self.populate_system_menu()
         self.tools_menu = self.menuBar().addMenu("&Tools")
         self.populate_tools_menu()
         self.help_menu = self.menuBar().addMenu("&Help")
         self.populate_help_menu()
 
-    def populate_file_menu(self):
-        self.options_button = QAction("Options", self)
-        self.options_button.triggered.connect(self.show_options_dialog)
-        self.file_menu.addAction(self.options_button)
-        self.options_button.setEnabled(True)
-
+    def populate_system_menu(self):
         self.minimize_app_button = QAction("Minimize", self)
         self.minimize_app_button.triggered.connect(self.minimize_to_tray)
         self.file_menu.addAction(self.minimize_app_button)
@@ -130,6 +150,11 @@ class MainWindow(QMainWindow):
         self.file_menu.addAction(self.close_app_button)
 
     def populate_tools_menu(self):
+        self.options_button = QAction("Options", self)
+        self.options_button.triggered.connect(self.show_options_dialog)
+        self.tools_menu.addAction(self.options_button)
+        self.options_button.setEnabled(True)
+
         self.retrieve_token_button = QAction("Retrieve Token", self)
         self.retrieve_token_button.triggered.connect(self.startTokenRetrieval)
         self.tools_menu.addAction(self.retrieve_token_button)
@@ -137,11 +162,12 @@ class MainWindow(QMainWindow):
 
     def populate_help_menu(self):
         self.about_button = QAction("About", self)
+        self.about_button.triggered.connect(self.about)
         self.help_menu.addAction(self.about_button)
+        self.about_button.setEnabled(True)
 
     def create_status_bar(self):
         self.status_bar = self.statusBar()
-        self.status_bar.showMessage("")
 
     def show_options_dialog(self):
         self.options_dialog.show()
@@ -151,11 +177,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.centralWidget)
 
         # Main layout
-        layout = QGridLayout()
+        layout = QGridLayout(self.centralWidget)
 
         # Placeholder for a logo
         banner = QLabel()
-        pixmap = QPixmap(".\\images\\banner_small.png")  # Set the path to your logo image
+        pixmap = QPixmap("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\banner_small.png")  # Update the path as needed
         banner.setPixmap(pixmap)
         banner.setAlignment(Qt.AlignCenter)
         banner.setFixedHeight(150)
@@ -166,39 +192,37 @@ class MainWindow(QMainWindow):
         saveLocationLayout = QGridLayout()
         self.saveLocationDisplay = QLineEdit()
         self.saveLocationDisplay.setPlaceholderText("No folder selected...")
-        auto_retrieve_enabled = self.save_manager.get_config_value('Retrieval', 'autoretrieve')
+        auto_retrieve_enabled = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
 
         select_folder_button = QPushButton("Select Save Location")
         select_folder_button.clicked.connect(self.select_folder)
-        saveLocationLayout.addWidget(self.saveLocationDisplay, 0, 0, 1, 1)
-        saveLocationLayout.addWidget(select_folder_button, 0, 1, 1, 1)
+        saveLocationLayout.addWidget(self.saveLocationDisplay, 0, 0)
+        saveLocationLayout.addWidget(select_folder_button, 0, 1)
         layout.addLayout(saveLocationLayout, 2, 0, 1, 2)
 
         self.caller_id_label = QLabel("Fax Inbox:")
-        self.inbox_button = QPushButton("Choose an Inbox", self)
+        self.inbox_button = QPushButton("Choose an Inbox")
         self.inbox_button.clicked.connect(self.open_select_inbox_dialog)
-        self.retrieve_numbers_thread = RetrieveNumbers()
+        self.retrieve_numbers_thread = RetrieveNumbers(self)
         self.retrieve_numbers_thread.numbers_retrieved.connect(self.update_inbox_selection)
-        layout.addWidget(self.caller_id_label, 3, 0, 1, 1)
-        layout.addWidget(self.inbox_button, 3, 1, 1, 1)
+        layout.addWidget(self.caller_id_label, 3, 0)
+        layout.addWidget(self.inbox_button, 3, 1)
 
         layout.addWidget(self.faxPollTimerProgressBar, 4, 0, 1, 2)
         layout.addWidget(self.tokenLifespanProgressBar, 5, 0, 1, 2)
 
-        self.faxPollButton = CustomPushButton("Check for New Faxes")
         self.faxPollButton.clicked.connect(self.retrieve_faxes)
         layout.addWidget(self.faxPollButton, 6, 0, 1, 2)
-        if auto_retrieve_enabled == "Enabled":
-            self.faxPollButton.setVisible(True)
-        elif auto_retrieve_enabled == "Disabled":
-            self.faxPollButton.setVisible(False)
+        self.faxPollButton.setVisible(auto_retrieve_enabled == "Enabled")
 
-        self.sendFaxButton = CustomPushButton("Send a Fax")
-        self.sendFaxButton.clicked.connect(self.show_send_fax_dialog)
-        layout.addWidget(self.sendFaxButton, 7, 0, 1, 2)
+        self.send_fax_button.clicked.connect(self.show_send_fax_dialog)
+        layout.addWidget(self.send_fax_button, 7, 0, 1, 2)
+        self.send_fax_button.setEnabled(False)
 
-        self.centralWidget.setLayout(layout)
-        self.populate_data()
+        self.update_status_bar('System Started', 1000)
+
+    def about(self):
+        self.about_dialog.show()
 
     def show_send_fax_dialog(self):
         self.send_fax_dialog.show()
@@ -208,7 +232,7 @@ class MainWindow(QMainWindow):
         self.api_pass = self.save_manager.get_config_value('API', 'password')
         self.client_id = self.save_manager.get_config_value('Client', 'client_id')
         self.client_pass = self.save_manager.get_config_value('Client', 'client_secret')
-        self.fax_user_info = self.save_manager.get_config_value('Account', 'account_id')
+        # self.fax_user_info = self.save_manager.get_config_value('Account', 'account_id')
         self.fax_extension = self.save_manager.get_config_value('Fax', 'fax_extension')
         self.access_token = self.save_manager.get_config_value('Token', 'access_token')
         self.token_expiration = self.save_manager.get_config_value('Token', 'token_expiration')
@@ -227,6 +251,7 @@ class MainWindow(QMainWindow):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
         self.saveLocationDisplay.setText(folder_path)
         self.save_manager.config.set('Path', 'save_path', folder_path)
+        self.save_manager.save_changes()
 
     def minimize_to_tray(self):
         self.hide()  # Hide the main window
@@ -238,7 +263,7 @@ class MainWindow(QMainWindow):
 
     def startTokenRetrieval(self):
         self.update_status_bar("Retrieving access token...", 5000)
-        self.token_thread = RetrieveToken()
+        self.token_thread = RetrieveToken(self)
         self.token_thread.finished.connect(self.handle_token_response)
         self.token_thread.start()
 
@@ -257,40 +282,33 @@ class MainWindow(QMainWindow):
             print("Retrieval already in progress")
 
     def update_inbox_selection(self, numbers):
-        dialog = SelectInboxDialog(numbers, self)
+        formatted_numbers = [self.format_phone_number(num) for num in numbers]
+        dialog = SelectInboxDialog(formatted_numbers, self)
         if dialog.exec() == QDialog.Accepted:
             selected_inboxes = dialog.selected_inboxes()
             all_numbers = ','.join(numbers)  # Join all numbers into a single string separated by commas
 
-            # Determine the button text and save the appropriate settings
             if selected_inboxes:
                 if len(selected_inboxes) == 1:
-                    button_text = selected_inboxes[0]
+                    button_text = self.format_phone_number(selected_inboxes[0])
                 else:
                     button_text = f"{len(selected_inboxes)} Inboxes"
                 inbox_ids = ','.join(selected_inboxes)
                 self.save_manager.config.set('Retrieval', 'fax_caller_id', inbox_ids)
             else:
                 button_text = "Choose an Inbox"
-                self.save_manager.config.set('Retrieval', 'fax_caller_id',
-                                             '')  # Clear the setting if no inboxes selected
+                self.save_manager.config.set('Retrieval', 'fax_caller_id', '')
 
-            # Update the button text
             self.inbox_button.setText(button_text)
-
-            # Save all available numbers to the config, regardless of selection
             self.save_manager.config.set('Account', 'all_numbers', all_numbers)
-
-            # Attempt to save the changes using the save manager
             try:
                 self.save_manager.save_changes()
             except Exception as e:
                 QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-        # Auto-select if only one inbox is available
         if len(numbers) == 1:
-            self.inbox_button.setText(numbers[0])
+            self.inbox_button.setText(self.format_phone_number(numbers[0]))
             self.save_manager.config.set('Retrieval', 'fax_caller_id', numbers[0])
             try:
                 self.save_manager.save_changes()
@@ -300,7 +318,7 @@ class MainWindow(QMainWindow):
 
     def populate_caller_ids(self, caller_ids):
         if caller_ids:
-            numbers = caller_ids.split(',')  # Assuming numbers are saved delimited by commas
+            numbers = [self.format_phone_number(num) for num in caller_ids.split(',')]  # Format each number
             if len(numbers) == 1:
                 self.inbox_button.setText(numbers[0])
             elif len(numbers) > 1:
@@ -308,17 +326,26 @@ class MainWindow(QMainWindow):
         else:
             self.inbox_button.setText("Choose an Inbox")
 
+    def format_phone_number(self, phone_number):
+        """Format a U.S. phone number into the format 1 (NNN) NNN-NNNN."""
+        if len(phone_number) == 10 and phone_number.isdigit():
+            return f"1 ({phone_number[:3]}) {phone_number[3:6]}-{phone_number[6:]}"
+        elif len(phone_number) == 11 and phone_number.isdigit() and phone_number.startswith('1'):
+            return f"1 ({phone_number[1:4]}) {phone_number[4:7]}-{phone_number[7:]}"
+        return phone_number  # Return the original if it doesn't meet the criteria
+
+    from PyQt5.QtCore import QTimer
+
     def update_status_bar(self, message, timeout):
-        self.timeout = int(timeout)
-        self.message = message
-        self.status_bar.showMessage(f"{self.message}", self.timeout)
+        # Display the initial message with the specified timeout
+        self.status_bar.showMessage(message, timeout)
 
+        # Set up a QTimer to reset the status bar to the copyright message after the initial message's timeout
+        QTimer.singleShot(timeout, self.reset_status_bar)
 
-    def restart_application(self):
-        """Restart the current application."""
-        QApplication.quit()  # Close the application
-        # executable = sys.executable  # Get the executable for the current application
-        # subprocess.Popen([executable] + sys.argv)  # Start a new instance with the same arguments
+    def reset_status_bar(self):
+        # Display the copyright message indefinitely (or with a specific timeout if needed)
+        self.status_bar.showMessage(f"Clinic Networking, LLC © 2024 - App Version: {self.version}")
 
 
 if __name__ == '__main__':
