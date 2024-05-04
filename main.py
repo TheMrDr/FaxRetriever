@@ -137,13 +137,13 @@ class MainWindow(QMainWindow):
         self.timer.start(1000)  # Trigger every second
 
         # Display the message box
-        reply = msgBox.exec_()  # Block execution here until the dialog is dismissed
+        msgBox.exec_()  # Block execution here until the dialog is dismissed
 
         # After the dialog is closed
         self.timer.stop()  # Ensure timer is stopped
 
         # Handle user interaction or auto-accept
-        if reply == QMessageBox.AcceptRole:
+        if msgBox.clickedButton() == okButton or self.countdown <= 0:
             print('Message Box: OK clicked or auto-accepted')
             self.start_upgrader(download_url)
         else:
