@@ -16,3 +16,9 @@
 2024-05-04 00:51:37,947 - ClinicFax - INFO - Credentials loaded for token retrieval.
 2024-05-04 00:51:38,198 - ClinicFax - INFO - Credentials loaded for token retrieval.
 2024-05-04 00:52:25,834 - ClinicFax - INFO - Application Closed
+2024-05-04 01:10:10,413 - ClinicFax - INFO - Application Started
+2024-05-04 01:10:10,553 - ClinicFax - INFO - Configuration loaded from: C:\Users\jfreeman\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 01:10:10,557 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 01:10:10,562 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 01:10:10,893 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 01:10:16,403 - ClinicFax - INFO - Application Closed

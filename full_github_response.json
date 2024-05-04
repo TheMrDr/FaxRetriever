@@ -1,0 +1,31 @@
+{
+    "status_code": 404,
+    "headers": {
+        "Server": "GitHub.com",
+        "Date": "Sat, 04 May 2024 06:09:08 GMT",
+        "Content-Type": "application/json; charset=utf-8",
+        "X-GitHub-Media-Type": "github.v3; format=json",
+        "x-github-api-version-selected": "2022-11-28",
+        "Access-Control-Expose-Headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset",
+        "Access-Control-Allow-Origin": "*",
+        "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+        "X-Frame-Options": "deny",
+        "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "0",
+        "Referrer-Policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+        "Content-Security-Policy": "default-src 'none'",
+        "Vary": "Accept-Encoding, Accept, X-Requested-With",
+        "Content-Encoding": "gzip",
+        "X-RateLimit-Limit": "60",
+        "X-RateLimit-Remaining": "56",
+        "X-RateLimit-Reset": "1714803578",
+        "X-RateLimit-Resource": "core",
+        "X-RateLimit-Used": "4",
+        "Content-Length": "91",
+        "X-GitHub-Request-Id": "43E0:4E93C:35D2881:52755B6:6635D104"
+    },
+    "body": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest"
+    }
+}

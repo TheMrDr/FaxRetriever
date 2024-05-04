@@ -19,7 +19,7 @@ class CheckForUpdate(QThread):
         # Correct URL to fetch the latest release
         url = "https://api.github.com/repos/TheMrDr/FaxRetriever/Version.py"
         response = requests.get(url)
-        self.save_full_response(response)  # Save the full response for troubleshooting
+        # self.save_full_response(response)  # Save the full response for troubleshooting
 
         if response.status_code == 200:
             data = response.json()
