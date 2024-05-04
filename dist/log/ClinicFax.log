@@ -22,3 +22,223 @@
 2024-05-04 01:10:10,562 - ClinicFax - INFO - Credentials loaded for token retrieval.
 2024-05-04 01:10:10,893 - ClinicFax - INFO - Credentials loaded for token retrieval.
 2024-05-04 01:10:16,403 - ClinicFax - INFO - Application Closed
+2024-05-04 01:39:22,790 - ClinicFax - INFO - Application Started
+2024-05-04 01:39:22,916 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 01:39:22,921 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 01:39:22,927 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 01:39:23,576 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 01:39:23,584 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 01:39:24,577 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 01:39:24,590 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 01:39:47,428 - ClinicFax - INFO - Application Closed
+2024-05-04 01:58:18,430 - ClinicFax - INFO - Application Started
+2024-05-04 01:58:18,555 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 01:58:18,560 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 01:58:18,565 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 01:58:19,029 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 01:58:19,038 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 01:58:20,037 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 01:58:20,052 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:02:02,730 - ClinicFax - INFO - Application Started
+2024-05-04 02:02:02,854 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:02:02,859 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:02:02,864 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:02:03,362 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:02:03,371 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:02:04,366 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:02:04,378 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:04:28,943 - ClinicFax - INFO - Application Started
+2024-05-04 02:04:29,072 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:04:29,082 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:04:29,089 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:04:29,596 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:04:29,606 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:04:30,611 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:04:30,623 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:04:45,265 - ClinicFax - INFO - Application Started
+2024-05-04 02:04:45,400 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:04:45,406 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:04:45,414 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:04:45,894 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:04:45,905 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:04:46,908 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:04:46,919 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:12:18,844 - ClinicFax - INFO - Application Started
+2024-05-04 02:12:18,971 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:12:18,977 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:12:18,983 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:12:19,444 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:12:19,454 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:12:20,454 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:12:20,463 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:12:49,748 - ClinicFax - INFO - Application Started
+2024-05-04 02:12:49,865 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:12:49,875 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:12:49,881 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:12:50,352 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:12:50,362 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:12:51,358 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:12:51,372 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:20:23,914 - ClinicFax - INFO - Application Started
+2024-05-04 02:20:24,086 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:20:24,092 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:20:24,098 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:20:24,568 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:20:24,581 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:20:25,590 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:20:25,601 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:29:11,650 - ClinicFax - INFO - Application Started
+2024-05-04 02:29:11,786 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:29:11,792 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:29:11,799 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:29:12,258 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:29:12,268 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:29:13,275 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:29:13,286 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:29:34,459 - ClinicFax - INFO - Application Started
+2024-05-04 02:29:34,590 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:29:34,595 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:29:34,603 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:29:35,068 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:29:35,079 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:29:36,076 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:29:36,086 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:30:08,134 - ClinicFax - INFO - Application Started
+2024-05-04 02:30:08,259 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:30:08,264 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:30:08,273 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:30:08,742 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:30:08,752 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:30:09,762 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:30:09,773 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:30:45,028 - ClinicFax - INFO - Application Closed
+2024-05-04 02:42:05,189 - ClinicFax - INFO - Application Started
+2024-05-04 02:42:05,326 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:42:05,333 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:42:05,341 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:42:05,883 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:42:05,893 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:42:06,897 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:42:06,916 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:42:32,971 - ClinicFax - INFO - Application Closed
+2024-05-04 02:48:23,984 - ClinicFax - INFO - Application Started
+2024-05-04 02:48:24,111 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:48:24,116 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:48:24,123 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:48:24,598 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:48:24,607 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:48:25,612 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:48:25,621 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:48:58,189 - ClinicFax - INFO - Application Started
+2024-05-04 02:48:58,308 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:48:58,313 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:48:58,320 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:48:58,778 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:48:58,788 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:48:59,787 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:48:59,797 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:55:44,705 - ClinicFax - INFO - Application Started
+2024-05-04 02:55:44,835 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 02:55:44,842 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 02:55:44,848 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:55:45,314 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 02:55:45,325 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 02:55:46,325 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:55:46,336 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 02:56:45,818 - ClinicFax - INFO - Application Closed
+2024-05-04 03:01:46,548 - ClinicFax - INFO - Application Started
+2024-05-04 03:01:46,670 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:01:46,673 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:01:46,678 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:01:47,151 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:01:47,159 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:01:48,152 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:01:48,166 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:02:37,562 - ClinicFax - INFO - Application Closed
+2024-05-04 03:04:17,391 - ClinicFax - INFO - Application Started
+2024-05-04 03:04:17,509 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:04:17,514 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:04:17,520 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:04:17,987 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:04:17,997 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:04:18,999 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:04:19,011 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:04:53,337 - ClinicFax - INFO - Application Closed
+2024-05-04 03:04:58,703 - ClinicFax - INFO - Application Started
+2024-05-04 03:04:58,820 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:04:58,825 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:04:58,831 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:04:59,300 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:04:59,311 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:05:00,305 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:05:00,321 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:05:11,873 - ClinicFax - INFO - Application Closed
+2024-05-04 03:05:19,019 - ClinicFax - INFO - Application Started
+2024-05-04 03:05:19,137 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:05:19,143 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:05:19,149 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:05:19,612 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:05:19,622 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:05:20,618 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:05:20,631 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:05:26,725 - ClinicFax - INFO - Application Closed
+2024-05-04 03:12:37,672 - ClinicFax - INFO - Application Started
+2024-05-04 03:12:37,804 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:12:37,810 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:12:37,817 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:12:38,290 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:12:38,300 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:12:39,307 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:12:39,318 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:13:18,692 - ClinicFax - INFO - Application Closed
+2024-05-04 03:14:51,336 - ClinicFax - INFO - Application Started
+2024-05-04 03:14:51,466 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:14:51,472 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:14:51,481 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:14:51,953 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:14:51,962 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:14:52,959 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:14:52,969 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:15:15,529 - ClinicFax - INFO - Application Started
+2024-05-04 03:15:15,653 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:15:15,658 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:15:15,664 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:15:16,116 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:15:16,128 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:15:17,130 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:15:17,143 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:15:26,799 - ClinicFax - INFO - Application Closed
+2024-05-04 03:16:29,266 - ClinicFax - INFO - Application Started
+2024-05-04 03:16:29,387 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:16:29,392 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:16:29,397 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:16:29,849 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:16:29,858 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:16:30,865 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:16:30,876 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:16:56,436 - ClinicFax - INFO - Application Started
+2024-05-04 03:16:56,564 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:16:56,570 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:16:56,576 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:16:57,035 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:16:57,046 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:16:58,053 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:16:58,064 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:17:22,383 - ClinicFax - INFO - Application Started
+2024-05-04 03:17:22,509 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:17:22,514 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:17:22,521 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:17:22,977 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:17:22,986 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:17:23,988 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:17:23,999 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:17:32,322 - ClinicFax - INFO - Application Closed
+2024-05-04 03:18:18,714 - ClinicFax - INFO - Application Started
+2024-05-04 03:18:18,850 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:18:18,856 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:18:18,863 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:18:19,326 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:18:19,336 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:18:20,332 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:18:20,344 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:18:26,104 - ClinicFax - INFO - Application Closed

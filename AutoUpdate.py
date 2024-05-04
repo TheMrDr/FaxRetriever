@@ -1,11 +1,12 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
-import webbrowser
 
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtWidgets import QApplication
 
 from Version import __version__
 
@@ -13,22 +14,20 @@ from Version import __version__
 class CheckForUpdate(QThread):
     new_version_available = pyqtSignal(str, str)  # signals with the download URL
 
-
     def run(self):
         current_version = __version__
-        # Correct URL to fetch the latest release
-        url = "https://api.github.com/repos/TheMrDr/FaxRetriever/Version.py"
+        url = "https://api.github.com/repos/TheMrDr/FaxRetriever/releases/latest"  # Use this for deployment of the software.
+        # url = "https://api.github.com/repos/test/test/test"  # Use this for development to test the application
         response = requests.get(url)
         # self.save_full_response(response)  # Save the full response for troubleshooting
 
         if response.status_code == 200:
             data = response.json()
-            # Check if 'tag_name' exists in the data
-            if 'tag_name' in data:
+            if 'tag_name' in data:  # Ensure 'tag_name' exists in the data
                 latest_version = data['tag_name']
                 if latest_version > current_version:
-                    # Check for assets and download URL
-                    if data['assets']:
+                    # Check if there are any assets available for download
+                    if 'assets' in data and data['assets']:
                         download_url = data['assets'][0]['browser_download_url']
                         self.new_version_available.emit(latest_version, download_url)
                     else:
@@ -51,35 +50,53 @@ class CheckForUpdate(QThread):
 
 
 class UpgradeApplication(QThread):
-    def __init__(self, download_url, fallback_url):
+    def __init__(self, download_url):
         super().__init__()
         self.download_url = download_url
-        self.fallback_url = fallback_url  # URL to open in browser for manual download
 
     def run(self):
-        # Attempt to download the new version
+        # Download the update
         response = requests.get(self.download_url)
         if response.status_code == 200:
             update_file_path = 'update_temp.exe'
             with open(update_file_path, 'wb') as file:
                 file.write(response.content)
 
-            # Try to replace the current executable with the new one
-            try:
-                current_exe = sys.executable
-                os.remove(current_exe + ".bak")  # Ensure there is no previous backup
-                os.rename(current_exe, current_exe + ".bak")  # Backup the current executable
-                os.rename(update_file_path, current_exe)  # Replace with the new file
-                # Restart the application
-                subprocess.Popen(current_exe, close_fds=True)
-                sys.exit()  # Close the current instance
-            except Exception as e:
-                print(f"Failed to update: {e}")
-                self.open_fallback_url()  # Open the fallback URL on failure
-        else:
-            print("Failed to download the update.")
-            self.open_fallback_url()
+            current_exe = sys.executable
+            backup_exe = current_exe + ".bak"
 
-    def open_fallback_url(self):
-        """Open a web browser to allow manual download of the update."""
-        webbrowser.open(self.fallback_url)
+            # Create a backup of the current executable
+            if os.path.exists(backup_exe):
+                os.remove(backup_exe)
+            shutil.copy(current_exe, backup_exe)
+
+            # Create a batch script to handle the executable update
+            batch_script_path = 'update_script.bat'
+            with open(batch_script_path, 'w') as bat_file:
+                bat_file.write(f"""
+@echo off
+:loop
+timeout /t 10
+tasklist /fi "IMAGENAME eq {os.path.basename(current_exe)}" | find /i "{os.path.basename(current_exe)}" >nul
+if errorlevel 1 (
+    echo Updating...
+    move /y "{update_file_path}" "{current_exe}"
+    if not errorlevel 1 (
+        echo Update successful, restarting...
+        start "" "{current_exe}"
+        del "{backup_exe}"  # Cleanup backup file
+    ) else (
+        echo Failed to update, restoring backup...
+        move /y "{backup_exe}" "{current_exe}"
+    )
+    del "{batch_script_path}"  # Cleanup the script itself
+    exit
+) else (
+    goto loop
+)
+""")
+            # Execute the batch file to perform the update
+            subprocess.Popen(['cmd.exe', '/c', batch_script_path], close_fds=True)
+            QApplication.instance().quit()  # Ensure the Qt application quits properly
+        else:
+            print("Failed to download the update. Status Code:", response.status_code)

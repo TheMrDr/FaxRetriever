@@ -110,12 +110,50 @@ class MainWindow(QMainWindow):
         self.update_checker.start()
 
     def upgrade_application(self, version, download_url):
-        reply = QMessageBox.question(self, 'Application Update', f"An update to version {version} is available. The application will now restart to apply this update.",
-                                     QMessageBox.Ok, QMessageBox.Ok)
-        if reply == QMessageBox.Ok:
-            self.upgrader = UpgradeApplication(download_url)
-            self.upgrader.start()
+        msgBox = QMessageBox(self)
+        msgBox.setWindowTitle('Update Available')
+        msgBox.setText(
+            f"An update to version {version} is available. The application will now restart to apply this update.")
 
+        # Define the OK button with a countdown and add it to the message box
+        okButton = msgBox.addButton("OK (10)", QMessageBox.AcceptRole)
+        msgBox.setDefaultButton(okButton)
+
+        # Setup a timer for updating the button text with a countdown
+        self.timer = QTimer(self)
+        self.countdown = 10  # Start countdown from 10 seconds
+
+        def update_button_text():
+            """Update the text of the button showing the countdown and check for countdown end."""
+            self.countdown -= 1
+            if self.countdown > 0:
+                okButton.setText(f"OK ({self.countdown})")
+            else:
+                self.timer.stop()  # Stop the timer
+                okButton.setText("OK")
+                msgBox.accept()  # Programmatically accept the dialog
+
+        self.timer.timeout.connect(update_button_text)
+        self.timer.start(1000)  # Trigger every second
+
+        # Display the message box
+        reply = msgBox.exec_()  # Block execution here until the dialog is dismissed
+
+        # After the dialog is closed
+        self.timer.stop()  # Ensure timer is stopped
+
+        # Handle user interaction or auto-accept
+        if reply == QMessageBox.AcceptRole:
+            print('Message Box: OK clicked or auto-accepted')
+            self.start_upgrader(download_url)
+        else:
+            print('Message Box: Closed using X or other non-OK means')
+            QApplication.quit()  # Quit the application if the message box is closed without clicking OK
+
+    def start_upgrader(self, download_url):
+        """Start the updater thread."""
+        self.upgrader = UpgradeApplication(download_url)
+        self.upgrader.start()
     def initialize_tray_menu(self):
         self.tray_menu = QMenu()
         self.tray_menu.addAction("Open Fax Manager", self.show)
