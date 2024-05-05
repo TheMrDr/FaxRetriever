@@ -13,11 +13,12 @@ from SystemLog import SystemLog
 class RetrieveFaxes(QThread):
     finished = pyqtSignal(list)
 
-    def __init__(self, main_window):
+
+    def __init__(self, main_window=None):
         super().__init__()
         self.log_system = SystemLog()
         self.main_window = main_window
-        self.poppler_path = "U:\\jfreeman\\Software Development\\FaxRetriever\\poppler\\bin"
+        self.poppler_path = os.path.join(sys._MEIPASS, "poppler", "bin")
         self.add_poppler_to_path()
         self.encryption_manager = SaveManager(self.main_window)
         self.token = self.encryption_manager.get_config_value('Token', 'access_token')

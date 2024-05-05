@@ -9,8 +9,10 @@ a = Analysis(
     'SaveManager.py', 'SendFax.py', 'SystemLog.py'],
     pathex=['U:\\jfreeman\\Software Development\\FaxRetriever'],
     binaries=[],
-    datas=[('images', 'images'),
-    ('ReadMe', 'ReadMe')],
+    datas=[
+    ('images/*', 'images'),  # Include all files inside the 'images' directory
+    ('ReadMe', '.')  # Include the 'ReadMe' file in the root directory of the bundled executable
+    ],
     hiddenimports=['pdf2image', 'pdf2image.backends', 'pdf2image.backends.poppler'],
     hookspath=[],
     hooksconfig={},

@@ -1,4 +1,5 @@
 import os
+import sys
 
 import requests
 from PyQt5 import QtGui
@@ -10,8 +11,13 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButto
 from SaveManager import SaveManager
 from SystemLog import SystemLog
 
+# Determine if running as a bundled executable
+if hasattr(sys, '_MEIPASS'):
+    bundle_dir = sys._MEIPASS
+else:
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
-# noinspection PyUnresolvedReferences
+# Use the bundle_dir to construct paths to bundled files
 class SendFax(QDialog):
     finished = pyqtSignal(str, str)  # Signal to indicate the fax send result
 
@@ -19,11 +25,12 @@ class SendFax(QDialog):
         super().__init__(parent)
         self.main_window = main_window
         self.encryption_manager = SaveManager(self.main_window)
-        self.setWindowIcon(QtGui.QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
         self.setWindowTitle("Send Fax")
         self.log_system = SystemLog()
         self.cover_sheet_path = None  # Store the full path to the cover sheet
         self.documents_paths = []  # List to store full paths of attached documents
+
 
         self.setWindowTitle('Send Fax')
         self.setup_ui()

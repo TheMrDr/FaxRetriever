@@ -4,13 +4,20 @@ This application was developed by Clinic Networking, LLC and is the property of 
 The purpose of this application is to retrieve faxes on the SkySwitch platform's Instant Fax API.
 """
 
+import os
 import sys
-
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QAction, QLabel, QLineEdit, QPushButton, QFileDialog,
                              QGridLayout, QSystemTrayIcon, QMenu, QMessageBox, QDialog)
+
+# Import other modules after setting bundle_dir
+# Determine if running as a bundled executable
+if hasattr(sys, '_MEIPASS'):
+    bundle_dir = sys._MEIPASS
+else:
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
 from AboutDialog import AboutDialog
 from AutoUpdate import CheckForUpdate, UpgradeApplication
@@ -31,6 +38,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.status_bar = None
         self.version = __version__
         self.save_manager = SaveManager(self)
         self.retrieve_numbers = RetrieveNumbers(self)
@@ -49,7 +57,7 @@ class MainWindow(QMainWindow):
         # Title the app window, set width, and set the app icon.
         self.setWindowTitle("Clinic Voice Instant Fax")
         self.setFixedWidth(600)
-        self.setWindowIcon(QtGui.QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
 
         # Initialize UI components that might display or utilize the data
         self.tokenLifespanProgressBar = TokenLifespanProgressBar(main_window=self)
@@ -63,12 +71,11 @@ class MainWindow(QMainWindow):
 
         # Tray icon setup should ideally not depend on data loading
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
         self.initialize_tray_menu()
 
         self.initialize_ui()
         self.check_for_updates()  # Check for updates at startup
-
 
         # Refresh data from configuration before initializing components that might depend on this data
         self.refresh_data_from_config()
@@ -219,7 +226,7 @@ class MainWindow(QMainWindow):
 
         # Placeholder for a logo
         banner = QLabel()
-        pixmap = QPixmap("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\banner_small.png")  # Update the path as needed
+        pixmap = QPixmap(os.path.join(bundle_dir, "images", "banner_small.png"))  # Update the path as needed
         banner.setPixmap(pixmap)
         banner.setAlignment(Qt.AlignCenter)
         banner.setFixedHeight(150)
@@ -252,6 +259,7 @@ class MainWindow(QMainWindow):
         self.faxPollButton.clicked.connect(self.retrieve_faxes)
         layout.addWidget(self.faxPollButton, 6, 0, 1, 2)
         self.faxPollButton.setVisible(auto_retrieve_enabled == "Enabled")
+        self.faxPollButton.setEnabled(False)
 
         self.send_fax_button.clicked.connect(self.show_send_fax_dialog)
         layout.addWidget(self.send_fax_button, 7, 0, 1, 2)
@@ -260,7 +268,7 @@ class MainWindow(QMainWindow):
         self.update_status_bar('System Started', 1000)
 
     def about(self):
-        self.about_dialog.show()
+        self.about_dialog.show()  # This is a QDialog popup
 
     def show_send_fax_dialog(self):
         self.send_fax_dialog.show()

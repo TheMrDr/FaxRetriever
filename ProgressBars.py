@@ -65,12 +65,14 @@ class TokenLifespanProgressBar(QWidget):
 
     def updateProgressBar(self):
         current_time = datetime.now()
+        token_retrieved_str = self.save_manager.get_config_value('Token',
+                                                                 'token_retrieved')  # Retrieve token retrieval time
         token_expiration_str = self.save_manager.get_config_value('Token', 'token_expiration')
         fax_user = self.save_manager.get_config_value('Account', 'fax_user')
         client_id = self.save_manager.get_config_value('Client', 'client_id')
 
         # Check if any variable except current_time is None or "None Set"
-        for var in [token_expiration_str, fax_user, client_id]:
+        for var in [token_retrieved_str, token_expiration_str, fax_user, client_id]:
             if var in [None, "None Set"]:
                 self.token_lifespan_bar.setValue(0)
                 self.time_remaining_label.setText("00:00:00")
@@ -86,20 +88,35 @@ class TokenLifespanProgressBar(QWidget):
             self.time_remaining_label.setText("Error in token date")
             return
 
-        remaining_duration = (token_expiration - current_time).total_seconds()
-        self.token_is_valid = remaining_duration > 0
+        remaining_duration = token_expiration - current_time
+        self.token_is_valid = remaining_duration.total_seconds() > 0
 
         if self.token_is_valid:
-            progress = int((remaining_duration / self.total_duration) * 100)
+            # Calculate the progress percentage based on elapsed time and total duration
+            token_retrieved_str = self.save_manager.get_config_value('Token', 'token_retrieved')
+            token_retrieved = datetime.strptime(token_retrieved_str, '%Y-%m-%d %H:%M:%S')
+            total_duration = token_expiration - token_retrieved
+            elapsed_time = current_time - token_retrieved
+            elapsed_time_seconds = elapsed_time.total_seconds()
+            total_duration_seconds = total_duration.total_seconds()
+
+            progress = int(100 - ((elapsed_time_seconds / total_duration_seconds) * 100))
+
+            # Format remaining duration as HH:MM
+            remaining_hours, remaining_minutes = divmod(remaining_duration.seconds, 3600)
+            remaining_time_formatted = "{:02}:{:02}".format(remaining_hours, remaining_minutes)
+
             self.token_lifespan_bar.setValue(progress)
-            self.time_remaining_label.setText(str(timedelta(seconds=int(remaining_duration))))
+            self.time_remaining_label.setText(remaining_time_formatted)
             self.main_window.send_fax_button.setEnabled(True)
 
             # Check if the token's lifespan is less than 10%
-            if progress < 10:
+            if progress < 5:
+                self.main_window.send_fax_button.setEnabled(True)
                 self.retrieve_token.start()  # Automatically start token retrieval
                 self.retrieve_token.finished.connect(self.token_retrieved)  # Connect finish signal to a slot
         else:
+            self.main_window.send_fax_button.setEnabled(False)
             self.token_expired_actions()
 
     def token_retrieved(self):
@@ -109,7 +126,6 @@ class TokenLifespanProgressBar(QWidget):
     def token_expired_actions(self):
         """Actions to take when token is expired or invalid."""
         self.token_lifespan_bar.setValue(0)
-        self.main_window.send_fax_button.setEnabled(False)
         self.time_remaining_label.setText("00:00:00")
         self.token_lifespan_text.setText("Token Expired. Please Update Credentials or Renew Token.")
         self.log_system.log_message('info', "Token lifespan has reached zero; no action taken.")
@@ -172,9 +188,11 @@ class FaxPollTimerProgressBar(QWidget):
 
         if auto_retrieve_enabled == "Enabled":
             self.faxPollTimer_text.setText("Automatically Polling for New Faxes every 5 minutes.")
+            self.main_window.faxPollButton.setEnabled(False)
         elif auto_retrieve_enabled == "Disabled":
             self.faxPollTimer_bar.setValue(0)
-            self.faxPollTimer_text.setText("Fax Retrieval Disabled - Check Settings to Enable.")
+            self.faxPollTimer_text.setText("Automatic Fax Retrieval Disabled - Check Settings to Enable.")
+            self.main_window.faxPollButton.setEnabled(True)
             self.time_remaining_label.setText("00:00:00")
             self.updateTimer.stop()  # Stop the timer if auto-retrieve is disabled
             return

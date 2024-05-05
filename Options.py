@@ -1,6 +1,14 @@
+import os
+import sys
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
+
+# Determine if running as a bundled executable
+if hasattr(sys, '_MEIPASS'):
+    bundle_dir = sys._MEIPASS
+else:
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
 from ProgressBars import FaxPollTimerProgressBar
 from SaveManager import SaveManager
@@ -8,11 +16,12 @@ from SaveManager import SaveManager
 
 # noinspection PyUnresolvedReferences
 class OptionsDialog(QDialog):
-    def __init__(self, main_window, token_progress_bar):
+    def __init__(self, main_window, token_progress_bar=None):
         super().__init__(parent=main_window)
         self.main_window = main_window
         self.save_manager = SaveManager(self.main_window)
-        self.setWindowIcon(QtGui.QIcon("U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico"))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
+
         self.setWindowTitle("Options")
         self.layout = QVBoxLayout()
         self.setup_ui()

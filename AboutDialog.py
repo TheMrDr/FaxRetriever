@@ -1,14 +1,23 @@
+import os
+import sys
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
+
+# Determine if running as a bundled executable
+if hasattr(sys, '_MEIPASS'):
+    bundle_dir = sys._MEIPASS
+else:
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
 class AboutDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("About")
-        self.setWindowIcon(QtGui.QIcon("U:/jfreeman/Software Development/FaxRetriever/images/logo.ico"))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
+        self.setFixedSize(600, 400)
 
         # Read contents of the 'ReadMe' file
-        with open('U:/jfreeman/Software Development/FaxRetriever/ReadMe', 'r') as file:
+        with open(os.path.join(bundle_dir, "ReadMe"), 'r') as file:
             readme_content = file.read()
 
         # Create a QTextEdit to display the readme content

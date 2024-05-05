@@ -1,5 +1,4 @@
 import datetime
-
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 
@@ -24,6 +23,7 @@ class RetrieveToken(QThread):
         self.key_client_pass = self.save_manager.get_config_value('Client', 'client_secret')
         self.key_api_username = self.save_manager.get_config_value('API', 'username')
         self.key_api_pass = self.save_manager.get_config_value('API', 'password')
+        self.key_token_retrieved = self.save_manager.get_config_value('Token', 'token_retrieved')  # Add this line
         self.log_system.log_message('info', "Credentials loaded for token retrieval.")
 
     def run(self):
@@ -69,14 +69,15 @@ class RetrieveToken(QThread):
                 # Encrypt and save the token and expiration date to config.ini using EncryptionKeyManager
                 self.save_manager.config.set('Token', 'access_token', self.key_access_token)
                 self.save_manager.config.set('Token', 'token_expiration', formatted_expiration)
+                self.save_manager.config.set('Token', 'token_retrieved', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))  # Add this line
                 self.save_manager.save_changes()
 
                 self.finished.emit("Success", "Token retrieved and saved successfully.")
                 self.log_system.log_message('info', "Token retrieved and saved successfully.")
+                self.main_window.populate_data()
             else:
                 self.main_window.update_status_bar("Failed to retrieve token.", 5000)
                 self.log_system.log_message('error', f"Failed to retrieve token. HTTP {response.status_code}: {response.text}")
         except Exception as e:
             self.main_window.update_status_bar(f"Token retrieval error: {str(e)}", 5000)
             self.log_system.log_message('error', f"Failed to retrieve access token: {e}")
-
