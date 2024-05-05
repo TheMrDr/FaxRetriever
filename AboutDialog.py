@@ -1,5 +1,6 @@
 import os
 import sys
+
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
 

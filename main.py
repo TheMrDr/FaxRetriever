@@ -6,9 +6,10 @@ The purpose of this application is to retrieve faxes on the SkySwitch platform's
 
 import os
 import sys
+
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QAction, QLabel, QLineEdit, QPushButton, QFileDialog,
                              QGridLayout, QSystemTrayIcon, QMenu, QMessageBox, QDialog)
 
@@ -219,7 +220,6 @@ class MainWindow(QMainWindow):
 
     def create_central_widget(self):
         self.centralWidget = QWidget()
-        self.setCentralWidget(self.centralWidget)
 
         # Main layout
         layout = QGridLayout(self.centralWidget)
@@ -266,6 +266,12 @@ class MainWindow(QMainWindow):
         self.send_fax_button.setEnabled(False)
 
         self.update_status_bar('System Started', 1000)
+
+        self.populate_data()
+
+        # Set central widget and layout
+        self.setCentralWidget(self.centralWidget)
+        self.centralWidget.setLayout(layout)
 
     def about(self):
         self.about_dialog.show()  # This is a QDialog popup

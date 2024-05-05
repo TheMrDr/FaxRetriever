@@ -1,12 +1,19 @@
 import os
 import platform
+import subprocess
+import sys
 
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
-from pdf2image import convert_from_path
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
+
+# Determine if running as a bundled executable
+if hasattr(sys, '_MEIPASS'):
+    bundle_dir = sys._MEIPASS
+else:
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
 
 # noinspection PyUnresolvedReferences
@@ -18,7 +25,7 @@ class RetrieveFaxes(QThread):
         super().__init__()
         self.log_system = SystemLog()
         self.main_window = main_window
-        self.poppler_path = os.path.join(sys._MEIPASS, "poppler", "bin")
+        self.poppler_path = os.path.join(bundle_dir, "poppler", "bin")
         self.add_poppler_to_path()
         self.encryption_manager = SaveManager(self.main_window)
         self.token = self.encryption_manager.get_config_value('Token', 'access_token')
@@ -109,9 +116,9 @@ class RetrieveFaxes(QThread):
 
                     # Convert PDF to JPG if required
                     if self.download_type in ['JPG', 'Both']:
-                        images = convert_from_path(file_path)
-                        for i, image in enumerate(images):
-                            image.save(os.path.join(self.save_path, f"{fax_id}_{i}.jpg"), 'JPEG')
+                        command = ['pdftoppm', '-jpeg', file_path, os.path.join(self.save_path, f"{fax_id}")]
+                        process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
+                        process.communicate()  # Wait for the process to finish
                         self.main_window.update_status_bar(f"Converted fax PDF to JPG for ID {fax_id}", 5000)
                         self.log_system.log_message('info', f"Converted fax PDF to JPG for ID {fax_id}")
 

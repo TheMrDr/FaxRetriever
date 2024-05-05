@@ -75,7 +75,7 @@ class TokenLifespanProgressBar(QWidget):
         for var in [token_retrieved_str, token_expiration_str, fax_user, client_id]:
             if var in [None, "None Set"]:
                 self.token_lifespan_bar.setValue(0)
-                self.time_remaining_label.setText("00:00:00")
+                self.time_remaining_label.setText("00:00")
                 self.log_system.log_message('error', "Invalid configuration value detected.")
                 self.updateTimer.stop()  # Stop the timer if configuration is invalid
                 return
@@ -104,7 +104,10 @@ class TokenLifespanProgressBar(QWidget):
 
             # Format remaining duration as HH:MM
             remaining_hours, remaining_minutes = divmod(remaining_duration.seconds, 3600)
-            remaining_time_formatted = "{:02}:{:02}".format(remaining_hours, remaining_minutes)
+            remaining_time = "{:02}:{:02}".format(remaining_hours, remaining_minutes)
+
+            # Truncate the formatted string to a maximum of 5 characters
+            remaining_time_formatted = remaining_time[:5]
 
             self.token_lifespan_bar.setValue(progress)
             self.time_remaining_label.setText(remaining_time_formatted)
@@ -163,10 +166,10 @@ class FaxPollTimerProgressBar(QWidget):
 
         self.faxPollTimer_bar = QProgressBar()
         self.faxPollTimer_bar.setTextVisible(False)  # Hide the percentage text
-        self.faxPollTimer_bar.setMaximum(300)  # 300 seconds equals 5 minutes
+        # self.faxPollTimer_bar.setMaximum(900)  # 300 seconds equals 5 minutes
         self.layout.addWidget(self.faxPollTimer_bar, 1, 0, 1, 1)  # Progress bar takes the majority of the space
 
-        self.time_remaining_label = QLabel("00:00:00")  # Label to display time
+        self.time_remaining_label = QLabel("00:00")  # Label to display time
         self.time_remaining_label.setMinimumWidth(50)  # Set a minimum width that can accommodate HH:MM:SS
         self.layout.addWidget(self.time_remaining_label, 1, 1, 1, 1)  # Place the timer label next to the progress bar
 
@@ -178,7 +181,8 @@ class FaxPollTimerProgressBar(QWidget):
         self.layout.setHorizontalSpacing(10)  # 10 pixels spacing between columns
 
     def setupTimer(self):
-        self.endTime = datetime.now() + timedelta(minutes=5)
+        self.endTime = datetime.now() + timedelta(minutes=15)
+        self.startTime = datetime.now()  # Store the start time
         self.updateTimer = QTimer(self)
         self.updateTimer.timeout.connect(self.updateProgressBar)
         self.updateTimer.start(1000)  # Updates every second
@@ -187,13 +191,13 @@ class FaxPollTimerProgressBar(QWidget):
         auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'auto_retrieve')
 
         if auto_retrieve_enabled == "Enabled":
-            self.faxPollTimer_text.setText("Automatically Polling for New Faxes every 5 minutes.")
+            self.faxPollTimer_text.setText("Automatically Polling for New Faxes every 15 minutes.")
             self.main_window.faxPollButton.setEnabled(False)
         elif auto_retrieve_enabled == "Disabled":
             self.faxPollTimer_bar.setValue(0)
             self.faxPollTimer_text.setText("Automatic Fax Retrieval Disabled - Check Settings to Enable.")
             self.main_window.faxPollButton.setEnabled(True)
-            self.time_remaining_label.setText("00:00:00")
+            self.time_remaining_label.setText("00:00")
             self.updateTimer.stop()  # Stop the timer if auto-retrieve is disabled
             return
 
@@ -205,9 +209,20 @@ class FaxPollTimerProgressBar(QWidget):
             self.updateTimer.stop()  # Stop the timer if the token is invalid
             return
 
-        remaining_time = self.endTime - datetime.now()
+        current_time = datetime.now()  # Get the current time
+        remaining_time = self.endTime - current_time
+        total_duration = self.endTime - self.startTime
+
+        # Calculate the progress percentage
+        elapsed_time = current_time - self.startTime
+        progress_percentage = (elapsed_time.total_seconds() / total_duration.total_seconds()) * 100
+
+        # Ensure progress_percentage is within the valid range [0, 100]
+        progress_percentage = min(max(progress_percentage, 0), 100)
+
+        self.faxPollTimer_bar.setValue(progress_percentage)
+
         seconds_left = int(remaining_time.total_seconds())
-        self.faxPollTimer_bar.setValue(seconds_left)
         self.time_remaining_label.setText(str(timedelta(seconds=seconds_left))[2:7])
 
         if seconds_left <= 0:

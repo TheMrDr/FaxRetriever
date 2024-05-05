@@ -1,4 +1,5 @@
 import datetime
+
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 
@@ -33,7 +34,7 @@ class RetrieveToken(QThread):
     # noinspection PyUnresolvedReferences
     def retrieve_token(self):
         # Check if any essential parameter is '--' or None
-        essential_params = [self.key_client_id, self.key_client_pass, self.key_api_pass]
+        essential_params = [self.key_client_id, self.key_client_pass, self.key_api_username, self.key_api_pass]
         if any(param == "None Set" or param is None for param in essential_params):
             self.finished.emit("Failure", "Essential credentials are not properly set.")
             self.log_system.log_message('error', "Essential credentials are not set properly for token retrieval.")

@@ -79,9 +79,9 @@ class SendFax(QDialog):
         self.populate_area_code()
 
         # Connect field transitions
-        self.area_code_input.editingFinished.connect(
+        self.area_code_input.textChanged.connect(
             lambda: self.focus_next(self.area_code_input, self.first_three_input))
-        self.first_three_input.editingFinished.connect(
+        self.first_three_input.textChanged.connect(
             lambda: self.focus_next(self.first_three_input, self.last_four_input))
 
         # Attach Cover Sheet
@@ -127,8 +127,11 @@ class SendFax(QDialog):
             # Split the stored string by commas to get individual numbers
             numbers = all_fax_numbers.split(',')
 
-            # Add each number to the combo box
-            for number in numbers:
+            # Format each number before adding it to the combo box
+            formatted_numbers = [self.main_window.format_phone_number(num) for num in numbers]
+
+            # Add each formatted number to the combo box
+            for number in formatted_numbers:
                 self.caller_id_combo.addItem(number.strip())  # Ensure to strip any whitespace
 
             # Automatically select the first number if there's only one
@@ -138,7 +141,8 @@ class SendFax(QDialog):
     def populate_area_code(self):
         if self.caller_id_combo.currentIndex() != -1:
             selected_number = self.caller_id_combo.currentText()
-            area_code = selected_number[1:4]  # Assuming the format +1XXXYYYZZZZ
+            area_code = selected_number[selected_number.find('(') + 1:selected_number.find(
+                ')')]  # Extract area code between parentheses
             self.area_code_input.setText(area_code)
 
     def focus_next(self, current_widget, next_widget):

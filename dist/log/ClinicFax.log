@@ -242,3 +242,180 @@
 2024-05-04 03:18:20,332 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
 2024-05-04 03:18:20,344 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
 2024-05-04 03:18:26,104 - ClinicFax - INFO - Application Closed
+2024-05-04 03:28:47,067 - ClinicFax - INFO - Application Started
+2024-05-04 03:28:47,194 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:28:47,200 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:28:47,207 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:28:47,664 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:28:47,674 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:28:48,674 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:28:48,688 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:28:53,763 - ClinicFax - INFO - Application Closed
+2024-05-04 03:30:50,672 - ClinicFax - INFO - Application Started
+2024-05-04 03:30:50,805 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:30:50,812 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:30:50,818 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:30:51,298 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:30:51,308 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:30:52,315 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:30:52,327 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:31:00,536 - ClinicFax - INFO - Application Closed
+2024-05-04 03:31:43,217 - ClinicFax - INFO - Application Started
+2024-05-04 03:31:43,345 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:31:43,350 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:31:43,355 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:31:43,837 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:31:43,846 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:31:44,844 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:31:44,857 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:32:13,557 - ClinicFax - INFO - Application Started
+2024-05-04 03:32:13,751 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:32:13,756 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:32:13,764 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:32:14,225 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:32:14,240 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:32:15,247 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:32:15,261 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:32:37,435 - ClinicFax - INFO - Application Started
+2024-05-04 03:32:37,558 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:32:37,566 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:32:37,574 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:32:38,044 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:32:38,054 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:32:39,060 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:32:39,074 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:32:41,711 - ClinicFax - INFO - Application Closed
+2024-05-04 03:37:34,423 - ClinicFax - INFO - Application Started
+2024-05-04 03:37:34,543 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:37:34,548 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:37:34,559 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:37:35,032 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:37:35,041 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:37:36,044 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:37:36,053 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:38:04,386 - ClinicFax - INFO - Application Started
+2024-05-04 03:38:04,514 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:38:04,520 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:38:04,528 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:38:04,992 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:38:05,001 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:38:05,997 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:38:06,013 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:39:52,452 - ClinicFax - INFO - Application Started
+2024-05-04 03:39:52,588 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 03:39:52,598 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 03:39:52,603 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:39:53,100 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 03:39:53,111 - ClinicFax - INFO - Token lifespan has reached zero; no action taken.
+2024-05-04 03:39:54,108 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 03:39:54,123 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-04 19:54:23,383 - ClinicFax - INFO - Application Started
+2024-05-04 19:54:23,499 - ClinicFax - INFO - Configuration loaded from: C:\Users\jfreeman\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 19:54:23,504 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 19:54:23,509 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 22:05:36,213 - ClinicFax - INFO - Application Started
+2024-05-04 22:05:36,426 - ClinicFax - INFO - Configuration loaded from: C:\Users\jfreeman\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-04 22:05:36,430 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-04 22:05:36,435 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 22:05:36,609 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 22:05:42,948 - ClinicFax - INFO - Application Closed
+2024-05-04 22:06:52,198 - ClinicFax - INFO - Application Started
+2024-05-04 22:06:52,241 - ClinicFax - INFO - Encryption key generated and stored.
+2024-05-04 22:06:52,246 - ClinicFax - WARNING - Configuration file not found, creating empty config.
+2024-05-04 22:06:52,253 - ClinicFax - WARNING - New section 'Token' added to configuration.
+2024-05-04 22:06:52,259 - ClinicFax - WARNING - Option 'access_token' not found in section 'Token', setting default value.
+2024-05-04 22:06:52,342 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:52,347 - ClinicFax - WARNING - New section 'Account' added to configuration.
+2024-05-04 22:06:52,354 - ClinicFax - WARNING - Option 'fax_user' not found in section 'Account', setting default value.
+2024-05-04 22:06:52,360 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:52,368 - ClinicFax - WARNING - New section 'Client' added to configuration.
+2024-05-04 22:06:52,373 - ClinicFax - WARNING - Option 'client_id' not found in section 'Client', setting default value.
+2024-05-04 22:06:52,378 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:52,383 - ClinicFax - WARNING - Option 'client_secret' not found in section 'Client', setting default value.
+2024-05-04 22:06:52,389 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:52,397 - ClinicFax - WARNING - New section 'API' added to configuration.
+2024-05-04 22:06:52,402 - ClinicFax - WARNING - Option 'username' not found in section 'API', setting default value.
+2024-05-04 22:06:52,408 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:52,413 - ClinicFax - WARNING - Option 'password' not found in section 'API', setting default value.
+2024-05-04 22:06:52,418 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:52,424 - ClinicFax - WARNING - Option 'token_retrieved' not found in section 'Token', setting default value.
+2024-05-04 22:06:52,432 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:52,437 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 22:06:52,453 - ClinicFax - WARNING - Option 'all_numbers' not found in section 'Account', setting default value.
+2024-05-04 22:06:52,459 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:52,998 - ClinicFax - WARNING - New section 'Log' added to configuration.
+2024-05-04 22:06:53,004 - ClinicFax - WARNING - Option 'logging_level' not found in section 'Log', setting default value.
+2024-05-04 22:06:53,010 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,020 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-04 22:06:53,037 - ClinicFax - WARNING - Option 'token_expiration' not found in section 'Token', setting default value.
+2024-05-04 22:06:53,044 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,051 - ClinicFax - ERROR - Invalid configuration value detected.
+2024-05-04 22:06:53,063 - ClinicFax - WARNING - New section 'Retrieval' added to configuration.
+2024-05-04 22:06:53,068 - ClinicFax - WARNING - Option 'auto_retrieve' not found in section 'Retrieval', setting default value.
+2024-05-04 22:06:53,074 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,081 - ClinicFax - WARNING - New section 'Fax Options' added to configuration.
+2024-05-04 22:06:53,086 - ClinicFax - WARNING - Option 'download_method' not found in section 'Fax Options', setting default value.
+2024-05-04 22:06:53,094 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,101 - ClinicFax - WARNING - Option 'delete_faxes' not found in section 'Fax Options', setting default value.
+2024-05-04 22:06:53,108 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,114 - ClinicFax - WARNING - New section 'Debug' added to configuration.
+2024-05-04 22:06:53,119 - ClinicFax - WARNING - Option 'debug_level' not found in section 'Debug', setting default value.
+2024-05-04 22:06:53,128 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,159 - ClinicFax - WARNING - New section 'Fax' added to configuration.
+2024-05-04 22:06:53,168 - ClinicFax - WARNING - Option 'fax_extension' not found in section 'Fax', setting default value.
+2024-05-04 22:06:53,174 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,179 - ClinicFax - WARNING - New section 'Path' added to configuration.
+2024-05-04 22:06:53,184 - ClinicFax - WARNING - Option 'save_path' not found in section 'Path', setting default value.
+2024-05-04 22:06:53,191 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,197 - ClinicFax - WARNING - Option 'account_uuid' not found in section 'Account', setting default value.
+2024-05-04 22:06:53,204 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:06:53,210 - ClinicFax - WARNING - Option 'fax_caller_id' not found in section 'Retrieval', setting default value.
+2024-05-04 22:06:53,217 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-04 22:07:34,386 - ClinicFax - INFO - Application Closed
+2024-05-05 00:31:46,064 - ClinicFax - INFO - Application Started
+2024-05-05 00:31:46,184 - ClinicFax - INFO - Configuration loaded from: C:\Users\jfreeman\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-05 00:31:46,189 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-05 00:31:46,193 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-05 00:31:46,391 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-05 00:36:45,832 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 00:36:45,841 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 00:36:46,562 - ClinicFax - INFO - Downloaded fax file for ID 37315412 to C:/Users/jfreeman/Desktop/FaxRetriever\37315412.pdf
+2024-05-05 00:36:46,564 - ClinicFax - INFO - Downloaded fax file for ID 37315412 to C:/Users/jfreeman/Desktop/FaxRetriever\37315412.pdf
+2024-05-05 00:36:47,157 - ClinicFax - INFO - Downloaded fax file for ID 37224706 to C:/Users/jfreeman/Desktop/FaxRetriever\37224706.pdf
+2024-05-05 00:36:47,170 - ClinicFax - INFO - Downloaded fax file for ID 37224706 to C:/Users/jfreeman/Desktop/FaxRetriever\37224706.pdf
+2024-05-05 00:36:47,613 - ClinicFax - INFO - Downloaded fax file for ID 37224624 to C:/Users/jfreeman/Desktop/FaxRetriever\37224624.pdf
+2024-05-05 00:36:47,672 - ClinicFax - INFO - Downloaded fax file for ID 37224624 to C:/Users/jfreeman/Desktop/FaxRetriever\37224624.pdf
+2024-05-05 00:36:48,271 - ClinicFax - INFO - Downloaded fax file for ID 37224287 to C:/Users/jfreeman/Desktop/FaxRetriever\37224287.pdf
+2024-05-05 00:36:48,423 - ClinicFax - INFO - Downloaded fax file for ID 37224287 to C:/Users/jfreeman/Desktop/FaxRetriever\37224287.pdf
+2024-05-05 00:36:59,738 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-05 00:36:59,745 - ClinicFax - INFO - Configuration loaded from: C:\Users\jfreeman\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-05 00:36:59,750 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-05 00:41:45,740 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 00:41:46,444 - ClinicFax - INFO - Downloaded fax file for ID 37315412 to C:/Users/jfreeman/Desktop/FaxRetriever\37315412_0.jpg
+2024-05-05 00:41:55,748 - ClinicFax - INFO - Converted fax PDF to JPG for ID 37315412
+2024-05-05 00:41:55,755 - ClinicFax - INFO - Removed original fax PDF for ID 37315412 after conversion to JPG
+2024-05-05 00:41:56,359 - ClinicFax - INFO - Downloaded fax file for ID 37224706 to C:/Users/jfreeman/Desktop/FaxRetriever\37224706_0.jpg
+2024-05-05 00:41:58,124 - ClinicFax - INFO - Converted fax PDF to JPG for ID 37224706
+2024-05-05 00:41:58,129 - ClinicFax - INFO - Removed original fax PDF for ID 37224706 after conversion to JPG
+2024-05-05 00:41:58,545 - ClinicFax - INFO - Downloaded fax file for ID 37224624 to C:/Users/jfreeman/Desktop/FaxRetriever\37224624_0.jpg
+2024-05-05 00:41:59,780 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 00:41:59,933 - ClinicFax - INFO - Converted fax PDF to JPG for ID 37224624
+2024-05-05 00:41:59,938 - ClinicFax - INFO - Removed original fax PDF for ID 37224624 after conversion to JPG
+2024-05-05 00:41:59,965 - ClinicFax - INFO - Fax PDF for ID 37315412 already converted to JPG
+2024-05-05 00:41:59,969 - ClinicFax - INFO - Fax PDF for ID 37224706 already converted to JPG
+2024-05-05 00:42:00,365 - ClinicFax - INFO - Downloaded fax file for ID 37224624 to C:/Users/jfreeman/Desktop/FaxRetriever\37224624_0.jpg
+2024-05-05 00:42:00,733 - ClinicFax - INFO - Downloaded fax file for ID 37224287 to C:/Users/jfreeman/Desktop/FaxRetriever\37224287_0.jpg
+2024-05-05 00:42:01,965 - ClinicFax - INFO - Converted fax PDF to JPG for ID 37224624
+2024-05-05 00:42:01,970 - ClinicFax - INFO - Removed original fax PDF for ID 37224624 after conversion to JPG
+2024-05-05 00:42:01,975 - ClinicFax - INFO - Fax PDF for ID 37224287 already converted to JPG
+2024-05-05 00:42:03,981 - ClinicFax - INFO - Converted fax PDF to JPG for ID 37224287
+2024-05-05 00:42:03,987 - ClinicFax - INFO - Removed original fax PDF for ID 37224287 after conversion to JPG
+2024-05-05 00:42:20,501 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-05 00:42:20,510 - ClinicFax - INFO - Configuration loaded from: C:\Users\jfreeman\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-05 00:42:20,514 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-05 00:46:20,820 - ClinicFax - INFO - Application Closed
+2024-05-05 02:45:17,635 - ClinicFax - INFO - Application Started
+2024-05-05 02:45:17,732 - ClinicFax - INFO - Configuration loaded from: C:\Users\jfreeman\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-05 02:45:17,736 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-05 02:45:17,741 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-05 02:45:17,885 - ClinicFax - INFO - Credentials loaded for token retrieval.

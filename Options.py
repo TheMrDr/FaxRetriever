@@ -1,5 +1,6 @@
 import os
 import sys
+
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
@@ -221,7 +222,7 @@ class OptionsDialog(QDialog):
         #     self.mark_read_button_group.checkedButton()) else ""
         log_level = self.logging_level_combo.currentText()
 
-        for section in ['API', 'Client', 'Account', 'Fax Options', 'Debug']:
+        for section in ['API', 'Client', 'Account', 'Fax Options', 'Debug', 'UserSettings']:
             if not self.save_manager.config.has_section(section):
                 self.save_manager.config.add_section(section)
 
@@ -250,6 +251,7 @@ class OptionsDialog(QDialog):
             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
             return
 
+        self.main_window.create_central_widget()
         self.accept()  # Close the dialog
 
         # # Show message box asking the user to restart the application
