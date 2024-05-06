@@ -1,0 +1,292 @@
+{
+    "data": [
+        {
+            "id": 37381852,
+            "caller_id": "17253331732",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-05-06T15:20:08.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37381852/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37381852/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37352862,
+            "caller_id": "17033233000",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-05-04T07:47:01.000000Z",
+            "pages": 3,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37352862/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37352862/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37340088,
+            "caller_id": "14805518885",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-05-03T18:39:04.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37340088/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37340088/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37311297,
+            "caller_id": "12065802805",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-05-02T22:17:03.000000Z",
+            "pages": 2,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37311297/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37311297/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37290388,
+            "caller_id": "13234219175",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-05-02T16:06:10.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37290388/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37290388/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37255268,
+            "caller_id": "14052714014",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-05-01T18:41:03.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37255268/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37255268/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37251917,
+            "caller_id": "14805518885",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-05-01T17:50:03.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37251917/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37251917/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37251694,
+            "caller_id": "17275607700",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-05-01T17:46:04.000000Z",
+            "pages": 2,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37251694/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37251694/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37217315,
+            "caller_id": "14805518885",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-04-30T20:40:07.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37217315/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37217315/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37210070,
+            "caller_id": "14805518885",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-04-30T18:46:02.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37210070/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37210070/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37205186,
+            "caller_id": "14805518885",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-04-30T17:30:06.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37205186/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37205186/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37177050,
+            "caller_id": "16026781179",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-04-29T23:00:02.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37177050/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37177050/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37152860,
+            "caller_id": "16026781179",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-04-29T15:37:06.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37152860/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37152860/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37115712,
+            "caller_id": "16026781179",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-04-26T20:32:01.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37115712/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37115712/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        },
+        {
+            "id": 37094225,
+            "caller_id": "12063971954",
+            "destination": 14056053588,
+            "created_by": "PSTN",
+            "created_at": "2024-04-26T14:04:07.000000Z",
+            "pages": 1,
+            "pdf": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37094225/pdf",
+            "thumbnail": "https://api.instant-fax.com/api/mailbox/100@pharmorespecialtypharmacy.23613.service/fax/37094225/thumbnail",
+            "status": "delivered",
+            "transcription": "",
+            "unread": false
+        }
+    ],
+    "publicToken": null,
+    "links": {
+        "first": "/?page=1",
+        "last": "/?page=13",
+        "prev": null,
+        "next": "/?page=2"
+    },
+    "meta": {
+        "current_page": 1,
+        "from": 1,
+        "last_page": 13,
+        "links": [
+            {
+                "url": null,
+                "label": "&laquo; Previous",
+                "active": false
+            },
+            {
+                "url": "/?page=1",
+                "label": "1",
+                "active": true
+            },
+            {
+                "url": "/?page=2",
+                "label": "2",
+                "active": false
+            },
+            {
+                "url": "/?page=3",
+                "label": "3",
+                "active": false
+            },
+            {
+                "url": "/?page=4",
+                "label": "4",
+                "active": false
+            },
+            {
+                "url": "/?page=5",
+                "label": "5",
+                "active": false
+            },
+            {
+                "url": "/?page=6",
+                "label": "6",
+                "active": false
+            },
+            {
+                "url": "/?page=7",
+                "label": "7",
+                "active": false
+            },
+            {
+                "url": "/?page=8",
+                "label": "8",
+                "active": false
+            },
+            {
+                "url": "/?page=9",
+                "label": "9",
+                "active": false
+            },
+            {
+                "url": "/?page=10",
+                "label": "10",
+                "active": false
+            },
+            {
+                "url": "/?page=11",
+                "label": "11",
+                "active": false
+            },
+            {
+                "url": "/?page=12",
+                "label": "12",
+                "active": false
+            },
+            {
+                "url": "/?page=13",
+                "label": "13",
+                "active": false
+            },
+            {
+                "url": "/?page=2",
+                "label": "Next &raquo;",
+                "active": false
+            }
+        ],
+        "path": "/",
+        "per_page": 15,
+        "to": 15,
+        "total": 195
+    }
+}
