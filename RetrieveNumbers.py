@@ -42,7 +42,7 @@ class RetrieveNumbers(QThread):
                 self.numbers_retrieved.emit(numbers)
                 self.finished.emit("Success", "Successfully retrieved fax numbers.")
                 self.log_system.log_message('info', f"Successfully retrieved fax numbers: {numbers}")
-                self.main_window.populate_data()
+                self.main_window.create_central_widget()
             else:
                 self.finished.emit("Failure", f"HTTP Error {response.status_code}: {response.text}")
                 self.log_system.log_message('error',

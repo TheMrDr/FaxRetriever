@@ -259,7 +259,7 @@ class MainWindow(QMainWindow):
         self.faxPollButton.clicked.connect(self.retrieve_faxes)
         layout.addWidget(self.faxPollButton, 6, 0, 1, 2)
         self.faxPollButton.setVisible(auto_retrieve_enabled == "Enabled")
-        self.faxPollButton.setEnabled(False)
+        self.faxPollButton.setEnabled(True)
 
         self.send_fax_button.clicked.connect(self.show_send_fax_dialog)
         layout.addWidget(self.send_fax_button, 7, 0, 1, 2)

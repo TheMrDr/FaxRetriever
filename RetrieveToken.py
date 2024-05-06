@@ -75,7 +75,7 @@ class RetrieveToken(QThread):
 
                 self.finished.emit("Success", "Token retrieved and saved successfully.")
                 self.log_system.log_message('info', "Token retrieved and saved successfully.")
-                self.main_window.populate_data()
+                self.main_window.create_central_widget()
             else:
                 self.main_window.update_status_bar("Failed to retrieve token.", 5000)
                 self.log_system.log_message('error', f"Failed to retrieve token. HTTP {response.status_code}: {response.text}")

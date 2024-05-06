@@ -251,6 +251,7 @@ class OptionsDialog(QDialog):
             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
             return
 
+
         self.main_window.create_central_widget()
         self.accept()  # Close the dialog
 

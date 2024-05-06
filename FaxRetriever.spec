@@ -11,7 +11,8 @@ a = Analysis(
     binaries=[],
     datas=[
     ('images/*', 'images'),  # Include all files inside the 'images' directory
-    ('ReadMe', '.')  # Include the 'ReadMe' file in the root directory of the bundled executable
+    ('ReadMe', '.'),  # Include the 'ReadMe' file in the root directory of the bundled executable
+    ('poppler', 'poppler')
     ],
     hiddenimports=['pdf2image', 'pdf2image.backends', 'pdf2image.backends.poppler'],
     hookspath=[],
