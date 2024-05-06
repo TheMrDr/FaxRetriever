@@ -1,9 +1,10 @@
+import json
 import os
 import platform
+import requests
 import subprocess
 import sys
 
-import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from SaveManager import SaveManager
@@ -44,14 +45,31 @@ class RetrieveFaxes(QThread):
         self.retrieve_faxes()
 
     def retrieve_faxes(self):
-        url = f"https://telco-api.skyswitch.com/users/{self.fax_account}/faxes/inbound"
+        base_url = "https://telco-api.skyswitch.com"
+        url = f"{base_url}/users/{self.fax_account}/faxes/inbound"
         headers = {"accept": "application/json", "authorization": f"Bearer {self.token}"}
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             faxes_response = response.json()
+            with open('faxes_response.txt', 'w') as outfile:
+                json.dump(faxes_response, outfile, indent=4)  # Write the JSON response to a .txt file with indentation
             if 'data' in faxes_response:
                 faxes = faxes_response['data']
                 self.download_fax_pdfs(faxes)
+                # Check if there are more pages and retrieve them if necessary
+                while 'next' in faxes_response['links'] and faxes_response['links']['next']:
+                    next_page_path = faxes_response['links']['next']  # Get the path for the next page
+                    next_page_url = url + next_page_path  # Construct the complete URL
+                    print("Requested URL:", next_page_url)  # Print the requested URL
+                    response = requests.get(next_page_url, headers=headers)
+                    if response.status_code == 200:
+                        faxes_response = response.json()
+                        faxes = faxes_response['data']
+                        self.download_fax_pdfs(faxes)
+                    else:
+                        self.log_system.log_message('error',
+                                                    f"Failed to retrieve next page of faxes. Status code: {response.status_code}")
+                        break
             else:
                 self.log_system.log_message('error', 'No fax data available')
                 self.finished.emit([])
@@ -62,6 +80,8 @@ class RetrieveFaxes(QThread):
     def download_fax_pdfs(self, faxes):
         download_results = []
         all_faxes_downloaded = True  # Flag to check if all faxes have been downloaded
+        downloaded_faxes_count = 0  # Counter for downloaded faxes
+
         for fax in faxes:
             fax_id = fax['id']
             pdf_path = os.path.join(self.save_path, f"{fax_id}.pdf")
@@ -130,6 +150,7 @@ class RetrieveFaxes(QThread):
 
                     download_results.append(
                         (fax_id, 'Downloaded', file_path if self.download_type != 'JPG' else 'Converted to JPG'))
+                    downloaded_faxes_count += 1  # Increment the counter for downloaded faxes
                 else:
                     download_results.append((fax_id, 'Failed to download'))
                     self.main_window.update_status_bar(f"Failed to download fax file for ID {fax_id}", 5000)
@@ -151,6 +172,9 @@ class RetrieveFaxes(QThread):
             elif self.download_type == 'Both':
                 self.main_window.update_status_bar("All faxes have already been downloaded and converted", 5000)
                 self.log_system.log_message('info', "All faxes have already been downloaded and converted")
+        elif downloaded_faxes_count > 1:  # If more than one fax is downloaded
+            self.main_window.update_status_bar(f"{downloaded_faxes_count} faxes downloaded", 5000)
+            self.log_system.log_message('info', f"{downloaded_faxes_count} faxes downloaded")
 
         self.finished.emit(download_results)  # Emit results of downloads
 

@@ -119,7 +119,7 @@ class TokenLifespanProgressBar(QWidget):
                 self.retrieve_token.start()  # Automatically start token retrieval
                 self.retrieve_token.finished.connect(self.token_retrieved)  # Connect finish signal to a slot
         else:
-            self.main_window.send_fax_button.setEnabled(False)
+            self.main_window.send_fax_button.setEnabled(True)
             self.token_expired_actions()
 
     def token_retrieved(self):
