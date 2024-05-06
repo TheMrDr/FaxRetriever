@@ -192,11 +192,11 @@ class FaxPollTimerProgressBar(QWidget):
 
         if auto_retrieve_enabled == "Enabled":
             self.faxPollTimer_text.setText("Automatically Polling for New Faxes every 15 minutes.")
-            self.main_window.faxPollButton.setEnabled(False)
+            # self.main_window.faxPollButton.setEnabled(False)
         elif auto_retrieve_enabled == "Disabled":
             self.faxPollTimer_bar.setValue(0)
             self.faxPollTimer_text.setText("Automatic Fax Retrieval Disabled - Check Settings to Enable.")
-            self.main_window.faxPollButton.setEnabled(True)
+            # self.main_window.faxPollButton.setEnabled(True)
             self.time_remaining_label.setText("00:00")
             self.updateTimer.stop()  # Stop the timer if auto-retrieve is disabled
             return

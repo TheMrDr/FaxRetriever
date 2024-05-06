@@ -250,9 +250,6 @@ class OptionsDialog(QDialog):
             QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
             return
-
-
-        self.main_window.create_central_widget()
         self.accept()  # Close the dialog
 
         # # Show message box asking the user to restart the application

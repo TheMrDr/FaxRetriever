@@ -70,7 +70,7 @@ class MainWindow(QMainWindow):
         self.retrieve_token.token_retrieved.connect(self.tokenLifespanProgressBar.restart_progress)
         self.retrieve_token.token_retrieved.connect(self.faxPollTimerProgressBar.restart_progress)
 
-        # Tray icon setup should ideally not depend on data loading
+        # Tray icon setup should not depend on data loading
         self.tray_icon = QSystemTrayIcon(self)
         self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
         self.initialize_tray_menu()
@@ -162,12 +162,13 @@ class MainWindow(QMainWindow):
         """Start the updater thread."""
         self.upgrader = UpgradeApplication(download_url)
         self.upgrader.start()
+
     def initialize_tray_menu(self):
         self.tray_menu = QMenu()
         self.tray_menu.addAction("Open Fax Manager", self.show)
         self.tray_menu.addAction("Close", self.close)
+        self.tray_icon.setIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
         self.tray_icon.setContextMenu(self.tray_menu)
-
 
     def initialize_ui(self):
         self.log_system.log_message('debug', 'UI Initializing')
@@ -259,7 +260,7 @@ class MainWindow(QMainWindow):
         self.faxPollButton.clicked.connect(self.retrieve_faxes)
         layout.addWidget(self.faxPollButton, 6, 0, 1, 2)
         self.faxPollButton.setVisible(auto_retrieve_enabled == "Enabled")
-        self.faxPollButton.setEnabled(True)
+        self.faxPollButton.setEnabled(False)
 
         self.send_fax_button.clicked.connect(self.show_send_fax_dialog)
         layout.addWidget(self.send_fax_button, 7, 0, 1, 2)

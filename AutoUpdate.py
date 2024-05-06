@@ -76,7 +76,7 @@ class UpgradeApplication(QThread):
                 bat_file.write(f"""
 @echo off
 :loop
-timeout /t 10
+timeout /t 1
 tasklist /fi "IMAGENAME eq {os.path.basename(current_exe)}" | find /i "{os.path.basename(current_exe)}" >nul
 if errorlevel 1 (
     echo Updating...
