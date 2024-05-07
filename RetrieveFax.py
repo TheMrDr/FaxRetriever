@@ -51,8 +51,8 @@ class RetrieveFaxes(QThread):
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             faxes_response = response.json()
-            with open('faxes_response.txt', 'w') as outfile:
-                json.dump(faxes_response, outfile, indent=4)  # Write the JSON response to a .txt file with indentation
+            # with open('faxes_response.txt', 'w') as outfile:
+            #     json.dump(faxes_response, outfile, indent=4)  # Write the JSON response to a .txt file with indentation
             if 'data' in faxes_response:
                 faxes = faxes_response['data']
                 self.download_fax_pdfs(faxes)

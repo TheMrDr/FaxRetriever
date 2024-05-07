@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
         self.about_dialog = AboutDialog()
         self.faxPollButton = CustomPushButton("Check for New Faxes")
         self.send_fax_button = CustomPushButton("Send a Fax")
-        self.settingsLoaded.connect(self.populate_data)  # Connect signal to slot
+        self.settingsLoaded.connect(self.reload_ui)  # Connect signal to slot
 
         # Load the app log services and set logging level.
         self.log_system = SystemLog()
@@ -268,11 +268,11 @@ class MainWindow(QMainWindow):
 
         self.update_status_bar('System Started', 1000)
 
-        self.populate_data()
-
         # Set central widget and layout
         self.setCentralWidget(self.centralWidget)
         self.centralWidget.setLayout(layout)
+
+        self.reload_ui()
 
     def about(self):
         self.about_dialog.show()  # This is a QDialog popup
@@ -281,24 +281,50 @@ class MainWindow(QMainWindow):
         self.send_fax_dialog.show()
 
     def refresh_data_from_config(self):
-        self.api_username = self.save_manager.get_config_value('API', 'username')
-        self.api_pass = self.save_manager.get_config_value('API', 'password')
+        self.access_token = self.save_manager.get_config_value('Token', 'access_token')
+        self.token_retrieved = self.save_manager.get_config_value('Token', 'token_retrieved')
+        self.token_expiration = self.save_manager.get_config_value('Token', 'token_expiration')
+
+        self.fax_user = self.save_manager.get_config_value('Account', 'fax_user')
+        self.all_numbers = self.save_manager.get_config_value('Account', 'all_numbers')
+        self.account_uuid = self.save_manager.get_config_value('Account', 'account_uuid')
+
         self.client_id = self.save_manager.get_config_value('Client', 'client_id')
         self.client_pass = self.save_manager.get_config_value('Client', 'client_secret')
-        # self.fax_user_info = self.save_manager.get_config_value('Account', 'account_id')
+
+        self.api_username = self.save_manager.get_config_value('API', 'username')
+        self.api_pass = self.save_manager.get_config_value('API', 'password')
+
+        self.log_level = self.save_manager.get_config_value('Log', 'logging_level')
+
+        self.auto_retrieve_enabled = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
+        self.fax_caller_id = self.save_manager.get_config_value('Retrieval', 'fax_caller_id')
+
+        self.download_method = self.save_manager.get_config_value('Fax Options', 'download_method')
+        self.delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
+
         self.fax_extension = self.save_manager.get_config_value('Fax', 'fax_extension')
-        self.access_token = self.save_manager.get_config_value('Token', 'access_token')
-        self.token_expiration = self.save_manager.get_config_value('Token', 'token_expiration')
         self.save_path = self.save_manager.get_config_value('Path', 'save_path')
-        self.account_uuid = self.save_manager.get_config_value('Account', 'account_uuid')
-        caller_ids = self.save_manager.get_config_value('Retrieval', 'fax_caller_id')
-        self.populate_caller_ids(caller_ids)
 
-    def populate_data(self):
-        self.refresh_data_from_config()
-        # Update the QLabel texts with the current values of the variables
-        self.saveLocationDisplay.setText(self.save_path if self.save_path is not None else "Not Set")
+        self.populate_caller_ids(self.fax_caller_id)
 
+    def reload_ui(self):
+        """
+        Reloads all widgets and their data in the application.
+        """
+        try:
+            # Refresh data configurations and UI components
+            self.refresh_data_from_config()
+
+            # Restart progress bars
+            self.tokenLifespanProgressBar.restart_progress()
+            self.faxPollTimerProgressBar.restart_progress()
+
+            # Update the status bar to indicate successful reloading
+            self.update_status_bar("UI and data reloaded successfully.", 5000)
+        except Exception as e:
+            self.update_status_bar(f"Failed to reload UI: {str(e)}", 10000)
+            QMessageBox.critical(self, "Reload Failed", f"An error occurred while reloading the UI: {str(e)}")
 
     def select_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")

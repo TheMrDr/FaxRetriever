@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QWidget, QLabel, QProgressBar, QGridLayout
 
+from Customizations import HomescreenProgressBar
 from RetrieveFax import RetrieveFaxes
 from RetrieveToken import RetrieveToken
 from SaveManager import SaveManager
@@ -30,7 +31,7 @@ class TokenLifespanProgressBar(QWidget):
         self.token_lifespan_text = QLabel("Access Token Lifespan:")
         self.layout.addWidget(self.token_lifespan_text, 0, 0, 1, 2)
 
-        self.token_lifespan_bar = QProgressBar()
+        self.token_lifespan_bar = HomescreenProgressBar()
         self.token_lifespan_bar.setTextVisible(False)
         self.layout.addWidget(self.token_lifespan_bar, 1, 0)
 
@@ -127,6 +128,27 @@ class TokenLifespanProgressBar(QWidget):
         self.updateProgressBar()  # Update progress bar once new token is retrieved
 
     def token_expired_actions(self):
+        token_retrieved_str = self.save_manager.get_config_value('Token', 'token_retrieved')
+        token_expiration_str = self.save_manager.get_config_value('Token', 'token_expiration')
+        fax_user = self.save_manager.get_config_value('Account', 'fax_user')
+        client_id = self.save_manager.get_config_value('Client', 'client_id')
+
+        if all(var not in [None, "None Set"] for var in [token_retrieved_str, token_expiration_str, fax_user,
+                                                         client_id]):
+            try:
+                self.main_window.set_fax_button.setEnabled(True)
+                self.main_window.update_status_bar("Token Expired. Attempting to Retrieve a New Token", 5000)
+                self.log_system.log_message('info', "Token Expired. Attempting to Retrieve a New Token")
+                self.retrieve_token.start()
+                self.rettrieve_token.finished.connect(self.token_retrieved)
+            except Error as e:
+
+                self.main_window.update_status_bar("Token Expired. Failed to Retrieve a New Token.")
+                self.log_system.log_message('error', "Token Expired. Failed to Retrieve a New Token")
+        else:
+            self.token_expired_actions()
+
+
         """Actions to take when token is expired or invalid."""
         self.token_lifespan_bar.setValue(0)
         self.time_remaining_label.setText("00:00:00")
@@ -154,8 +176,6 @@ class FaxPollTimerProgressBar(QWidget):
         self.setupTimer()
 
     def setupUI(self):
-        auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'auto_retrieve')
-
         self.layout = QGridLayout(self)
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(0, 0, 0, 0)
@@ -164,7 +184,7 @@ class FaxPollTimerProgressBar(QWidget):
         # self.faxPollTimer_text = QLabel("")
         self.layout.addWidget(self.faxPollTimer_text, 0, 0, 1, 2)  # Span across all columns for alignment
 
-        self.faxPollTimer_bar = QProgressBar()
+        self.faxPollTimer_bar = HomescreenProgressBar()
         self.faxPollTimer_bar.setTextVisible(False)  # Hide the percentage text
         # self.faxPollTimer_bar.setMaximum(900)  # 300 seconds equals 5 minutes
         self.layout.addWidget(self.faxPollTimer_bar, 1, 0, 1, 1)  # Progress bar takes the majority of the space

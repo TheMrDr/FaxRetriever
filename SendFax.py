@@ -3,10 +3,10 @@ import sys
 
 import requests
 from PyQt5 import QtGui
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
-                             QComboBox, QListWidget, QGridLayout, QMessageBox)
+                             QComboBox, QListWidget, QGridLayout, QMessageBox, QMenu, QAction)
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
@@ -87,27 +87,24 @@ class SendFax(QDialog):
         # Attach Cover Sheet
         self.cover_sheet_label = QLabel("Attached Cover Sheet:")
         self.cover_sheet_list = QListWidget()
+        self.cover_sheet_list.setContextMenuPolicy(Qt.CustomContextMenu)  # Enable custom context menu
         self.cover_sheet_list.setMaximumHeight(self.cover_sheet_list.sizeHintForRow(0) + 10 * self.cover_sheet_list.frameWidth())  # Set the max height to fit one row
-        self.cover_sheet_button = QPushButton("Attach Cover Sheet")
-        self.cover_sheet_button.clicked.connect(self.attach_cover_sheet)
-        self.remove_cover_button = QPushButton("Remove Cover Sheet")
-        self.remove_cover_button.clicked.connect(self.remove_cover_sheet)
+        self.cover_sheet_button = QPushButton("Add/Change Cover Sheet")
+        self.cover_sheet_button.clicked.connect(self.attach_or_change_cover_sheet)
         layout.addWidget(self.cover_sheet_label)
         layout.addWidget(self.cover_sheet_list)
         layout.addWidget(self.cover_sheet_button)
-        layout.addWidget(self.remove_cover_button)
 
         # Attach Document
         self.document_label = QLabel("Attached Documents:")
         self.document_list = QListWidget()
+        self.document_list.setContextMenuPolicy(Qt.CustomContextMenu)  # Enable custom context menu
+        self.document_list.customContextMenuRequested.connect(self.show_document_context_menu)  # Connect to context menu event
         self.document_button = QPushButton("Attach Document")
         self.document_button.clicked.connect(self.attach_document)
-        self.remove_document_button = QPushButton("Remove Selected Document")
-        self.remove_document_button.clicked.connect(self.remove_document)
         layout.addWidget(self.document_label)
         layout.addWidget(self.document_list)
         layout.addWidget(self.document_button)
-        layout.addWidget(self.remove_document_button)
 
         # Send Button
         self.send_button = QPushButton("Send Fax")
@@ -118,6 +115,28 @@ class SendFax(QDialog):
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.close)
         layout.addWidget(self.cancel_button)
+
+    def show_document_context_menu(self, pos):
+        document_item = self.document_list.itemAt(pos)
+        if document_item:
+            menu = QMenu()
+            remove_action = QAction("Remove Document", self)
+            remove_action.triggered.connect(lambda: self.remove_document(document_item))
+            menu.addAction(remove_action)
+            menu.exec_(self.document_list.mapToGlobal(pos))
+
+    def remove_document(self, item):
+        index = self.document_list.row(item)
+        del self.documents_paths[index]  # Remove the corresponding full path
+        self.document_list.takeItem(index)
+
+    def attach_or_change_cover_sheet(self):
+        options = QFileDialog.Options()
+        filename, _ = QFileDialog.getOpenFileName(self, "Select a cover sheet", "", "Documents (*.pdf *.doc *.docx);;Images (*.jpg *.png *.tiff);;Text Files (*.txt)", options=options)
+        if filename:
+            self.cover_sheet_path = filename  # Store the full path
+            self.cover_sheet_list.clear()
+            self.cover_sheet_list.addItem(self.format_display_name(filename))
 
     def populate_caller_id_combo_box(self):
         # Retrieve all fax numbers stored in the configuration

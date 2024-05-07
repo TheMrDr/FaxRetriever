@@ -1,6 +1,6 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import (QPushButton, QDialog, QVBoxLayout, QListView, QDialogButtonBox)
+from PyQt5.QtWidgets import (QPushButton, QDialog, QVBoxLayout, QListView, QDialogButtonBox, QProgressBar)
 
 from SaveManager import SaveManager
 
@@ -73,3 +73,24 @@ class SelectInboxDialog(QDialog):
             QMessageBox.critical(self, "Error", "Failed to save selected inboxes: " + str(e))
             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
+class HomescreenProgressBar(QProgressBar):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("QProgressBar::chunk { background-color: #2a81dc; margin: 1px; } "
+                           "QProgressBar { border: 1px solid transparent; border-radius: 5px; } "
+                           "QProgressBar::chunk:indeterminate { border-radius: 5px; } "
+                           "QProgressBar::chunk:indeterminate { "
+                           "    animation: pulse 1.5s ease-in-out infinite; "
+                           "} "
+                           "@keyframes pulse { "
+                           "    0% { background-color: #2a81dc; } "
+                           "    10% { background-color: #508ed8; } "
+                           "    20% { background-color: #2a81dc; } "
+                           "    30% { background-color: #508ed8; } "
+                           "    40% { background-color: #2a81dc; } "
+                           "    50% { background-color: #508ed8; } "
+                           "    60% { background-color: #2a81dc; } "
+                           "    70% { background-color: #508ed8; } "
+                           "    80% { background-color: #2a81dc; } "
+                           "    90% { background-color: #508ed8; } "
+                           "    100% { background-color: #2a81dc; } }")
