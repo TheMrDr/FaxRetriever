@@ -56,7 +56,8 @@ class RetrieveToken(QThread):
             }
             response = requests.post(url, data=payload, headers=headers)
             if response.status_code == 200:
-                self.main_window.update_status_bar("Token retrieved successfully.", 5000)
+                if self.main_window.isVisible():
+                    self.main_window.update_status_bar("Token retrieved successfully.", 5000)
                 self.token_retrieved.emit()  # Emit signal when new token is retrieved
 
                 token_info = response.json()
@@ -77,8 +78,10 @@ class RetrieveToken(QThread):
                 self.log_system.log_message('info', "Token retrieved and saved successfully.")
                 self.main_window.reload_ui()
             else:
-                self.main_window.update_status_bar("Failed to retrieve token.", 5000)
+                if self.main_window.isVisible():
+                    self.main_window.update_status_bar("Failed to retrieve token.", 5000)
                 self.log_system.log_message('error', f"Failed to retrieve token. HTTP {response.status_code}: {response.text}")
         except Exception as e:
-            self.main_window.update_status_bar(f"Token retrieval error: {str(e)}", 5000)
+            if self.main_window.isVisible():
+                self.main_window.update_status_bar(f"Token retrieval error: {str(e)}", 5000)
             self.log_system.log_message('error', f"Failed to retrieve access token: {e}")

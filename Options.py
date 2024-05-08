@@ -243,12 +243,14 @@ class OptionsDialog(QDialog):
             self.save_manager.save_changes()
             self.save_manager.read_encrypted_ini()  # Reload configuration after saving
             QMessageBox.information(self, "Settings Updated", "Settings have been updated successfully.")
-            self.main_window.update_status_bar("Settings saved successfully.", 5000)
+            if self.main_window.isVisible():
+                self.main_window.update_status_bar("Settings saved successfully.", 5000)
             self.main_window.reload_ui()
             self.fax_timer_progress_bar.restart_progress()
         except Exception as e:
             QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
-            self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+            if self.main_window.isVisible():
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
             return
         self.accept()  # Close the dialog
 

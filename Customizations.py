@@ -71,7 +71,8 @@ class SelectInboxDialog(QDialog):
             super().accept()  # Close the dialog only if save succeeds
         except Exception as e:
             QMessageBox.critical(self, "Error", "Failed to save selected inboxes: " + str(e))
-            self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+            if self.main_window.isVisible():
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
 class HomescreenProgressBar(QProgressBar):
     def __init__(self, parent=None):

@@ -14,7 +14,8 @@ from Version import __version__
 class CheckForUpdate(QThread):
     new_version_available = pyqtSignal(str, str)  # signals with the download URL
 
-    def run(self):
+    def run(self, main_window):
+        self.main_window = main_window
         current_version = __version__
         url = "https://api.github.com/repos/TheMrDr/FaxRetriever/releases/latest"  # Use this for deployment of the software.
         # url = "https://api.github.com/repos/test/test/test"  # Use this for development to test the application
@@ -29,6 +30,8 @@ class CheckForUpdate(QThread):
                     # Check if there are any assets available for download
                     if 'assets' in data and data['assets']:
                         download_url = data['assets'][0]['browser_download_url']
+                        if self.main_window.isVisible():
+                            self.main_window.update_status_bar(f"Updating app to latest version: {latest_version}. Please wait...")
                         self.new_version_available.emit(latest_version, download_url)
                     else:
                         print("No assets found for the latest release.")
@@ -37,16 +40,16 @@ class CheckForUpdate(QThread):
         else:
             print(f"Failed to fetch update data from GitHub. Status Code: {response.status_code}")
 
-    def save_full_response(self, response):
-        """Save the full raw HTTP response to a file for debugging purposes."""
-        response_details = {
-            "status_code": response.status_code,
-            "headers": dict(response.headers),
-            "body": response.json() if response.text else "No content"
-        }
-        with open("full_github_response.json", "w") as file:
-            json.dump(response_details, file, indent=4)
-            print("Saved full GitHub API response to 'full_github_response.json'")
+    # def save_full_response(self, response):
+    #     """Save the full raw HTTP response to a file for debugging purposes."""
+    #     response_details = {
+    #         "status_code": response.status_code,
+    #         "headers": dict(response.headers),
+    #         "body": response.json() if response.text else "No content"
+    #     }
+    #     with open("full_github_response.json", "w") as file:
+    #         json.dump(response_details, file, indent=4)
+    #         print("Saved full GitHub API response to 'full_github_response.json'")
 
 
 class UpgradeApplication(QThread):

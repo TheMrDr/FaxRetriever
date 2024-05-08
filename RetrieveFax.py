@@ -95,7 +95,8 @@ class RetrieveFaxes(QThread):
                              file.startswith(f"{fax_id}_") and file.endswith(".jpg")]
                 if jpg_files:
                     # Skip downloading if a JPG file already exists
-                    self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already converted to JPG", 5000)
+                    if self.main_window.isVisible():
+                        self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already converted to JPG", 5000)
                     self.log_system.log_message('info', f"Fax PDF for ID {fax_id} already converted to JPG")
                     continue
                 file_path = os.path.join(self.save_path,
@@ -104,14 +105,16 @@ class RetrieveFaxes(QThread):
                 # Check if any PDF or JPG file exists for the fax ID
                 if os.path.exists(pdf_path):
                     # Skip downloading if a PDF file already exists
-                    self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already downloaded", 5000)
+                    if self.main_window.isVisible():
+                        self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already downloaded", 5000)
                     self.log_system.log_message('info', f"Fax PDF for ID {fax_id} already downloaded")
                     continue
                 jpg_files = [file for file in os.listdir(self.save_path) if
                              file.startswith(f"{fax_id}_") and file.endswith(".jpg")]
                 if jpg_files:
                     # Skip downloading if any JPG file already exists
-                    self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already converted to JPG", 5000)
+                    if self.main_window.isVisible():
+                        self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already converted to JPG", 5000)
                     self.log_system.log_message('info', f"Fax PDF for ID {fax_id} already converted to JPG")
                     continue
                 file_path = pdf_path
@@ -131,7 +134,8 @@ class RetrieveFaxes(QThread):
                 if pdf_response.status_code == 200:
                     with open(file_path, 'wb') as f:
                         f.write(pdf_response.content)
-                    self.main_window.update_status_bar(f"Downloaded fax file for ID {fax_id}", 5000)
+                    if self.main_window.isVisible():
+                        self.main_window.update_status_bar(f"Downloaded fax file for ID {fax_id}", 5000)
                     self.log_system.log_message('info', f"Downloaded fax file for ID {fax_id} to {file_path}")
 
                     # Convert PDF to JPG if required
@@ -139,7 +143,8 @@ class RetrieveFaxes(QThread):
                         command = ['pdftoppm', '-jpeg', file_path, os.path.join(self.save_path, f"{fax_id}")]
                         process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
                         process.communicate()  # Wait for the process to finish
-                        self.main_window.update_status_bar(f"Converted fax PDF to JPG for ID {fax_id}", 5000)
+                        if self.main_window.isVisible():
+                            self.main_window.update_status_bar(f"Converted fax PDF to JPG for ID {fax_id}", 5000)
                         self.log_system.log_message('info', f"Converted fax PDF to JPG for ID {fax_id}")
 
                     # Remove the PDF if only JPG is required
@@ -153,7 +158,8 @@ class RetrieveFaxes(QThread):
                     downloaded_faxes_count += 1  # Increment the counter for downloaded faxes
                 else:
                     download_results.append((fax_id, 'Failed to download'))
-                    self.main_window.update_status_bar(f"Failed to download fax file for ID {fax_id}", 5000)
+                    if self.main_window.isVisible():
+                        self.main_window.update_status_bar(f"Failed to download fax file for ID {fax_id}", 5000)
                     self.log_system.log_message('error',
                                                 f"Failed to download fax file for ID {fax_id}, HTTP {pdf_response.status_code}")
 
@@ -164,16 +170,20 @@ class RetrieveFaxes(QThread):
         # Check if all faxes have been downloaded and provide appropriate status messages
         if all_faxes_downloaded:
             if self.download_type == 'PDF':
-                self.main_window.update_status_bar("All faxes have already been downloaded as PDFs", 5000)
+                if self.main_window.isVisible():
+                    self.main_window.update_status_bar("All faxes have already been downloaded as PDFs", 5000)
                 self.log_system.log_message('info', "All faxes have already been downloaded as PDFs")
             elif self.download_type == 'JPG':
-                self.main_window.update_status_bar("All faxes have already been converted to JPG", 5000)
+                if self.main_window.isVisible():
+                    self.main_window.update_status_bar("All faxes have already been converted to JPG", 5000)
                 self.log_system.log_message('info', "All faxes have already been converted to JPG")
             elif self.download_type == 'Both':
-                self.main_window.update_status_bar("All faxes have already been downloaded and converted", 5000)
+                if self.main_window.isVisible():
+                    self.main_window.update_status_bar("All faxes have already been downloaded and converted", 5000)
                 self.log_system.log_message('info', "All faxes have already been downloaded and converted")
         elif downloaded_faxes_count > 1:  # If more than one fax is downloaded
-            self.main_window.update_status_bar(f"{downloaded_faxes_count} faxes downloaded", 5000)
+            if self.main_window.isVisible():
+                self.main_window.update_status_bar(f"{downloaded_faxes_count} faxes downloaded", 5000)
             self.log_system.log_message('info', f"{downloaded_faxes_count} faxes downloaded")
 
         self.finished.emit(download_results)  # Emit results of downloads

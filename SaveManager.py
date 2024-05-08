@@ -66,7 +66,8 @@ class SaveManager:
                     self.log_system.log_message('debug', f"  {option}: {decrypted_value}")
                 except Exception as e:
                     self.log_system.log_message('error', f"Error decrypting {option} in section {section}: {e}")
-                    # self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+                    if self.main_window.isVisible():
+                        self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
                     decrypted_config.set(section, option, encrypted_value)
 
         self.config = decrypted_config

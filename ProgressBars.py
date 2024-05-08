@@ -137,24 +137,23 @@ class TokenLifespanProgressBar(QWidget):
                                                          client_id]):
             try:
                 self.main_window.send_fax_button.setEnabled(True)
-                self.main_window.update_status_bar("Token Expired. Attempting to Retrieve a New Token", 5000)
+                if self.main_window.isVisible():
+                    self.main_window.update_status_bar("Token Expired. Attempting to Retrieve a New Token", 5000)
                 self.log_system.log_message('info', "Token Expired. Attempting to Retrieve a New Token")
                 self.retrieve_token.start()
                 self.rettrieve_token.finished.connect(self.token_retrieved)
-            except Error as e:
+            except Exception as e:
+                if self.main_window.isVisible():
+                    self.main_window.update_status_bar(f"Token Expired. Failed to Retrieve a New Token: {e}", 5000)
+                self.log_system.log_message('error', f"Token Expired. Failed to Retrieve a New Token: {e}")
 
-                self.main_window.update_status_bar("Token Expired. Failed to Retrieve a New Token.")
-                self.log_system.log_message('error', "Token Expired. Failed to Retrieve a New Token")
         else:
-            self.token_expired_actions()
-
-
-        """Actions to take when token is expired or invalid."""
-        self.token_lifespan_bar.setValue(0)
-        self.time_remaining_label.setText("00:00:00")
-        self.token_lifespan_text.setText("Token Expired. Please Update Credentials or Renew Token.")
-        self.log_system.log_message('info', "Token lifespan has reached zero; no action taken.")
-        self.updateTimer.stop()  # Stop the timer since the token is no longer valid
+            """Actions to take when token is expired or invalid."""
+            self.token_lifespan_bar.setValue(0)
+            self.time_remaining_label.setText("00:00:00")
+            self.token_lifespan_text.setText("Token Expired. Please Update Credentials or Renew Token.")
+            self.log_system.log_message('info', "Token lifespan has reached zero; no action taken.")
+            self.updateTimer.stop()  # Stop the timer since the token is no longer valid
 
     def is_token_valid(self):
         return self.token_is_valid
@@ -223,7 +222,8 @@ class FaxPollTimerProgressBar(QWidget):
 
         if not self.token_progress_bar or not self.token_progress_bar.is_token_valid():
             self.faxPollTimer_bar.setValue(0)
-            self.main_window.update_status_bar("Invalid or Missing Token - "
+            if self.main_window.isVisible():
+                self.main_window.update_status_bar("Invalid or Missing Token - "
                                                "Request New Token in Tools, or Check Settings.", 5000)
             self.log_system.log_message('info', "Token is invalid, halting fax poll timer.")
             self.updateTimer.stop()  # Stop the timer if the token is invalid
@@ -250,11 +250,13 @@ class FaxPollTimerProgressBar(QWidget):
 
     def retrieveFaxes(self):
         if not self.token_progress_bar.is_token_valid():
-            self.main_window.update_status_bar("Token is invalid, cannot retrieve faxes.", 5000)
+            if self.main_window.isVisible():
+                self.main_window.update_status_bar("Token is invalid, cannot retrieve faxes.", 5000)
             self.log_system.log_message('info', "Token is invalid, cannot retrieve faxes.")
             return  # Do not retrieve faxes if the token is invalid
 
-        self.main_window.update_status_bar("Checking for new faxes...", 5000)
+        if self.main_window.isVisible():
+            self.main_window.update_status_bar("Checking for new faxes...", 5000)
         self.log_system.log_message('info', "Fax retrieval initiated.")
         self.setupTimer()  # Reset and restart the fax poll timer
         self.faxRetrieval = RetrieveFaxes(self.main_window)

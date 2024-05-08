@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
             event.ignore()  # Ignore the close event, the application remains fully open
 
     def check_for_updates(self):
-        self.update_checker = CheckForUpdate()
+        self.update_checker = CheckForUpdate(self)
         self.update_checker.new_version_available.connect(self.upgrade_application)
         self.update_checker.start()
 
@@ -174,8 +174,6 @@ class MainWindow(QMainWindow):
         self.log_system.log_message('debug', 'UI Initializing')
         self.create_menu()
         self.log_system.log_message('debug', 'Menu Initialized')
-        self.create_status_bar()
-        self.log_system.log_message('debug', 'Status Bar Initialized')
         self.create_central_widget()
         self.log_system.log_message('debug', 'Main UI Initialized')
 
@@ -271,6 +269,9 @@ class MainWindow(QMainWindow):
         # Set central widget and layout
         self.setCentralWidget(self.centralWidget)
         self.centralWidget.setLayout(layout)
+
+        self.create_status_bar()
+        self.log_system.log_message('debug', 'Status Bar Initialized')
 
         self.reload_ui()
 
@@ -417,7 +418,8 @@ class MainWindow(QMainWindow):
 
     def update_status_bar(self, message, timeout):
         # Display the initial message with the specified timeout
-        self.status_bar.showMessage(message, timeout)
+        if MainWindow.isVisible(self):
+            self.status_bar.showMessage(message, timeout)
 
         # Set up a QTimer to reset the status bar to the copyright message after the initial message's timeout
         QTimer.singleShot(timeout, self.reset_status_bar)
