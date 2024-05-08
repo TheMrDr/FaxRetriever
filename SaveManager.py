@@ -130,9 +130,9 @@ class SaveManager:
         defaults = {
             ("Token", "token_expiration"): datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             ("Token", "access_token"): "None Set",
-            ("Path", "save_path"): os.path.join(os.getenv('PUBLIC'), 'Desktop', 'FaxRetriever'),
             ("Retrieval", "auto_retrieve"): "Disabled",
-            ("UserSettings", "logging_level"): "Info",
+            ("UserSettings", "save_path"): os.path.join(os.getenv('PUBLIC'), 'Desktop', 'FaxRetriever'),
             ("UserSettings", "selected_inboxes"): "",
+            ("UserSettings", "logging_level"): "Info",
         }
         return defaults.get((section, option), "None Set")

@@ -305,7 +305,7 @@ class MainWindow(QMainWindow):
         self.delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
 
         self.fax_extension = self.save_manager.get_config_value('Fax', 'fax_extension')
-        self.save_path = self.save_manager.get_config_value('Path', 'save_path')
+        self.save_path = self.save_manager.get_config_value('UserSettings', 'save_path')
 
         self.populate_caller_ids(self.fax_caller_id)
 
@@ -321,6 +321,9 @@ class MainWindow(QMainWindow):
             self.tokenLifespanProgressBar.restart_progress()
             self.faxPollTimerProgressBar.restart_progress()
 
+            # Load content into dynamic fields and buttons
+            self.saveLocationDisplay.setText(self.save_path)
+
             # Update the status bar to indicate successful reloading
             self.update_status_bar("UI and data reloaded successfully.", 5000)
         except Exception as e:
@@ -330,7 +333,7 @@ class MainWindow(QMainWindow):
     def select_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
         self.saveLocationDisplay.setText(folder_path)
-        self.save_manager.config.set('Path', 'save_path', folder_path)
+        self.save_manager.config.set('UserSettings', 'save_path', folder_path)
         self.save_manager.save_changes()
 
     def minimize_to_tray(self):
