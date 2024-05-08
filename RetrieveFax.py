@@ -31,7 +31,7 @@ class RetrieveFaxes(QThread):
         self.encryption_manager = SaveManager(self.main_window)
         self.token = self.encryption_manager.get_config_value('Token', 'access_token')
         self.fax_account = self.encryption_manager.get_config_value('Account', 'fax_user')
-        self.save_path = self.encryption_manager.get_config_value('Path', 'save_path')
+        self.save_path = self.encryption_manager.get_config_value('UserSettings', 'save_path')
         self.download_type = self.encryption_manager.get_config_value('Fax Options', 'download_method')
         self.delete_fax_option = self.encryption_manager.get_config_value('Fax Options', 'delete_faxes')
         # self.mark_read = self.encryption_manager.get_config_value('Fax Options', 'mark_read')
