@@ -75,6 +75,8 @@ class UpgradeApplication(QThread):
             with open(batch_script_path, 'w') as bat_file:
                 bat_file.write(f"""
 @echo off
+taskkill /f /im FaxRetriever.exe >nul 2>&1
+
 :loop
 timeout /t 1
 tasklist /fi "IMAGENAME eq {os.path.basename(current_exe)}" | find /i "{os.path.basename(current_exe)}" >nul

@@ -419,3 +419,286 @@
 2024-05-05 02:45:17,736 - ClinicFax - INFO - Encryption Key: [Protected]
 2024-05-05 02:45:17,741 - ClinicFax - INFO - Credentials loaded for token retrieval.
 2024-05-05 02:45:17,885 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-05 03:00:16,906 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 03:00:16,914 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 03:00:17,656 - ClinicFax - INFO - Downloaded fax file for ID 37315412 to C:/Users/jfreeman/Desktop/FaxRetriever\37315412.pdf
+2024-05-05 03:00:17,669 - ClinicFax - INFO - Downloaded fax file for ID 37315412 to C:/Users/jfreeman/Desktop/FaxRetriever\37315412.pdf
+2024-05-05 03:00:18,405 - ClinicFax - INFO - Downloaded fax file for ID 37224706 to C:/Users/jfreeman/Desktop/FaxRetriever\37224706.pdf
+2024-05-05 03:00:18,417 - ClinicFax - INFO - Downloaded fax file for ID 37224706 to C:/Users/jfreeman/Desktop/FaxRetriever\37224706.pdf
+2024-05-05 03:00:18,830 - ClinicFax - INFO - Downloaded fax file for ID 37224624 to C:/Users/jfreeman/Desktop/FaxRetriever\37224624.pdf
+2024-05-05 03:00:18,881 - ClinicFax - INFO - Downloaded fax file for ID 37224624 to C:/Users/jfreeman/Desktop/FaxRetriever\37224624.pdf
+2024-05-05 03:00:19,589 - ClinicFax - INFO - Downloaded fax file for ID 37224287 to C:/Users/jfreeman/Desktop/FaxRetriever\37224287.pdf
+2024-05-05 03:00:19,650 - ClinicFax - INFO - Downloaded fax file for ID 37224287 to C:/Users/jfreeman/Desktop/FaxRetriever\37224287.pdf
+2024-05-05 03:15:16,309 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 03:15:16,339 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 03:30:15,680 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 03:30:15,728 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 03:45:15,033 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 03:45:15,063 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 04:00:14,401 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 04:00:14,420 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 04:15:14,076 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 04:15:14,106 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 04:30:13,982 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 04:30:14,012 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 04:45:13,606 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 04:45:13,637 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 05:00:13,189 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 05:00:13,218 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 05:15:12,526 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 05:15:12,557 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 05:30:11,870 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 05:30:11,900 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 05:45:11,004 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 05:45:11,033 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 06:00:10,684 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 06:00:10,704 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 06:15:10,386 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 06:15:10,435 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 06:30:09,854 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 06:30:09,905 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 06:45:09,381 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 06:45:09,869 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 07:00:08,567 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 07:00:09,336 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 07:15:07,939 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 07:15:08,816 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 07:30:07,138 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 07:30:08,146 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 07:45:06,647 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 07:45:07,163 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 08:00:06,531 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 08:00:06,550 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 08:15:05,948 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 08:15:05,998 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 08:30:05,835 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 08:30:05,864 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 08:45:05,063 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 08:45:05,094 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 09:00:04,533 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 09:00:04,550 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 09:15:03,918 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 09:15:03,967 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 09:30:03,263 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 09:30:03,312 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 09:45:02,657 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 09:45:02,686 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:00:01,878 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:00:01,894 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:15:01,510 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:15:01,560 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:30:01,256 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:30:01,306 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:45:00,486 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:45:00,513 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:59:59,705 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 10:59:59,731 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 11:14:58,719 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 11:14:59,734 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 11:29:57,902 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 11:29:58,910 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 11:44:57,070 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 11:44:58,061 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 11:59:56,297 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 11:59:57,312 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 12:14:56,308 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 12:14:56,338 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 12:29:55,844 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 12:29:55,874 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 12:44:55,512 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 12:44:55,539 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 12:59:54,851 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 12:59:54,871 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 13:14:53,951 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 13:14:53,982 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 13:29:53,079 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 13:29:53,128 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 13:44:52,807 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 13:44:52,838 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 13:59:51,855 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 13:59:51,982 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 14:14:50,909 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 14:14:51,214 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 14:29:49,944 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 14:29:50,664 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 14:44:48,983 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 14:44:49,950 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 14:59:48,017 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 14:59:48,990 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 15:14:47,053 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 15:14:48,016 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 15:29:46,076 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 15:29:47,045 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 15:44:45,108 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 15:44:46,068 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 15:59:44,123 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 15:59:45,093 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 16:14:43,144 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 16:14:44,110 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 16:29:42,192 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 16:29:43,129 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 16:44:41,213 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 16:44:42,171 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 16:59:40,255 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 16:59:41,190 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 17:14:39,265 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 17:14:40,234 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 17:29:38,280 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 17:29:39,247 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 17:44:37,299 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 17:44:38,258 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 17:59:36,366 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 17:59:37,273 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 18:14:35,398 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 18:14:36,406 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 18:29:34,414 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 18:29:35,563 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 18:44:33,446 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 18:44:34,570 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 18:59:32,492 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 18:59:33,580 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 19:14:31,522 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 19:14:32,652 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 19:29:30,567 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 19:29:32,120 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 19:44:29,597 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 19:44:31,325 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 19:59:28,637 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 19:59:30,353 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 20:14:28,326 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 20:14:29,414 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 20:29:27,418 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 20:29:28,423 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 20:44:26,461 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 20:44:27,454 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 20:59:25,489 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 20:59:26,466 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 21:14:24,500 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 21:14:25,685 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 21:29:23,519 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 21:29:24,717 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 21:44:22,550 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 21:44:23,743 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 21:59:21,580 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 21:59:22,774 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 22:14:20,607 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 22:14:21,797 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 22:29:19,627 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 22:29:20,827 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 22:44:18,655 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 22:44:19,840 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 22:59:17,699 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 22:59:18,861 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 23:14:16,724 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 23:14:17,871 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 23:29:15,762 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 23:29:16,899 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 23:44:14,778 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 23:44:15,921 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 23:59:13,885 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-05 23:59:15,005 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 00:14:12,900 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 00:14:14,057 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 00:29:11,935 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 00:29:13,439 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 00:44:10,967 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 00:44:12,731 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 00:59:10,051 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 00:59:12,077 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 01:11:17,739 - ClinicFax - INFO - Starting token retrieval thread.
+2024-05-06 01:11:18,497 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-06 01:11:18,683 - ClinicFax - INFO - Token retrieved and saved successfully.
+2024-05-06 01:14:09,083 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 01:14:11,083 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 01:29:08,098 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 01:29:10,099 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 01:44:07,127 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 01:44:09,481 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 01:59:06,310 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 01:59:08,662 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 02:14:05,324 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 02:14:08,037 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 02:29:04,352 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 02:29:07,329 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 02:44:03,422 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 02:44:06,678 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 02:59:02,457 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 02:59:06,057 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 03:14:01,469 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 03:14:05,334 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 03:29:00,497 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 03:29:04,688 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 03:43:59,536 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 03:44:04,068 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 03:58:58,567 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 03:59:03,351 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 04:13:57,690 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 04:14:02,696 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 04:28:56,733 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 04:29:02,069 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 04:43:55,760 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 04:44:01,351 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 04:58:54,801 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 04:59:00,356 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 05:13:53,829 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 05:13:59,364 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 05:28:52,867 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 05:28:58,705 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 05:43:51,897 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 05:43:58,089 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 05:58:50,936 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 05:58:57,369 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 06:13:50,021 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 06:13:56,717 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 06:28:49,037 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 06:28:55,726 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 06:43:48,090 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 06:43:54,776 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 06:58:47,127 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 06:58:53,815 - ClinicFax - INFO - Fax retrieval initiated.
+2024-05-06 07:12:20,393 - ClinicFax - INFO - Application Closed
+2024-05-06 21:51:03,948 - ClinicFax - INFO - Application Started
+2024-05-06 21:51:04,073 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-06 21:51:04,078 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-06 21:51:04,084 - ClinicFax - WARNING - Option 'token_retrieved' not found in section 'Token', setting default value.
+2024-05-06 21:51:04,091 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-06 21:51:04,096 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-06 21:51:04,559 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-06 21:51:04,568 - ClinicFax - ERROR - Invalid configuration value detected.
+2024-05-06 21:51:04,634 - ClinicFax - ERROR - Invalid configuration value detected.
+2024-05-06 21:51:04,639 - ClinicFax - ERROR - Invalid configuration value detected.
+2024-05-06 21:51:04,644 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:04,724 - ClinicFax - ERROR - Invalid configuration value detected.
+2024-05-06 21:51:04,729 - ClinicFax - ERROR - Invalid configuration value detected.
+2024-05-06 21:51:04,733 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:05,563 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:05,570 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:06,565 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:07,562 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:08,562 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:09,565 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:10,563 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:11,557 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-06 21:51:11,563 - ClinicFax - INFO - Starting token retrieval thread.
+2024-05-06 21:51:11,563 - ClinicFax - INFO - Token is invalid, halting fax poll timer.
+2024-05-06 21:51:12,420 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-06 21:51:12,431 - ClinicFax - INFO - Token retrieved and saved successfully.
+2024-05-06 21:54:33,921 - ClinicFax - INFO - Application Closed
+2024-05-06 21:54:43,095 - ClinicFax - INFO - Application Started
+2024-05-06 21:54:43,213 - ClinicFax - INFO - Configuration loaded from: C:\Users\Administrator\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-06 21:54:43,219 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-06 21:54:43,224 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-06 21:54:43,656 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-06 21:54:50,195 - ClinicFax - INFO - Application Closed
+2024-05-07 14:47:21,754 - ClinicFax - INFO - Application Started
+2024-05-07 14:47:21,853 - ClinicFax - INFO - Configuration loaded from: C:\Users\jfreeman\AppData\Local\CN-FaxRetriever\config.ini
+2024-05-07 14:47:21,857 - ClinicFax - INFO - Encryption Key: [Protected]
+2024-05-07 14:47:21,863 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-07 14:47:22,112 - ClinicFax - INFO - Credentials loaded for token retrieval.
+2024-05-07 14:47:36,114 - ClinicFax - INFO - Starting fax number retrieval thread.
+2024-05-07 14:47:36,908 - ClinicFax - INFO - Successfully retrieved fax numbers: ['14058038006']
+2024-05-07 14:47:39,269 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-07 14:47:39,278 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-07 14:47:39,284 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-07 14:47:46,762 - ClinicFax - INFO - All configurations have been encrypted and saved.
+2024-05-07 14:47:50,918 - ClinicFax - INFO - Application Closed

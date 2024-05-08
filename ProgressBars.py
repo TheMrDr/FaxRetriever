@@ -136,7 +136,7 @@ class TokenLifespanProgressBar(QWidget):
         if all(var not in [None, "None Set"] for var in [token_retrieved_str, token_expiration_str, fax_user,
                                                          client_id]):
             try:
-                self.main_window.set_fax_button.setEnabled(True)
+                self.main_window.send_fax_button.setEnabled(True)
                 self.main_window.update_status_bar("Token Expired. Attempting to Retrieve a New Token", 5000)
                 self.log_system.log_message('info', "Token Expired. Attempting to Retrieve a New Token")
                 self.retrieve_token.start()
