@@ -121,14 +121,14 @@ class SendFax(QDialog):
         if document_item:
             menu = QMenu()
             remove_action = QAction("Remove Document", self)
-            remove_action.triggered.connect(lambda: self.remove_document(document_item))
+            remove_action.triggered.connect(self.remove_document)
             menu.addAction(remove_action)
             menu.exec_(self.document_list.mapToGlobal(pos))
 
-    def remove_document(self, item):
-        index = self.document_list.row(item)
-        del self.documents_paths[index]  # Remove the corresponding full path
-        self.document_list.takeItem(index)
+    # def remove_document(self, item):
+    #     index = self.document_list.row(item)
+    #     del self.documents_paths[index]  # Remove the corresponding full path
+    #     self.document_list.takeItem(index)
 
     def attach_or_change_cover_sheet(self):
         options = QFileDialog.Options()
@@ -194,6 +194,7 @@ class SendFax(QDialog):
             for file in files:
                 self.documents_paths.append(file)  # Store full path
                 self.document_list.addItem(self.format_display_name(file))
+
     def remove_document(self):
         selected_items = self.document_list.selectedItems()
         if not selected_items:
