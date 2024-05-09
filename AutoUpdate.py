@@ -93,6 +93,9 @@ timeout /t 1
 tasklist /fi "IMAGENAME eq {os.path.basename(current_exe)}" | find /i "{os.path.basename(current_exe)}" >nul
 if errorlevel 1 (
     echo Updating...
+    if exist "{current_exe}" (
+        copy /y "{current_exe}" "{backup_exe}"
+    )
     move /y "{update_file_path}" "{current_exe}"
     if not errorlevel 1 (
         echo Update successful, restarting...
