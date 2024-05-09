@@ -14,31 +14,39 @@ from Version import __version__
 class CheckForUpdate(QThread):
     new_version_available = pyqtSignal(str, str)  # signals with the download URL
 
-    def run(self, main_window):
+    def __init__(self, main_window=None):
+        super().__init__()
         self.main_window = main_window
-        current_version = __version__
-        url = "https://api.github.com/repos/TheMrDr/FaxRetriever/releases/latest"  # Use this for deployment of the software.
-        # url = "https://api.github.com/repos/test/test/test"  # Use this for development to test the application
-        response = requests.get(url)
-        # self.save_full_response(response)  # Save the full response for troubleshooting
 
-        if response.status_code == 200:
-            data = response.json()
-            if 'tag_name' in data:  # Ensure 'tag_name' exists in the data
-                latest_version = data['tag_name']
-                if latest_version > current_version:
-                    # Check if there are any assets available for download
-                    if 'assets' in data and data['assets']:
-                        download_url = data['assets'][0]['browser_download_url']
-                        if self.main_window.isVisible():
-                            self.main_window.update_status_bar(f"Updating app to latest version: {latest_version}. Please wait...")
-                        self.new_version_available.emit(latest_version, download_url)
-                    else:
-                        print("No assets found for the latest release.")
+    def run(self):
+        if self.main_window:
+            current_version = __version__
+            url = "https://api.github.com/repos/TheMrDr/FaxRetriever/releases/latest"  # Use this for deployment of the software.
+            # url = "https://api.github.com/repos/test/test/test"  # Use this for development to test the application
+            response = requests.get(url)
+            # self.save_full_response(response)  # Save the full response for troubleshooting
+
+            if response.status_code == 200:
+                data = response.json()
+                if 'tag_name' in data:  # Ensure 'tag_name' exists in the data
+                    latest_version = data['tag_name']
+                    if latest_version > current_version:
+                        # Check if there are any assets available for download
+                        if 'assets' in data and data['assets']:
+                            download_url = data['assets'][0]['browser_download_url']
+                            if self.main_window.isVisible():
+                                self.main_window.update_status_bar(f"Updating app to latest version: {latest_version}. Please wait...", 5000)
+                            self.new_version_available.emit(latest_version, download_url)
+                        else:
+                            if self.main_window.isVisible():
+                                self.main_window.update_status_bar("No assets found for the latest release.", 5000)
+                else:
+                    if self.main_window.isVisible():
+                        self.main_window.update_status_bar("No tag name found in the latest release.", 5000)
             else:
-                print("No tag name found in the latest release.")
-        else:
-            print(f"Failed to fetch update data from GitHub. Status Code: {response.status_code}")
+                if self.main_window.isVisible():
+                    self.main_window.update_status_bar(
+                        f"Failed to fetch update data from GitHub. Status Code: {response.status_code}", 5000)
 
     # def save_full_response(self, response):
     #     """Save the full raw HTTP response to a file for debugging purposes."""

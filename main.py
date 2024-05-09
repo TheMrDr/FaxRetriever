@@ -39,48 +39,55 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.initialize_attributes()
+        self.setup_ui()
+        self.connect_signals()
+        self.load_initial_data()
+        self.finalize_initialization()
+
+    def initialize_attributes(self):
+        """Initialize attributes with default values or configurations"""
         self.status_bar = None
         self.version = __version__
         self.save_manager = SaveManager(self)
-        self.retrieve_numbers = RetrieveNumbers(self)
-        self.retrieve_token = RetrieveToken(self)
-        self.send_fax_dialog = SendFax(self)
-        self.about_dialog = AboutDialog()
-        self.faxPollButton = CustomPushButton("Check for New Faxes")
-        self.send_fax_button = CustomPushButton("Send a Fax")
-        self.settingsLoaded.connect(self.reload_ui)  # Connect signal to slot
-
-        # Load the app log services and set logging level.
         self.log_system = SystemLog()
         self.logging_level = self.save_manager.get_config_value('Log', 'logging_level')
         self.log_system.refresh_logging_level(self.logging_level)
 
-        # Title the app window, set width, and set the app icon.
+    def setup_ui(self):
+        """Setup the main window UI components"""
         self.setWindowTitle("Clinic Voice Instant Fax")
         self.setFixedWidth(600)
         self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
+        self.initialize_components()
+        self.initialize_tray_menu()
 
-        # Initialize UI components that might display or utilize the data
-        self.tokenLifespanProgressBar = TokenLifespanProgressBar(main_window=self)
+    def initialize_components(self):
+        """Initialize UI components that might display or utilize saved data"""
+        self.retrieve_numbers = RetrieveNumbers(self)
+        self.retrieve_token = RetrieveToken(self)  # Pass self as main_window
+        self.send_fax_dialog = SendFax(self)
+        self.about_dialog = AboutDialog()
+        self.faxPollButton = CustomPushButton("Check for New Faxes")
+        self.send_fax_button = CustomPushButton("Send a Fax")
+        self.tokenLifespanProgressBar = TokenLifespanProgressBar(main_window=self)  # Pass self as main_window
         self.faxPollTimerProgressBar = FaxPollTimerProgressBar(main_window=self,
-                                                               token_progress_bar=self.tokenLifespanProgressBar)
+                                                               token_progress_bar=self.tokenLifespanProgressBar)  # Pass self as main_window
         self.options_dialog = OptionsDialog(main_window=self, token_progress_bar=self.tokenLifespanProgressBar)
 
-        # Initialize signals and slots
+    def connect_signals(self):
+        self.settingsLoaded.connect(self.reload_ui)  # Connect signal to slot
         self.retrieve_token.token_retrieved.connect(self.tokenLifespanProgressBar.restart_progress)
         self.retrieve_token.token_retrieved.connect(self.faxPollTimerProgressBar.restart_progress)
 
-        # Tray icon setup should not depend on data loading
-        self.tray_icon = QSystemTrayIcon(self)
-        self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
-        self.initialize_tray_menu()
-
+    def load_initial_data(self):
+        """Load data and setup initial state of the application"""
+        self.check_for_updates()
         self.initialize_ui()
         self.check_for_updates()  # Check for updates at startup
 
-        # Refresh data from configuration before initializing components that might depend on this data
-        self.refresh_data_from_config()
-
+    def finalize_initialization(self):
+        """Final steps to initialize the UI based on loaded data"""
         required_height = (self.centralWidget.sizeHint().height() + self.statusBar().sizeHint().height() +
                            self.menuBar().sizeHint().height() + 10)
         self.setFixedSize(600, required_height)  # Set width to 600 and height dynamically
@@ -164,6 +171,9 @@ class MainWindow(QMainWindow):
         self.upgrader.start()
 
     def initialize_tray_menu(self):
+        # Tray icon setup should not depend on data loading
+        self.tray_icon = QSystemTrayIcon(self)
+        self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
         self.tray_menu = QMenu()
         self.tray_menu.addAction("Open Fax Manager", self.show)
         self.tray_menu.addAction("Close", self.close)
@@ -223,6 +233,8 @@ class MainWindow(QMainWindow):
         # Main layout
         layout = QGridLayout(self.centralWidget)
 
+        self.load_data_from_config()
+
         # Placeholder for a logo
         banner = QLabel()
         pixmap = QPixmap(os.path.join(bundle_dir, "images", "banner_small.png"))  # Update the path as needed
@@ -264,7 +276,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.send_fax_button, 7, 0, 1, 2)
         self.send_fax_button.setEnabled(False)
 
-        self.update_status_bar('System Started', 1000)
+        if self.isVisible():
+            self.update_status_bar('System Started', 1000)
 
         # Set central widget and layout
         self.setCentralWidget(self.centralWidget)
@@ -280,6 +293,32 @@ class MainWindow(QMainWindow):
 
     def show_send_fax_dialog(self):
         self.send_fax_dialog.show()
+
+    def load_data_from_config(self):
+        self.access_token = self.save_manager.get_config_value('Token', 'access_token')
+        self.token_retrieved = self.save_manager.get_config_value('Token', 'token_retrieved')
+        self.token_expiration = self.save_manager.get_config_value('Token', 'token_expiration')
+
+        self.fax_user = self.save_manager.get_config_value('Account', 'fax_user')
+        self.all_numbers = self.save_manager.get_config_value('Account', 'all_numbers')
+        self.account_uuid = self.save_manager.get_config_value('Account', 'account_uuid')
+
+        self.client_id = self.save_manager.get_config_value('Client', 'client_id')
+        self.client_pass = self.save_manager.get_config_value('Client', 'client_secret')
+
+        self.api_username = self.save_manager.get_config_value('API', 'username')
+        self.api_pass = self.save_manager.get_config_value('API', 'password')
+
+        self.log_level = self.save_manager.get_config_value('Log', 'logging_level')
+
+        self.auto_retrieve_enabled = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
+        self.fax_caller_id = self.save_manager.get_config_value('Retrieval', 'fax_caller_id')
+
+        self.download_method = self.save_manager.get_config_value('Fax Options', 'download_method')
+        self.delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
+
+        self.fax_extension = self.save_manager.get_config_value('Fax', 'fax_extension')
+        self.save_path = self.save_manager.get_config_value('UserSettings', 'save_path')
 
     def refresh_data_from_config(self):
         self.access_token = self.save_manager.get_config_value('Token', 'access_token')
@@ -421,7 +460,7 @@ class MainWindow(QMainWindow):
 
     def update_status_bar(self, message, timeout):
         # Display the initial message with the specified timeout
-        if MainWindow.isVisible(self):
+        if self.isVisible():
             self.status_bar.showMessage(message, timeout)
 
         # Set up a QTimer to reset the status bar to the copyright message after the initial message's timeout
@@ -438,6 +477,7 @@ if __name__ == '__main__':
     log_system = SystemLog()
     log_system.log_message('info', 'Application Started')
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = MainWindow()  # Pass any required arguments here
     window.show()
     sys.exit(app.exec_())
+
