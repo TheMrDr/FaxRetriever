@@ -141,7 +141,7 @@ class TokenLifespanProgressBar(QWidget):
                     self.main_window.update_status_bar("Token Expired. Attempting to Retrieve a New Token", 5000)
                 self.log_system.log_message('info', "Token Expired. Attempting to Retrieve a New Token")
                 self.retrieve_token.start()
-                self.rettrieve_token.finished.connect(self.token_retrieved)
+                self.retrieve_token.finished.connect(self.token_retrieved)
             except Exception as e:
                 if self.main_window.isVisible():
                     self.main_window.update_status_bar(f"Token Expired. Failed to Retrieve a New Token: {e}", 5000)

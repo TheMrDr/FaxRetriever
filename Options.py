@@ -184,8 +184,8 @@ class OptionsDialog(QDialog):
             self.delete_no_radio.setChecked(True)
 
         # Set Debug Level
-        debug_level = self.save_manager.get_config_value('Debug', 'debug_level')
-        self.logging_level_combo.setCurrentText(debug_level)
+        logging_level = self.save_manager.get_config_value('UserSettings', 'logging_level')
+        self.logging_level_combo.setCurrentText(logging_level)
 
     def toggle_sensitive_settings(self, checked):
         if checked:

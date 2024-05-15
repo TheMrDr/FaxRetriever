@@ -1,6 +1,7 @@
 import json
 import os
 import platform
+import re
 import requests
 import subprocess
 import sys
@@ -35,6 +36,7 @@ class RetrieveFaxes(QThread):
         self.download_type = self.encryption_manager.get_config_value('Fax Options', 'download_method')
         self.delete_fax_option = self.encryption_manager.get_config_value('Fax Options', 'delete_faxes')
         # self.mark_read = self.encryption_manager.get_config_value('Fax Options', 'mark_read')
+        self.allowed_caller_ids = self.load_allowed_caller_ids()
 
 
     def add_poppler_to_path(self):
@@ -44,6 +46,13 @@ class RetrieveFaxes(QThread):
     def run(self):
         self.retrieve_faxes()
 
+    def load_allowed_caller_ids(self):
+        # Retrieve the caller IDs from the configuration
+        caller_ids = self.encryption_manager.get_config_value('Retrieval', 'fax_caller_id')
+        # Split by comma and reformat to numbers only
+        formatted_caller_ids = [re.sub(r'\D', '', cid) for cid in caller_ids.split(',')]
+        return formatted_caller_ids
+
     def retrieve_faxes(self):
         base_url = "https://telco-api.skyswitch.com"
         url = f"{base_url}/users/{self.fax_account}/faxes/inbound"
@@ -51,8 +60,8 @@ class RetrieveFaxes(QThread):
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             faxes_response = response.json()
-            # with open('faxes_response.txt', 'w') as outfile:
-            #     json.dump(faxes_response, outfile, indent=4)  # Write the JSON response to a .txt file with indentation
+            with open('faxes_response.txt', 'w') as outfile:
+                json.dump(faxes_response, outfile, indent=4)  # Write the JSON response to a .txt file with indentation
             if 'data' in faxes_response:
                 faxes = faxes_response['data']
                 self.download_fax_pdfs(faxes)
@@ -83,6 +92,14 @@ class RetrieveFaxes(QThread):
         downloaded_faxes_count = 0  # Counter for downloaded faxes
 
         for fax in faxes:
+            destination_number = str(fax['destination'])
+            print(f'Fax Destination Phone Number: {destination_number}')
+            print(f'List of Allowed Numbers: {self.allowed_caller_ids}')
+
+            if destination_number not in self.allowed_caller_ids:
+                self.log_system.log_message('info', f'Destination number {destination_number} not in allowed caller IDs')
+                continue  # Skip downloading the fax
+
             fax_id = fax['id']
             pdf_path = os.path.join(self.save_path, f"{fax_id}.pdf")
 

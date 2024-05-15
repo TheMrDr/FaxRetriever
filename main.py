@@ -23,6 +23,7 @@ else:
 from AboutDialog import AboutDialog
 from AutoUpdate import CheckForUpdate, UpgradeApplication
 from Customizations import CustomPushButton, SelectInboxDialog
+from FaxStatusDialog import FaxStatusDialog
 from Options import OptionsDialog
 from ProgressBars import TokenLifespanProgressBar, FaxPollTimerProgressBar
 from RetrieveNumbers import RetrieveNumbers
@@ -51,7 +52,7 @@ class MainWindow(QMainWindow):
         self.version = __version__
         self.save_manager = SaveManager(self)
         self.log_system = SystemLog()
-        self.logging_level = self.save_manager.get_config_value('Log', 'logging_level')
+        self.logging_level = self.save_manager.get_config_value('UserSettings', 'logging_level')
         self.log_system.refresh_logging_level(self.logging_level)
 
     def setup_ui(self):
@@ -68,6 +69,7 @@ class MainWindow(QMainWindow):
         self.retrieve_token = RetrieveToken(self)  # Pass self as main_window
         self.send_fax_dialog = SendFax(self)
         self.about_dialog = AboutDialog()
+        self.fax_status_dialog = FaxStatusDialog(self)
         self.faxPollButton = CustomPushButton("Check for New Faxes")
         self.send_fax_button = CustomPushButton("Send a Fax")
         self.tokenLifespanProgressBar = TokenLifespanProgressBar(main_window=self)  # Pass self as main_window
@@ -196,6 +198,11 @@ class MainWindow(QMainWindow):
         self.populate_help_menu()
 
     def populate_system_menu(self):
+        self.options_button = QAction("Options", self)
+        self.options_button.triggered.connect(self.show_options_dialog)
+        self.file_menu.addAction(self.options_button)
+        self.options_button.setEnabled(True)
+
         self.minimize_app_button = QAction("Minimize", self)
         self.minimize_app_button.triggered.connect(self.minimize_to_tray)
         self.file_menu.addAction(self.minimize_app_button)
@@ -205,10 +212,10 @@ class MainWindow(QMainWindow):
         self.file_menu.addAction(self.close_app_button)
 
     def populate_tools_menu(self):
-        self.options_button = QAction("Options", self)
-        self.options_button.triggered.connect(self.show_options_dialog)
-        self.tools_menu.addAction(self.options_button)
-        self.options_button.setEnabled(True)
+        self.fax_status_button = QAction("Fax Status", self)
+        self.fax_status_button.triggered.connect(self.show_fax_status_dialog)
+        self.tools_menu.addAction(self.fax_status_button)
+        self.fax_status_button.setEnabled(True)
 
         self.retrieve_token_button = QAction("Retrieve Token", self)
         self.retrieve_token_button.triggered.connect(self.startTokenRetrieval)
@@ -226,6 +233,10 @@ class MainWindow(QMainWindow):
 
     def show_options_dialog(self):
         self.options_dialog.show()
+
+    def show_fax_status_dialog(self):
+        self.fax_status_dialog.initiate_fetch()
+        self.fax_status_dialog.show()
 
     def create_central_widget(self):
         self.centralWidget = QWidget()
@@ -301,7 +312,6 @@ class MainWindow(QMainWindow):
 
         self.fax_user = self.save_manager.get_config_value('Account', 'fax_user')
         self.all_numbers = self.save_manager.get_config_value('Account', 'all_numbers')
-        self.account_uuid = self.save_manager.get_config_value('Account', 'account_uuid')
 
         self.client_id = self.save_manager.get_config_value('Client', 'client_id')
         self.client_pass = self.save_manager.get_config_value('Client', 'client_secret')
@@ -309,7 +319,7 @@ class MainWindow(QMainWindow):
         self.api_username = self.save_manager.get_config_value('API', 'username')
         self.api_pass = self.save_manager.get_config_value('API', 'password')
 
-        self.log_level = self.save_manager.get_config_value('Log', 'logging_level')
+        self.log_level = self.save_manager.get_config_value('UserSettings', 'logging_level')
 
         self.auto_retrieve_enabled = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
         self.fax_caller_id = self.save_manager.get_config_value('Retrieval', 'fax_caller_id')
@@ -317,7 +327,6 @@ class MainWindow(QMainWindow):
         self.download_method = self.save_manager.get_config_value('Fax Options', 'download_method')
         self.delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
 
-        self.fax_extension = self.save_manager.get_config_value('Fax', 'fax_extension')
         self.save_path = self.save_manager.get_config_value('UserSettings', 'save_path')
 
     def refresh_data_from_config(self):
@@ -327,7 +336,6 @@ class MainWindow(QMainWindow):
 
         self.fax_user = self.save_manager.get_config_value('Account', 'fax_user')
         self.all_numbers = self.save_manager.get_config_value('Account', 'all_numbers')
-        self.account_uuid = self.save_manager.get_config_value('Account', 'account_uuid')
 
         self.client_id = self.save_manager.get_config_value('Client', 'client_id')
         self.client_pass = self.save_manager.get_config_value('Client', 'client_secret')
@@ -335,7 +343,7 @@ class MainWindow(QMainWindow):
         self.api_username = self.save_manager.get_config_value('API', 'username')
         self.api_pass = self.save_manager.get_config_value('API', 'password')
 
-        self.log_level = self.save_manager.get_config_value('Log', 'logging_level')
+        self.log_level = self.save_manager.get_config_value('UserSettings', 'logging_level')
 
         self.auto_retrieve_enabled = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
         self.fax_caller_id = self.save_manager.get_config_value('Retrieval', 'fax_caller_id')
@@ -343,7 +351,6 @@ class MainWindow(QMainWindow):
         self.download_method = self.save_manager.get_config_value('Fax Options', 'download_method')
         self.delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
 
-        self.fax_extension = self.save_manager.get_config_value('Fax', 'fax_extension')
         self.save_path = self.save_manager.get_config_value('UserSettings', 'save_path')
 
         self.populate_caller_ids(self.fax_caller_id)

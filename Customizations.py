@@ -95,3 +95,4 @@ class HomescreenProgressBar(QProgressBar):
                            "    80% { background-color: #2a81dc; } "
                            "    90% { background-color: #508ed8; } "
                            "    100% { background-color: #2a81dc; } }")
+
