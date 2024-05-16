@@ -1,12 +1,13 @@
-import json
 import os
+import requests
 import shutil
 import subprocess
 import sys
 
-import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QApplication
+
+from SystemLog import SystemLog
 
 from Version import __version__
 
@@ -64,6 +65,7 @@ class UpgradeApplication(QThread):
     def __init__(self, download_url):
         super().__init__()
         self.download_url = download_url
+        self.log_system = SystemLog()
 
     def run(self):
         # Download the update
@@ -115,4 +117,4 @@ if errorlevel 1 (
             subprocess.Popen(['cmd.exe', '/c', batch_script_path], close_fds=True)
             QApplication.instance().quit()  # Ensure the Qt application quits properly
         else:
-            print("Failed to download the update. Status Code:", response.status_code)
+            self.log_system.log_message("error", f"Failed to download the update. Status Code: {response.status_code}")

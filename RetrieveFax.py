@@ -69,7 +69,7 @@ class RetrieveFaxes(QThread):
                 while 'next' in faxes_response['links'] and faxes_response['links']['next']:
                     next_page_path = faxes_response['links']['next']  # Get the path for the next page
                     next_page_url = url + next_page_path  # Construct the complete URL
-                    print("Requested URL:", next_page_url)  # Print the requested URL
+                    # print("Requested URL:", next_page_url)  # Print the requested URL
                     response = requests.get(next_page_url, headers=headers)
                     if response.status_code == 200:
                         faxes_response = response.json()
@@ -93,8 +93,8 @@ class RetrieveFaxes(QThread):
 
         for fax in faxes:
             destination_number = str(fax['destination'])
-            print(f'Fax Destination Phone Number: {destination_number}')
-            print(f'List of Allowed Numbers: {self.allowed_caller_ids}')
+            # print(f'Fax Destination Phone Number: {destination_number}')
+            # print(f'List of Allowed Numbers: {self.allowed_caller_ids}')
 
             if destination_number not in self.allowed_caller_ids:
                 self.log_system.log_message('info', f'Destination number {destination_number} not in allowed caller IDs')

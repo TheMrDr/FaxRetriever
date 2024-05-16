@@ -1,7 +1,9 @@
 import os
 import sys
-
 import requests
+
+from PIL import Image
+
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QIntValidator
@@ -176,9 +178,11 @@ class SendFax(QDialog):
             return f"{base_name[:15]}...{base_name[-10:]}"  # Keep the start and end of the filename
         return base_name
 
-    def attach_cover_sheet(self):
+    def attach_or_change_cover_sheet(self):
         options = QFileDialog.Options()
-        filename, _ = QFileDialog.getOpenFileName(self, "Select a cover sheet", "", "Documents (*.pdf *.doc *.docx);;Images (*.jpg *.png *.tiff);;Text Files (*.txt)", options=options)
+        filename, _ = QFileDialog.getOpenFileName(self, "Select a cover sheet", "",
+                                                  "Documents (*.pdf *.doc *.docx *.jpg *.png *.tif *.tiff *.txt)",
+                                                  options=options)
         if filename:
             self.cover_sheet_path = filename  # Store the full path
             self.cover_sheet_list.clear()
@@ -189,7 +193,9 @@ class SendFax(QDialog):
 
     def attach_document(self):
         options = QFileDialog.Options()
-        files, _ = QFileDialog.getOpenFileNames(self, "Select one or more files to fax", "", "Documents (*.pdf *.doc *.docx);;Images (*.jpg *.png *.tiff);;Text Files (*.txt)", options=options)
+        files, _ = QFileDialog.getOpenFileNames(self, "Select one or more files to fax", "",
+                                                "Documents (*.pdf *.doc *.docx *.jpg *.png *.tif *.tiff *.txt)",
+                                                options=options)
         if files:
             for file in files:
                 self.documents_paths.append(file)  # Store full path
@@ -242,3 +248,10 @@ class SendFax(QDialog):
             # Make sure to close all files opened for sending
             for _, file_tuple in files.items():
                 file_tuple[1].close()
+
+    def convert_tif_to_jpg(self, tif_path):
+        # Convert .TIF file to .JPG
+        jpg_path = tif_path.replace(".tif", ".jpg").replace(".TIF", ".JPG")
+        image = Image.open(tif_path)
+        image.convert('RGB').save(jpg_path, 'JPEG')
+        return jpg_path

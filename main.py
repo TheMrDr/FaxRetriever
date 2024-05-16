@@ -161,10 +161,10 @@ class MainWindow(QMainWindow):
 
         # Handle user interaction or auto-accept
         if msgBox.clickedButton() == okButton or self.countdown <= 0:
-            print('Message Box: OK clicked or auto-accepted')
+            # print('Message Box: OK clicked or auto-accepted')
             self.start_upgrader(download_url)
         else:
-            print('Message Box: Closed using X or other non-OK means')
+            # print('Message Box: Closed using X or other non-OK means')
             QApplication.quit()  # Quit the application if the message box is closed without clicking OK
 
     def start_upgrader(self, download_url):
@@ -408,7 +408,8 @@ class MainWindow(QMainWindow):
         if not self.retrieve_numbers_thread.isRunning():
             self.retrieve_numbers_thread.start()
         else:
-            print("Retrieval already in progress")
+            self.update_status_bar("Retrieval already in progress", 5000)
+
 
     def update_inbox_selection(self, numbers):
         formatted_numbers = [self.format_phone_number(num) for num in numbers]
