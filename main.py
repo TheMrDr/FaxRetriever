@@ -480,12 +480,11 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-
     log_system = SystemLog()
     log_system.log_message('info', 'Application Started')
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
-    window = MainWindow()  # Pass any required arguments here
+    window = MainWindow()
     window.show()
     sys.exit(app.exec_())
 

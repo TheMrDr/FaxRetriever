@@ -49,17 +49,6 @@ class CheckForUpdate(QThread):
                     self.main_window.update_status_bar(
                         f"Failed to fetch update data from GitHub. Status Code: {response.status_code}", 5000)
 
-    # def save_full_response(self, response):
-    #     """Save the full raw HTTP response to a file for debugging purposes."""
-    #     response_details = {
-    #         "status_code": response.status_code,
-    #         "headers": dict(response.headers),
-    #         "body": response.json() if response.text else "No content"
-    #     }
-    #     with open("full_github_response.json", "w") as file:
-    #         json.dump(response_details, file, indent=4)
-    #         print("Saved full GitHub API response to 'full_github_response.json'")
-
 
 class UpgradeApplication(QThread):
     def __init__(self, download_url):

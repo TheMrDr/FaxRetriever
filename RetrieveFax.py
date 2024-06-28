@@ -5,8 +5,13 @@ import re
 import requests
 import subprocess
 import sys
+import shutil
 
-from PyQt5.QtCore import QThread, pyqtSignal
+import fitz  # PyMuPDF
+
+from PyQt5.QtCore import QThread, pyqtSignal, QRect
+from PyQt5.QtPrintSupport import QPrinter, QPrinterInfo
+from PyQt5.QtGui import QImage, QPainter
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
@@ -22,7 +27,6 @@ else:
 class RetrieveFaxes(QThread):
     finished = pyqtSignal(list)
 
-
     def __init__(self, main_window=None):
         super().__init__()
         self.log_system = SystemLog()
@@ -33,11 +37,13 @@ class RetrieveFaxes(QThread):
         self.token = self.encryption_manager.get_config_value('Token', 'access_token')
         self.fax_account = self.encryption_manager.get_config_value('Account', 'fax_user')
         self.save_path = self.encryption_manager.get_config_value('UserSettings', 'save_path')
+        self.printed_path = os.path.join(self.save_path, "Printed")
         self.download_type = self.encryption_manager.get_config_value('Fax Options', 'download_method')
         self.delete_fax_option = self.encryption_manager.get_config_value('Fax Options', 'delete_faxes')
+        self.print_faxes = self.encryption_manager.get_config_value('Fax Options', 'print_faxes') == 'Yes'
+        self.printer_name = self.encryption_manager.get_config_value('Fax Options', 'printer_full_name')
         # self.mark_read = self.encryption_manager.get_config_value('Fax Options', 'mark_read')
         self.allowed_caller_ids = self.load_allowed_caller_ids()
-
 
     def add_poppler_to_path(self):
         if platform.system() == "Windows":
@@ -69,15 +75,13 @@ class RetrieveFaxes(QThread):
                 while 'next' in faxes_response['links'] and faxes_response['links']['next']:
                     next_page_path = faxes_response['links']['next']  # Get the path for the next page
                     next_page_url = url + next_page_path  # Construct the complete URL
-                    # print("Requested URL:", next_page_url)  # Print the requested URL
                     response = requests.get(next_page_url, headers=headers)
                     if response.status_code == 200:
                         faxes_response = response.json()
                         faxes = faxes_response['data']
                         self.download_fax_pdfs(faxes)
                     else:
-                        self.log_system.log_message('error',
-                                                    f"Failed to retrieve next page of faxes. Status code: {response.status_code}")
+                        self.log_system.log_message('error', f"Failed to retrieve next page of faxes. Status code: {response.status_code}")
                         break
             else:
                 self.log_system.log_message('error', 'No fax data available')
@@ -93,8 +97,6 @@ class RetrieveFaxes(QThread):
 
         for fax in faxes:
             destination_number = str(fax['destination'])
-            # print(f'Fax Destination Phone Number: {destination_number}')
-            # print(f'List of Allowed Numbers: {self.allowed_caller_ids}')
 
             if destination_number not in self.allowed_caller_ids:
                 self.log_system.log_message('info', f'Destination number {destination_number} not in allowed caller IDs')
@@ -102,32 +104,30 @@ class RetrieveFaxes(QThread):
 
             fax_id = fax['id']
             pdf_path = os.path.join(self.save_path, f"{fax_id}.pdf")
+            printed_pdf_path = os.path.join(self.printed_path, f"{fax_id}.pdf")
 
             # Determine the appropriate file name and extension based on the download type
             if self.download_type == 'PDF':
                 file_path = pdf_path
             elif self.download_type == 'JPG':
                 # Check if any JPG file exists for the fax ID
-                jpg_files = [file for file in os.listdir(self.save_path) if
-                             file.startswith(f"{fax_id}_") and file.endswith(".jpg")]
+                jpg_files = [file for file in os.listdir(self.save_path) if file.startswith(f"{fax_id}_") and file.endswith(".jpg")]
                 if jpg_files:
                     # Skip downloading if a JPG file already exists
                     if self.main_window.isVisible():
                         self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already converted to JPG", 5000)
                     self.log_system.log_message('info', f"Fax PDF for ID {fax_id} already converted to JPG")
                     continue
-                file_path = os.path.join(self.save_path,
-                                         f"{fax_id}_0.jpg")  # Assuming the first page is named as <fax_id>_0.jpg
+                file_path = os.path.join(self.save_path, f"{fax_id}_0.jpg")  # Assuming the first page is named as <fax_id>_0.jpg
             elif self.download_type == 'Both':
                 # Check if any PDF or JPG file exists for the fax ID
-                if os.path.exists(pdf_path):
+                if os.path.exists(pdf_path) or os.path.exists(printed_pdf_path):
                     # Skip downloading if a PDF file already exists
                     if self.main_window.isVisible():
                         self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already downloaded", 5000)
                     self.log_system.log_message('info', f"Fax PDF for ID {fax_id} already downloaded")
                     continue
-                jpg_files = [file for file in os.listdir(self.save_path) if
-                             file.startswith(f"{fax_id}_") and file.endswith(".jpg")]
+                jpg_files = [file for file in os.listdir(self.save_path) if file.startswith(f"{fax_id}_") and file.endswith(".jpg")]
                 if jpg_files:
                     # Skip downloading if any JPG file already exists
                     if self.main_window.isVisible():
@@ -143,7 +143,7 @@ class RetrieveFaxes(QThread):
             all_faxes_downloaded = False
 
             # Download the file if it doesn't already exist
-            if not os.path.exists(file_path):
+            if not os.path.exists(file_path) and not os.path.exists(printed_pdf_path):
                 pdf_url = f"https://telco-api.skyswitch.com/users/{self.fax_account}/faxes/{fax_id}/pdf"
                 headers = {"accept": "application/json", "authorization": f"Bearer {self.token}"}
                 pdf_response = requests.get(pdf_url, headers=headers)
@@ -167,18 +167,19 @@ class RetrieveFaxes(QThread):
                     # Remove the PDF if only JPG is required
                     if self.download_type == 'JPG':
                         os.remove(file_path)
-                        self.log_system.log_message('info',
-                                                    f"Removed original fax PDF for ID {fax_id} after conversion to JPG")
+                        self.log_system.log_message('info', f"Removed original fax PDF for ID {fax_id} after conversion to JPG")
 
-                    download_results.append(
-                        (fax_id, 'Downloaded', file_path if self.download_type != 'JPG' else 'Converted to JPG'))
+                    # Print the fax if the option is enabled
+                    if self.print_faxes:
+                        self.print_fax(file_path)
+
+                    download_results.append((fax_id, 'Downloaded', file_path if self.download_type != 'JPG' else 'Converted to JPG'))
                     downloaded_faxes_count += 1  # Increment the counter for downloaded faxes
                 else:
                     download_results.append((fax_id, 'Failed to download'))
                     if self.main_window.isVisible():
                         self.main_window.update_status_bar(f"Failed to download fax file for ID {fax_id}", 5000)
-                    self.log_system.log_message('error',
-                                                f"Failed to download fax file for ID {fax_id}, HTTP {pdf_response.status_code}")
+                    self.log_system.log_message('error', f"Failed to download fax file for ID {fax_id}, HTTP {pdf_response.status_code}")
 
             # Optionally delete the fax record after processing
             if self.delete_fax_option == 'Yes':
@@ -205,17 +206,42 @@ class RetrieveFaxes(QThread):
 
         self.finished.emit(download_results)  # Emit results of downloads
 
-    # def mark_fax_as_read(self, fax_id):
-    #     read_url = f"https://telco-api.skyswitch.com/users/{self.fax_account}/faxes/{fax_id}/read"
-    #     headers = {
-    #         "accept": "application/json",
-    #         "authorization": f"Bearer {self.token}"
-    #     }
-    #     read_response = requests.get(read_url, headers=headers)
-    #     if read_response.status_code == 200:
-    #         self.log_system.log_message('info', f"Marked fax {fax_id} as read successfully.")
-    #     else:
-    #         self.log_system.log_message('error', f"Failed to mark fax {fax_id} as read, HTTP {read_response.status_code}")
+    def print_fax(self, file_path):
+        if os.path.exists(file_path):
+            printer = QPrinter()
+            printer.setPrinterName(self.printer_name)
+            printer.setOutputFormat(QPrinter.NativeFormat)
+            printer.setPageSize(QPrinter.Letter)
+            printer.setPageMargins(0, 0, 0, 0, QPrinter.Millimeter)
+
+            # Check if the printer is valid
+            available_printers = QPrinterInfo.availablePrinters()
+            if any(p.printerName() == self.printer_name for p in available_printers):
+                doc = fitz.open(file_path)  # Open the PDF file using PyMuPDF
+                painter = QPainter(printer)
+
+                for page_num in range(len(doc)):
+                    page = doc[page_num]
+                    pix = page.get_pixmap()
+                    img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
+
+                    # Calculate the target rectangle for the image
+                    target_rect = QRect(0, 0, printer.pageRect().width(), printer.pageRect().height())
+                    painter.drawImage(target_rect, img)
+
+                    if page_num < len(doc) - 1:
+                        printer.newPage()
+
+                painter.end()
+                doc.close()
+
+                # Move the file to the "Printed" directory
+                if not os.path.exists(self.printed_path):
+                    os.makedirs(self.printed_path)
+                shutil.move(file_path, os.path.join(self.printed_path, os.path.basename(file_path)))
+                self.log_system.log_message('info', f"Printed fax {file_path} and moved to 'Printed' directory.")
+            else:
+                self.log_system.log_message('error', f"Printer {self.printer_name} not found.")
 
     def delete_fax(self, fax_id):
         delete_url = f"https://telco-api.skyswitch.com/users/{self.fax_account}/faxes/{fax_id}/delete"

@@ -4,6 +4,7 @@ import sys
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
+from PyQt5.QtPrintSupport import QPrintDialog, QPrinterInfo
 
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):
@@ -15,7 +16,6 @@ from ProgressBars import FaxPollTimerProgressBar
 from SaveManager import SaveManager
 
 
-# noinspection PyUnresolvedReferences
 class OptionsDialog(QDialog):
     def __init__(self, main_window, token_progress_bar=None):
         super().__init__(parent=main_window)
@@ -63,19 +63,22 @@ class OptionsDialog(QDialog):
         self.fax_user_input = QLineEdit()
         self.fax_user_input.setEnabled(False)
 
-        self.logging_level_level = QLabel("Logging Level:")
+        self.logging_level_label = QLabel("Logging Level:")
         self.logging_level_combo = QComboBox()
         self.logging_level_combo.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
+
+        # Group Box for all print-related settings
+        self.print_faxes_group = QGroupBox("Print Options")
+        print_faxes_layout = QHBoxLayout()
+        self.setup_print_options_group(print_faxes_layout)
+        self.print_faxes_group.setLayout(print_faxes_layout)
 
         # Group Box for all download-related settings
         self.download_options_group = QGroupBox("Download Options")
         download_options_layout = QVBoxLayout()
-
-        # Individual settings within the group
         self.setup_download_method_group(download_options_layout)
         self.setup_delete_faxes_group(download_options_layout)
         # self.setup_mark_read_group(download_options_layout)
-
         self.download_options_group.setLayout(download_options_layout)
 
         # Save button
@@ -88,6 +91,7 @@ class OptionsDialog(QDialog):
 
         # Add widgets to the form
         form_layout.addRow(self.disable_fax_retrieval_checkbox)
+        form_layout.addRow(self.print_faxes_group)
         form_layout.addRow(self.download_options_group)
         form_layout.addRow(self.edit_sensitive_checkbox)
         form_layout.addRow(self.username_label, self.username_input)
@@ -95,12 +99,20 @@ class OptionsDialog(QDialog):
         form_layout.addRow(self.client_id_label, self.client_id_input)
         form_layout.addRow(self.client_secret_label, self.client_secret_input)
         form_layout.addRow(self.fax_user_label, self.fax_user_input)
-        form_layout.addRow(self.logging_level_level, self.logging_level_combo)
+        form_layout.addRow(self.logging_level_label, self.logging_level_combo)
         form_layout.addRow(self.save_button)
         form_layout.addRow(self.cancel_button)
 
         self.layout.addLayout(form_layout)
         self.setLayout(self.layout)
+
+    def setup_print_options_group(self, parent_layout):
+        self.print_faxes_checkbox = QCheckBox("Print Faxes")
+        self.select_printer_button = QPushButton("Select Printer")
+        self.select_printer_button.clicked.connect(self.select_printer)
+
+        parent_layout.addWidget(self.print_faxes_checkbox)
+        parent_layout.addWidget(self.select_printer_button)
 
     def setup_download_method_group(self, parent_layout):
         self.download_method_group = QGroupBox("Download Method")
@@ -132,25 +144,16 @@ class OptionsDialog(QDialog):
         parent_layout.addWidget(self.delete_faxes_group)
         # self.delete_no_radio.toggled.connect(self.toggle_mark_as_read)
 
-    # def setup_mark_read_group(self, parent_layout):
-    #     self.mark_read_group = QGroupBox("Mark Fax as Read")
-    #     self.mark_read_button_group = QButtonGroup(self)
-    #     mark_read_layout = QHBoxLayout()
-    #     self.mark_read_yes_radio = QRadioButton("Yes")
-    #     self.mark_read_no_radio = QRadioButton("No")
-    #     self.mark_read_button_group.addButton(self.mark_read_yes_radio)
-    #     self.mark_read_button_group.addButton(self.mark_read_no_radio)
-    #     mark_read_layout.addWidget(self.mark_read_yes_radio)
-    #     mark_read_layout.addWidget(self.mark_read_no_radio)
-    #     self.mark_read_group.setLayout(mark_read_layout)
-    #     parent_layout.addWidget(self.mark_read_group)
-
     def toggle_download_options(self, checked):
         self.download_options_group.setDisabled(checked)
 
-    # def toggle_mark_as_read(self, checked):
-    #     # Enable mark as read options only if delete is set to No
-    #     self.mark_read_group.setEnabled(checked)
+    def select_printer(self):
+        printer_dialog = QPrintDialog()
+        if printer_dialog.exec_() == QPrintDialog.Accepted:
+            printer_info = printer_dialog.printer().printerName()
+            truncated_printer_name = (printer_info[:20] + '..') if len(printer_info) > 20 else printer_info
+            self.select_printer_button.setText(truncated_printer_name)
+            self.selected_printer_full_name = printer_info  # Store the full printer name
 
     def populate_settings(self):
         # Populate settings from config file
@@ -182,6 +185,15 @@ class OptionsDialog(QDialog):
             self.delete_yes_radio.setChecked(True)
         else:
             self.delete_no_radio.setChecked(True)
+
+        # Set print faxes option
+        print_faxes = self.save_manager.get_config_value('Fax Options', 'print_faxes')
+        if print_faxes == 'Yes':
+            self.print_faxes_checkbox.setChecked(True)
+            printer_name = self.save_manager.get_config_value('Fax Options', 'printer_name')
+            truncated_printer_name = (printer_name[:20] + '..') if len(printer_name) > 20 else printer_name
+            self.select_printer_button.setText(truncated_printer_name)
+            self.selected_printer_full_name = self.save_manager.get_config_value('Fax Options', 'printer_full_name')
 
         # Set Debug Level
         logging_level = self.save_manager.get_config_value('UserSettings', 'logging_level')
@@ -221,6 +233,9 @@ class OptionsDialog(QDialog):
         # mark_read = self.mark_read_button_group.checkedButton().text() if (
         #     self.mark_read_button_group.checkedButton()) else ""
         log_level = self.logging_level_combo.currentText()
+        print_faxes = 'Yes' if self.print_faxes_checkbox.isChecked() else 'No'
+        printer_name = self.select_printer_button.text()
+        printer_full_name = self.selected_printer_full_name
 
         for section in ['API', 'Client', 'Account', 'Fax Options', 'Debug', 'UserSettings']:
             if not self.save_manager.config.has_section(section):
@@ -235,6 +250,9 @@ class OptionsDialog(QDialog):
         self.save_manager.config.set('Fax Options', 'delete_faxes', delete_faxes)
         # self.encryption_manager.config.set('Fax Options', 'mark_read', mark_read)
         self.save_manager.config.set('UserSettings', 'logging_level', log_level)
+        self.save_manager.config.set('Fax Options', 'print_faxes', print_faxes)
+        self.save_manager.config.set('Fax Options', 'printer_name', printer_name)
+        self.save_manager.config.set('Fax Options', 'printer_full_name', printer_full_name)
 
         retrieval_status = 'Disabled' if retrieval_disabled else 'Enabled'
         self.save_manager.config.set('Retrieval', 'auto_retrieve', retrieval_status)
@@ -254,11 +272,11 @@ class OptionsDialog(QDialog):
             return
         self.accept()  # Close the dialog
 
-        # # Show message box asking the user to restart the application
-        # msg_box = QMessageBox()
-        # msg_box.setIcon(QMessageBox.Information)
-        # msg_box.setText("Settings changed. Please restart the application for changes to take effect.")
-        # msg_box.setWindowTitle("Restart Required")
-        # msg_box.setStandardButtons(QMessageBox.Ok)
-        # msg_box.buttonClicked.connect(lambda: self.main_window.restart_application())
-        # msg_box.exec()
+
+if __name__ == "__main__":
+    from PyQt5.QtWidgets import QApplication
+
+    app = QApplication(sys.argv)
+    dialog = OptionsDialog(None)
+    dialog.show()
+    sys.exit(app.exec_())
