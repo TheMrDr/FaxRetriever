@@ -92,6 +92,7 @@ if errorlevel 1 (
         echo Update successful, restarting...
         start "" "{current_exe}"
         del "{backup_exe}"  # Cleanup backup file
+        del "*.txt" # Delete all .txt files in the same dir as FaxRetriever
     ) else (
         echo Failed to update, restoring backup...
         move /y "{backup_exe}" "{current_exe}"
