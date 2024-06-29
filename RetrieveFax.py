@@ -6,7 +6,6 @@ import requests
 import subprocess
 import sys
 import shutil
-
 import fitz  # PyMuPDF
 
 from PyQt5.QtCore import QThread, pyqtSignal, QRect
@@ -16,14 +15,14 @@ from PyQt5.QtGui import QImage, QPainter
 from SaveManager import SaveManager
 from SystemLog import SystemLog
 
+from plyer import notification
+
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):
     bundle_dir = sys._MEIPASS
 else:
     bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
-
-# noinspection PyUnresolvedReferences
 class RetrieveFaxes(QThread):
     finished = pyqtSignal(list)
 
@@ -42,7 +41,6 @@ class RetrieveFaxes(QThread):
         self.delete_fax_option = self.encryption_manager.get_config_value('Fax Options', 'delete_faxes')
         self.print_faxes = self.encryption_manager.get_config_value('Fax Options', 'print_faxes') == 'Yes'
         self.printer_name = self.encryption_manager.get_config_value('Fax Options', 'printer_full_name')
-        # self.mark_read = self.encryption_manager.get_config_value('Fax Options', 'mark_read')
         self.allowed_caller_ids = self.load_allowed_caller_ids()
 
     def add_poppler_to_path(self):
@@ -199,10 +197,11 @@ class RetrieveFaxes(QThread):
                 if self.main_window.isVisible():
                     self.main_window.update_status_bar("All faxes have already been downloaded and converted", 5000)
                 self.log_system.log_message('info', "All faxes have already been downloaded and converted")
-        elif downloaded_faxes_count > 1:  # If more than one fax is downloaded
+        elif downloaded_faxes_count > 0:  # If one or more faxes are downloaded
             if self.main_window.isVisible():
                 self.main_window.update_status_bar(f"{downloaded_faxes_count} faxes downloaded", 5000)
             self.log_system.log_message('info', f"{downloaded_faxes_count} faxes downloaded")
+            self.notify_user(downloaded_faxes_count)  # Notify user about the downloaded faxes
 
         self.finished.emit(download_results)  # Emit results of downloads
 
@@ -251,3 +250,12 @@ class RetrieveFaxes(QThread):
             self.log_system.log_message('info', f"Deleted fax {fax_id} successfully.")
         else:
             self.log_system.log_message('error', f"Failed to delete fax {fax_id}, HTTP {delete_response.status_code}")
+
+    def notify_user(self, fax_count):
+        # Display a Windows notification
+        notification.notify(
+            title='New Faxes Received',
+            message=f'{fax_count} new faxes have been downloaded.',
+            app_name='Clinic Voice',
+            timeout=10  # Duration in seconds
+        )
