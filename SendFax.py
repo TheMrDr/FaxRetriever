@@ -1,10 +1,14 @@
+import io
 import os
 import pyinsane2
 import shutil
 import sys
 import requests
 
-from PIL import Image
+from docx import Document
+from docx.shared import Inches
+
+from PIL import Image, ImageDraw
 
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt
@@ -197,23 +201,17 @@ class DocumentManager:
     def update_image_label(self, filepath, label):
         try:
             if filepath.lower().endswith(('.pdf', '.doc', '.docx', '.txt')):
-                # For simplicity, we will convert the first page to an image using a third-party library like PyMuPDF (for PDFs) or python-docx (for DOCX)
                 if filepath.lower().endswith('.pdf'):
                     import fitz
                     doc = fitz.open(filepath)
-                    page = doc.load_page(0)  # number of page
+                    page = doc.load_page(0)
                     pix = page.get_pixmap()
                     image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
                     pixmap = QPixmap.fromImage(image)
                 elif filepath.lower().endswith('.docx'):
-                    from docx import Document
-                    import io
-                    from PIL import Image as PILImage, ImageDraw
-
                     doc = Document(filepath)
-                    # Extract text from the first page (first section)
-                    text = doc.paragraphs[0].text
-                    image = PILImage.new('RGB', (200, 200), color='white')
+                    text = "\n".join([p.text for p in doc.paragraphs[:10]])  # Adjust number of paragraphs as needed
+                    image = Image.new('RGB', (800, 1000), color='white')
                     d = ImageDraw.Draw(image)
                     d.text((10, 10), text, fill='black')
                     byte_arr = io.BytesIO()
@@ -224,7 +222,7 @@ class DocumentManager:
                 else:  # .txt
                     with open(filepath, 'r') as file:
                         text = file.read()
-                    image = QImage(200, 200, QImage.Format_RGB32)
+                    image = QImage(800, 1000, QImage.Format_RGB32)
                     image.fill(Qt.white)
                     painter = QPainter(image)
                     painter.setPen(Qt.black)
