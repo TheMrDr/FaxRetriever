@@ -1,10 +1,14 @@
 import os
 import sys
 
+from ProgressBars import FaxPollTimerProgressBar
+
 from PyQt5 import QtGui
 from PyQt5.QtPrintSupport import QPrintDialog
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
+
+from SaveManager import SaveManager
 
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):
@@ -12,10 +16,8 @@ if hasattr(sys, '_MEIPASS'):
 else:
     bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
-from ProgressBars import FaxPollTimerProgressBar
-from SaveManager import SaveManager
 
-
+# noinspection PyUnresolvedReferences
 class OptionsDialog(QDialog):
     def __init__(self, main_window, token_progress_bar=None):
         super().__init__(parent=main_window)
@@ -28,6 +30,8 @@ class OptionsDialog(QDialog):
         self.setup_ui()
         self.populate_settings()
         self.fax_timer_progress_bar = FaxPollTimerProgressBar(self.main_window, token_progress_bar)
+
+        self.selected_printer_full_name = None
 
     def setup_ui(self):
         form_layout = QFormLayout()
@@ -78,7 +82,6 @@ class OptionsDialog(QDialog):
         download_options_layout = QVBoxLayout()
         self.setup_download_method_group(download_options_layout)
         self.setup_delete_faxes_group(download_options_layout)
-        # self.setup_mark_read_group(download_options_layout)
         self.download_options_group.setLayout(download_options_layout)
 
         # Save button
@@ -230,12 +233,15 @@ class OptionsDialog(QDialog):
             self.download_method_button_group.checkedButton()) else ""
         delete_faxes = self.delete_faxes_button_group.checkedButton().text() if (
             self.delete_faxes_button_group.checkedButton()) else ""
-        # mark_read = self.mark_read_button_group.checkedButton().text() if (
-        #     self.mark_read_button_group.checkedButton()) else ""
         log_level = self.logging_level_combo.currentText()
         print_faxes = 'Yes' if self.print_faxes_checkbox.isChecked() else 'No'
-        printer_name = self.select_printer_button.text()
-        printer_full_name = self.selected_printer_full_name
+
+        if self.print_faxes_checkbox.isChecked() and not self.selected_printer_full_name:
+            QMessageBox.critical(self, "Error", "You must select a printer if the 'Print Faxes' option is enabled.")
+            return
+
+        printer_name = self.select_printer_button.text() if self.print_faxes_checkbox.isChecked() else ""
+        printer_full_name = self.selected_printer_full_name if self.print_faxes_checkbox.isChecked() else ""
 
         for section in ['API', 'Client', 'Account', 'Fax Options', 'Debug', 'UserSettings']:
             if not self.save_manager.config.has_section(section):
@@ -248,7 +254,6 @@ class OptionsDialog(QDialog):
         self.save_manager.config.set('Account', 'fax_user', fax_user)
         self.save_manager.config.set('Fax Options', 'download_method', download_method)
         self.save_manager.config.set('Fax Options', 'delete_faxes', delete_faxes)
-        # self.encryption_manager.config.set('Fax Options', 'mark_read', mark_read)
         self.save_manager.config.set('UserSettings', 'logging_level', log_level)
         self.save_manager.config.set('Fax Options', 'print_faxes', print_faxes)
         self.save_manager.config.set('Fax Options', 'printer_name', printer_name)
