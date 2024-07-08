@@ -2,9 +2,9 @@ import os
 import sys
 
 from PyQt5 import QtGui
+from PyQt5.QtPrintSupport import QPrintDialog
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
-from PyQt5.QtPrintSupport import QPrintDialog, QPrinterInfo
 
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):

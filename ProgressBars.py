@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QWidget, QLabel, QProgressBar, QGridLayout
+from PyQt5.QtWidgets import QWidget, QLabel, QGridLayout
 
 from Customizations import HomescreenProgressBar
 from RetrieveFax import RetrieveFaxes

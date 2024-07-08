@@ -40,6 +40,11 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.log_system = None
+        self.save_manager = None
+        self.version = None
+        self.status_bar = None
+        self.update_checker_timer = None
         self.initialize_attributes()
         self.setup_ui()
         self.connect_signals()
@@ -74,7 +79,7 @@ class MainWindow(QMainWindow):
         self.send_fax_button = CustomPushButton("Send a Fax")
         self.tokenLifespanProgressBar = TokenLifespanProgressBar(main_window=self)  # Pass self as main_window
         self.faxPollTimerProgressBar = FaxPollTimerProgressBar(main_window=self,
-                                                               token_progress_bar=self.tokenLifespanProgressBar)  # Pass self as main_window
+                                                               token_progress_bar=self.tokenLifespanProgressBar)
         self.options_dialog = OptionsDialog(main_window=self, token_progress_bar=self.tokenLifespanProgressBar)
 
     def connect_signals(self):
@@ -86,7 +91,7 @@ class MainWindow(QMainWindow):
         """Load data and setup initial state of the application"""
         self.check_for_updates()
         self.initialize_ui()
-        self.check_for_updates()  # Check for updates at startup
+        self.setup_periodic_update_check()  # Set up periodic update check
 
     def finalize_initialization(self):
         """Final steps to initialize the UI based on loaded data"""
@@ -122,9 +127,16 @@ class MainWindow(QMainWindow):
             event.ignore()  # Ignore the close event, the application remains fully open
 
     def check_for_updates(self):
+        self.log_system.log_message('info', 'Checking for updates')
         self.update_checker = CheckForUpdate(self)
         self.update_checker.new_version_available.connect(self.upgrade_application)
         self.update_checker.start()
+
+    def setup_periodic_update_check(self):
+        """Set up a periodic update check every 24 hours"""
+        self.update_checker_timer = QTimer(self)
+        self.update_checker_timer.timeout.connect(self.check_for_updates)
+        self.update_checker_timer.start(24 * 60 * 60 * 1000)  # 24 hours in milliseconds
 
     def upgrade_application(self, version, download_url):
         msgBox = QMessageBox(self)
@@ -161,10 +173,8 @@ class MainWindow(QMainWindow):
 
         # Handle user interaction or auto-accept
         if msgBox.clickedButton() == okButton or self.countdown <= 0:
-            # print('Message Box: OK clicked or auto-accepted')
             self.start_upgrader(download_url)
         else:
-            # print('Message Box: Closed using X or other non-OK means')
             QApplication.quit()  # Quit the application if the message box is closed without clicking OK
 
     def start_upgrader(self, download_url):
@@ -410,7 +420,6 @@ class MainWindow(QMainWindow):
         else:
             self.update_status_bar("Retrieval already in progress", 5000)
 
-
     def update_inbox_selection(self, numbers):
         formatted_numbers = [self.format_phone_number(num) for num in numbers]
         dialog = SelectInboxDialog(formatted_numbers, self)
@@ -487,4 +496,3 @@ if __name__ == '__main__':
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
-

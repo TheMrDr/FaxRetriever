@@ -1,21 +1,19 @@
-import json
 import os
 import platform
 import re
-import requests
+import shutil
 import subprocess
 import sys
-import shutil
-import fitz  # PyMuPDF
 
+import fitz  # PyMuPDF
+import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QRect
-from PyQt5.QtPrintSupport import QPrinter, QPrinterInfo
 from PyQt5.QtGui import QImage, QPainter
+from PyQt5.QtPrintSupport import QPrinter, QPrinterInfo
+from plyer import notification
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
-
-from plyer import notification
 
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):

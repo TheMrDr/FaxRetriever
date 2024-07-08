@@ -1,16 +1,15 @@
-from datetime import datetime, timezone
 import os
 import re
-import requests
 import sys
-import tzlocal
+from datetime import datetime, timezone
 
-from PyQt5.QtCore import pyqtSignal, QThread, QTimer, Qt, QPoint, QUrl
-from PyQt5.QtGui import QPixmap, QPainter, QColor
+import requests
+import tzlocal
+from PyQt5.QtCore import pyqtSignal, QThread, QTimer, Qt, QUrl
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PyQt5.QtWidgets import (QDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QLineEdit, QWidget,
                              QLabel)
-
 
 from SaveManager import SaveManager
 
