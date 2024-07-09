@@ -18,16 +18,21 @@ class SaveManager:
         return cls._instance
 
     def init(self, main_window, application_name):
-        self.log_system = SystemLog()
-        self.main_window = main_window
-        self.application_name = application_name
-        self.config = configparser.ConfigParser()
-        self.registry_path = fr"Software\Clinic Networking, LLC"
-        self.key_name = "FaxRetriever"
-        self.ini_dir = os.path.join(os.getenv('LOCALAPPDATA'), self.application_name)
-        os.makedirs(self.ini_dir, exist_ok=True)
-        self.ini_path = os.path.join(self.ini_dir, "config.ini")
-        self.read_encrypted_ini()
+        try:
+            self.log_system = SystemLog()
+            self.main_window = main_window
+            self.application_name = application_name
+            self.config = configparser.ConfigParser()
+            self.registry_path = fr"Software\Clinic Networking, LLC"
+            self.key_name = "FaxRetriever"
+            self.ini_dir = os.path.join(os.getenv('LOCALAPPDATA'), self.application_name)
+            os.makedirs(self.ini_dir, exist_ok=True)
+            self.ini_path = os.path.join(self.ini_dir, "config.ini")
+            self.read_encrypted_ini()
+        except Exception as e:
+            self.log_system.log_message('error', f"Failed to initialize SaveManager: {e}")
+            if self.main_window:
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
     @staticmethod
     def generate_encryption_key():
@@ -39,14 +44,29 @@ class SaveManager:
                 encryption_key, _ = reg.QueryValueEx(registry_key, self.key_name)
                 return encryption_key
         except FileNotFoundError:
-            with reg.CreateKey(reg.HKEY_CURRENT_USER, self.registry_path) as registry_key:
-                encryption_key = self.generate_encryption_key()
-                reg.SetValueEx(registry_key, self.key_name, 0, reg.REG_SZ, encryption_key)
-                self.log_system.log_message('info', "Encryption key generated and stored.")
-                return encryption_key
+            try:
+                with reg.CreateKey(reg.HKEY_CURRENT_USER, self.registry_path) as registry_key:
+                    encryption_key = self.generate_encryption_key()
+                    reg.SetValueEx(registry_key, self.key_name, 0, reg.REG_SZ, encryption_key)
+                    self.log_system.log_message('info', "Encryption key generated and stored.")
+                    return encryption_key
+            except Exception as e:
+                self.log_system.log_message('error', f"Failed to generate or store encryption key: {e}")
+                if self.main_window:
+                    self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+                return None
+        except Exception as e:
+            self.log_system.log_message('error', f"Failed to retrieve encryption key: {e}")
+            if self.main_window:
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+            return None
 
     def read_encrypted_ini(self):
         encryption_key = self.get_encryption_key()
+        if not encryption_key:
+            self.log_system.log_message('error', "Encryption key is not available.")
+            return
+
         fernet = Fernet(encryption_key.encode())
         if not os.path.exists(self.ini_path):
             self.log_system.log_message('warning', "Configuration file not found, creating empty config.")
@@ -66,7 +86,7 @@ class SaveManager:
                     self.log_system.log_message('debug', f"  {option}: {decrypted_value}")
                 except Exception as e:
                     self.log_system.log_message('error', f"Error decrypting {option} in section {section}: {e}")
-                    if self.main_window.isVisible():
+                    if self.main_window and self.main_window.isVisible():
                         self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
                     decrypted_config.set(section, option, encrypted_value)
 
@@ -78,6 +98,10 @@ class SaveManager:
     def save_changes(self):
         """Encrypt and write the in-memory configuration to file."""
         encryption_key = self.get_encryption_key()
+        if not encryption_key:
+            self.log_system.log_message('error', "Encryption key is not available.")
+            return
+
         fernet = Fernet(encryption_key.encode())
         encrypted_config = configparser.ConfigParser()
 
@@ -111,6 +135,10 @@ class SaveManager:
 
     def get_config_value(self, section, option):
         encryption_key = self.get_encryption_key()
+        if not encryption_key:
+            self.log_system.log_message('error', "Encryption key is not available.")
+            return "None Set"
+
         fernet = Fernet(encryption_key.encode())
         if not self.config.has_section(section):
             self.config.add_section(section)

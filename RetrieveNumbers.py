@@ -12,15 +12,25 @@ class RetrieveNumbers(QThread):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
-        self.save_manager = SaveManager(self.main_window)
+        try:
+            self.save_manager = SaveManager(self.main_window)
+            self.access_token = self.save_manager.get_config_value('Token', 'access_token')
+            self.user_id = self.save_manager.get_config_value('Account', 'fax_user')
+        except Exception as e:
+            self.log_system = SystemLog()
+            self.log_system.log_message('error', f"Failed to initialize SaveManager or retrieve configuration: {e}")
+            self.finished.emit("Failure", "Initialization failed.")
+            return
+
         self.log_system = SystemLog()
 
-        self.access_token = self.save_manager.get_config_value('Token', 'access_token')
-        self.user_id = self.save_manager.get_config_value('Account', 'fax_user')
-
     def run(self):
-        self.log_system.log_message('info', "Starting fax number retrieval thread.")
-        self.retrieve_numbers()
+        try:
+            self.log_system.log_message('info', "Starting fax number retrieval thread.")
+            self.retrieve_numbers()
+        except Exception as e:
+            self.finished.emit("Failure", str(e))
+            self.log_system.log_message('error', f"Exception in run method: {e}")
 
     def retrieve_numbers(self):
         if not self.access_token or not self.user_id:
@@ -42,7 +52,10 @@ class RetrieveNumbers(QThread):
                 self.numbers_retrieved.emit(numbers)
                 self.finished.emit("Success", "Successfully retrieved fax numbers.")
                 self.log_system.log_message('info', f"Successfully retrieved fax numbers: {numbers}")
-                self.main_window.reload_ui()
+                try:
+                    self.main_window.reload_ui()
+                except Exception as e:
+                    self.log_system.log_message('error', f"Failed to reload UI: {e}")
             else:
                 self.finished.emit("Failure", f"HTTP Error {response.status_code}: {response.text}")
                 self.log_system.log_message('error',

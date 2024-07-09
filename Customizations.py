@@ -1,6 +1,6 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import (QPushButton, QDialog, QVBoxLayout, QListView, QDialogButtonBox, QProgressBar)
+from PyQt5.QtWidgets import (QPushButton, QDialog, QVBoxLayout, QListView, QDialogButtonBox, QProgressBar, QMessageBox)
 
 from SaveManager import SaveManager
 
@@ -23,7 +23,6 @@ class CustomPushButton(QPushButton):
         """)
 
 
-# noinspection PyUnresolvedReferences
 class SelectInboxDialog(QDialog):
     def __init__(self, inboxes, parent=None):
         super().__init__(parent)
@@ -56,23 +55,24 @@ class SelectInboxDialog(QDialog):
         return selected
 
     def accept(self):
-        # Get the list of selected inboxes
-        selected_inboxes = self.selected_inboxes()
-        # Convert list to a string for storage
-        selected_inboxes_str = ','.join(selected_inboxes)
-
-        # Check the current settings before saving
-        self.save_manager.get_config_value('UserSettings', 'selected_inboxes')
-        # Save the selected inboxes using SaveManager
-        self.save_manager.config.set('UserSettings', 'selected_inboxes', selected_inboxes_str)
-
         try:
+            # Get the list of selected inboxes
+            selected_inboxes = self.selected_inboxes()
+            # Convert list to a string for storage
+            selected_inboxes_str = ','.join(selected_inboxes)
+
+            # Check the current settings before saving
+            self.save_manager.get_config_value('UserSettings', 'selected_inboxes')
+            # Save the selected inboxes using SaveManager
+            self.save_manager.config.set('UserSettings', 'selected_inboxes', selected_inboxes_str)
+
             self.save_manager.save_changes()
             super().accept()  # Close the dialog only if save succeeds
         except Exception as e:
             QMessageBox.critical(self, "Error", "Failed to save selected inboxes: " + str(e))
-            if self.main_window.isVisible():
+            if hasattr(self, 'main_window') and self.main_window.isVisible():
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+
 
 class HomescreenProgressBar(QProgressBar):
     def __init__(self, parent=None):
@@ -95,4 +95,3 @@ class HomescreenProgressBar(QProgressBar):
                            "    80% { background-color: #2a81dc; } "
                            "    90% { background-color: #508ed8; } "
                            "    100% { background-color: #2a81dc; } }")
-

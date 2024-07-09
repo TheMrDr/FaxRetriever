@@ -9,7 +9,7 @@ from PyQt5.QtCore import pyqtSignal, QThread, QTimer, Qt, QUrl
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PyQt5.QtWidgets import (QDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QLineEdit, QWidget,
-                             QLabel)
+                             QLabel, QMessageBox)
 
 from SaveManager import SaveManager
 
@@ -90,43 +90,61 @@ class CustomFaxTable(QTableWidget):
         self.setEditTriggers(QTableWidget.NoEditTriggers)
 
     def add_fax(self, fax):
-        row = self.rowCount()
-        self.insertRow(row)
-        self.setItem(row, 0, QTableWidgetItem(str(fax['id'])))
-        self.setItem(row, 1, QTableWidgetItem(fax.get('direction', 'N/A')))
-        self.setItem(row, 2, QTableWidgetItem(format_phone_number(fax.get('caller_id', 'N/A'))))
-        self.setItem(row, 3, QTableWidgetItem(format_phone_number(fax.get('destination', 'N/A'))))
-        self.setItem(row, 4, QTableWidgetItem(fax.get('status', 'N/A')))
-        self.setItem(row, 5, QTableWidgetItem(str(fax.get('pages', 'N/A'))))
-        self.setItem(row, 6, QTableWidgetItem(self.format_timestamp(fax.get('created_at', 'N/A'))))
-        self.setRowHeight(row, 40)  # Ensuring all rows have a consistent height
+        try:
+            row = self.rowCount()
+            self.insertRow(row)
+            self.setItem(row, 0, QTableWidgetItem(str(fax['id'])))
+            self.setItem(row, 1, QTableWidgetItem(fax.get('direction', 'N/A')))
+            self.setItem(row, 2, QTableWidgetItem(format_phone_number(fax.get('caller_id', 'N/A'))))
+            self.setItem(row, 3, QTableWidgetItem(format_phone_number(fax.get('destination', 'N/A'))))
+            self.setItem(row, 4, QTableWidgetItem(fax.get('status', 'N/A')))
+            self.setItem(row, 5, QTableWidgetItem(str(fax.get('pages', 'N/A'))))
+            self.setItem(row, 6, QTableWidgetItem(self.format_timestamp(fax.get('created_at', 'N/A'))))
+            self.setRowHeight(row, 40)  # Ensuring all rows have a consistent height
+        except Exception as e:
+            print(f"Error adding fax to table: {str(e)}")
 
+    @staticmethod
     def format_phone_number(number):
         clean_number = re.sub(r'\D', '', str(number))
         return f"1 ({clean_number[1:4]}) {clean_number[4:7]}-{clean_number[7:11]}"
 
     def format_timestamp(self, timestamp):
-        if timestamp == 'N/A':
+        try:
+            if timestamp == 'N/A':
+                return 'N/A'
+            dt = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+            local_timezone = tzlocal.get_localzone()
+            dt = dt.replace(tzinfo=timezone.utc).astimezone(local_timezone)
+            return dt.strftime('%Y-%m-%d %H:%M:%S %Z')
+        except Exception as e:
+            print(f"Error formatting timestamp: {str(e)}")
             return 'N/A'
-        dt = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-        local_timezone = tzlocal.get_localzone()
-        dt = dt.replace(tzinfo=timezone.utc).astimezone(local_timezone)
-        return dt.strftime('%Y-%m-%d %H:%M:%S %Z')
 
     def filter_table(self):
-        filter_text = self.search_box.text().lower()
-        for i in range(self.rowCount()):
-            row_visible = any(filter_text in self.item(i, j).text().lower() for j in range(self.columnCount()))
-            self.setRowHidden(i, not row_visible)
+        try:
+            filter_text = self.search_box.text().lower()
+            for i in range(self.rowCount()):
+                row_visible = any(filter_text in self.item(i, j).text().lower() for j in range(self.columnCount()))
+                self.setRowHidden(i, not row_visible)
+        except Exception as e:
+            print(f"Error filtering table: {str(e)}")
 
     def enable_sorting_and_refresh(self):
-        self.adjust_column_sizes()
-        self.setSortingEnabled(True)
-        self.sortByColumn(6, Qt.DescendingOrder)  # Default sorting by the 'Timestamp' column
+        try:
+            self.adjust_column_sizes()
+            self.setSortingEnabled(True)
+            self.sortByColumn(6, Qt.DescendingOrder)  # Default sorting by the 'Timestamp' column
+        except Exception as e:
+            print(f"Error enabling sorting and refresh: {str(e)}")
 
     def adjust_column_sizes(self):
-        for column in range(self.columnCount()):
-            self.resizeColumnToContents(column)  # Dynamically resize each column based on its content
+        try:
+            for column in range(self.columnCount()):
+                self.resizeColumnToContents(column)  # Dynamically resize each column based on its content
+        except Exception as e:
+            print(f"Error adjusting column sizes: {str(e)}")
+
 
 class RetrieveFaxesThread(QThread):
     finished = pyqtSignal(list)
@@ -137,31 +155,35 @@ class RetrieveFaxesThread(QThread):
         self.token = token
 
     def run(self):
-        base_url = "https://telco-api.skyswitch.com"
-        inbound_url = f"{base_url}/users/{self.fax_account}/faxes/inbound"
-        outbound_url = f"{base_url}/users/{self.fax_account}/faxes/outbound"
-        headers = {"accept": "application/json", "authorization": f"Bearer {self.token}"}
-        faxes = []
+        try:
+            base_url = "https://telco-api.skyswitch.com"
+            inbound_url = f"{base_url}/users/{self.fax_account}/faxes/inbound"
+            outbound_url = f"{base_url}/users/{self.fax_account}/faxes/outbound"
+            headers = {"accept": "application/json", "authorization": f"Bearer {self.token}"}
+            faxes = []
 
-        # Handle inbound faxes
-        inbound_response = requests.get(inbound_url, headers=headers)
-        if inbound_response.status_code == 200:
-            inbound_faxes = inbound_response.json().get('data', [])
-            # Add 'direction' field to each inbound fax
-            for fax in inbound_faxes:
-                fax['direction'] = 'Inbound'
-            faxes.extend(inbound_faxes)
+            # Handle inbound faxes
+            inbound_response = requests.get(inbound_url, headers=headers)
+            if inbound_response.status_code == 200:
+                inbound_faxes = inbound_response.json().get('data', [])
+                # Add 'direction' field to each inbound fax
+                for fax in inbound_faxes:
+                    fax['direction'] = 'Inbound'
+                faxes.extend(inbound_faxes)
 
-        # Handle outbound faxes
-        outbound_response = requests.get(outbound_url, headers=headers)
-        if outbound_response.status_code == 200:
-            outbound_faxes = outbound_response.json().get('data', [])
-            # Add 'direction' field to each outbound fax
-            for fax in outbound_faxes:
-                fax['direction'] = 'Outbound'
-            faxes.extend(outbound_faxes)
+            # Handle outbound faxes
+            outbound_response = requests.get(outbound_url, headers=headers)
+            if outbound_response.status_code == 200:
+                outbound_faxes = outbound_response.json().get('data', [])
+                # Add 'direction' field to each outbound fax
+                for fax in outbound_faxes:
+                    fax['direction'] = 'Outbound'
+                faxes.extend(outbound_faxes)
 
-        self.finished.emit(faxes)
+            self.finished.emit(faxes)
+        except Exception as e:
+            print(f"Error retrieving faxes: {str(e)}")
+            self.finished.emit([])
 
 
 class FaxStatusDialog(QDialog):
@@ -175,9 +197,14 @@ class FaxStatusDialog(QDialog):
         self.layout.addWidget(self.fax_result_table)
 
         self.save_manager = SaveManager()
-        self.fax_account = self.save_manager.get_config_value('Account', 'fax_user')
-        self.token = self.save_manager.get_config_value('Token', 'access_token')
-        self.retrieve_thread = RetrieveFaxesThread(self.fax_account, self.token)
+        try:
+            self.fax_account = self.save_manager.get_config_value('Account', 'fax_user')
+            self.token = self.save_manager.get_config_value('Token', 'access_token')
+            self.retrieve_thread = RetrieveFaxesThread(self.fax_account, self.token)
+        except Exception as e:
+            print(f"Error initializing FaxStatusDialog: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Initialization failed: {str(e)}")
+            self.close()
 
     def initiate_fetch(self):
         print("Starting to fetch faxes...")
@@ -187,26 +214,34 @@ class FaxStatusDialog(QDialog):
         except TypeError:
             # No connection exists yet; ignore the exception
             pass
-        self.retrieve_thread.finished.connect(self.populate_table)
-        self.retrieve_thread.start()
-
+        try:
+            self.retrieve_thread.finished.connect(self.populate_table)
+            self.retrieve_thread.start()
+        except Exception as e:
+            print(f"Error initiating fetch: {str(e)}")
 
     def populate_table(self, faxes):
-        print(f"Populating table with {len(faxes)} faxes")
-        self.fax_result_table.clearContents()
-        self.fax_result_table.setRowCount(0)
-        if not faxes:
-            print("No faxes to display.")
-            return
+        try:
+            print(f"Populating table with {len(faxes)} faxes")
+            self.fax_result_table.clearContents()
+            self.fax_result_table.setRowCount(0)
+            if not faxes:
+                print("No faxes to display.")
+                return
 
-        for fax in faxes:
-            self.fax_result_table.add_fax(fax)
+            for fax in faxes:
+                self.fax_result_table.add_fax(fax)
 
-        # Delay sorting to ensure all widgets are loaded
-        QTimer.singleShot(100, self.fax_result_table.enable_sorting_and_refresh)
+            # Delay sorting to ensure all widgets are loaded
+            QTimer.singleShot(100, self.fax_result_table.enable_sorting_and_refresh)
+        except Exception as e:
+            print(f"Error populating table: {str(e)}")
 
     def closeEvent(self, event):
         # Clear the table when the dialog is about to close
-        self.fax_result_table.clearContents()
-        self.fax_result_table.setRowCount(0)
+        try:
+            self.fax_result_table.clearContents()
+            self.fax_result_table.setRowCount(0)
+        except Exception as e:
+            print(f"Error during closeEvent: {str(e)}")
         super().closeEvent(event)

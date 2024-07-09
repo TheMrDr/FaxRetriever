@@ -1,6 +1,5 @@
 import os
 import sys
-
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
 
@@ -18,8 +17,11 @@ class AboutDialog(QDialog):
         self.setFixedSize(600, 400)
 
         # Read contents of the 'ReadMe' file
-        with open(os.path.join(bundle_dir, "ReadMe"), 'r') as file:
-            readme_content = file.read()
+        try:
+            with open(os.path.join(bundle_dir, "ReadMe"), 'r') as file:
+                readme_content = file.read()
+        except Exception as e:
+            readme_content = f"Error loading ReadMe file: {str(e)}"
 
         # Create a QTextEdit to display the readme content
         self.text_edit = QTextEdit()
