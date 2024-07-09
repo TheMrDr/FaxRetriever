@@ -154,6 +154,7 @@ class RetrieveFaxes(QThread):
                     else:
                         continue
 
+
                     all_faxes_downloaded = False
 
                     if not os.path.exists(file_path) and not os.path.exists(printed_pdf_path):
