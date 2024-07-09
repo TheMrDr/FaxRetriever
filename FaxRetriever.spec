@@ -14,7 +14,7 @@ a = Analysis(
     ('ReadMe', '.'),  # Include the 'ReadMe' file in the root directory of the bundled executable
     ('poppler', 'poppler')
     ],
-    hiddenimports=['pdf2image', 'pdf2image.backends', 'pdf2image.backends.poppler'],
+    hiddenimports=['pdf2image', 'pdf2image.backends', 'pdf2image.backends.poppler', 'plyer', 'plyer.notification'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

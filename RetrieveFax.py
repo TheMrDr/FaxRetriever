@@ -191,6 +191,10 @@ class RetrieveFaxes(QThread):
                                 self.main_window.update_status_bar(f"Failed to download fax file for ID {fax_id}", 5000)
                             self.log_system.log_message('error', f"Failed to download fax file for ID {fax_id}, HTTP {pdf_response.status_code}")
 
+                    # Optionally delete the fax record after processing
+                    if self.delete_fax_option == 'Yes':
+                        self.delete_fax(fax_id)
+
                 except Exception as e:
                     self.log_system.log_message('error', f"Exception in download_fax_pdfs loop: {str(e)}")
 
