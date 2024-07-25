@@ -5,18 +5,18 @@ block_cipher = None
 
 
 a = Analysis(
-    ['customizations.py', 'main.py', 'Options.py', 'ProgressBars.py', 'RetrieveFax.py', 'RetrieveNumbers.py',
-    'SaveManager.py', 'SendFax.py', 'SystemLog.py'],
+    ['AboutDialog.py', 'AutoUpdate.py', 'Customizations.py', 'FaxStatusDialog.py', 'main.py', 'options.py',
+     'ProgressBars.py', 'RetrieveFax.py', 'RetrieveNumbers.py', 'SaveManager.py', 'SendFax.py', 'SystemLog.py'],
     pathex=['U:\\jfreeman\\Software Development\\FaxRetriever'],
     binaries=[],
     datas=[
-    ('images', 'images'),  # Include all files inside the 'images' directory
-    ('ReadMe', '.'),  # Include the 'ReadMe' file in the root directory of the bundled executable
-    ('poppler', 'poppler')
+        ('images', 'images'),
+        ('ReadMe', '.'),
+        ('poppler', 'poppler')
     ],
-    hiddenimports=['pdf2image', 'pdf2image.backends', 'pdf2image.backends.poppler', 'plyer', 'plyer.notification'],
-    hookspath=[],
-    hooksconfig={},
+    hiddenimports=['pdf2image', 'pdf2image.backends', 'pdf2image.backends.poppler', 'plyer', 'plyer.notification',
+    'fitz', 'pymupdf', 'pyinsane2', 'docx', 'python-docx'],
+    hookspath=['./hooks'],
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
@@ -25,6 +25,7 @@ a = Analysis(
     noarchive=False,
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
 
 exe = EXE(
     pyz,

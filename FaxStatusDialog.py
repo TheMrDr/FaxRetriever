@@ -4,7 +4,7 @@ import sys
 from datetime import datetime, timezone
 
 import requests
-import tzlocal
+import pytz
 from PyQt5.QtCore import pyqtSignal, QThread, QTimer, Qt, QUrl
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
@@ -114,7 +114,7 @@ class CustomFaxTable(QTableWidget):
             if timestamp == 'N/A':
                 return 'N/A'
             dt = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-            local_timezone = tzlocal.get_localzone()
+            local_timezone = pytz.timezone('America/New_York')  # Replace with your local timezone
             dt = dt.replace(tzinfo=timezone.utc).astimezone(local_timezone)
             return dt.strftime('%Y-%m-%d %H:%M:%S %Z')
         except Exception as e:

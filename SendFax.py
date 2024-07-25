@@ -11,7 +11,7 @@ from docx import Document
 from PIL import Image, ImageDraw
 
 from PyQt5 import QtGui
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QObject
 from PyQt5.QtGui import QPixmap, QImage, QPainter
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QInputDialog,
                              QComboBox, QListWidget, QGridLayout, QMessageBox, QMenu, QAction, QHBoxLayout)
@@ -297,83 +297,97 @@ class ScanningDialog(QDialog):
         layout.addWidget(self.label, alignment=Qt.AlignCenter)  # Center align the text
         self.setLayout(layout)
 
+class ScannerManager(QObject):
+    scan_started = pyqtSignal()
+    scan_finished = pyqtSignal(list)
+    show_message = pyqtSignal(str, str, QMessageBox.Icon)
+    scanning_dialog_closed = pyqtSignal()
 
-class ScannerManager:
     def __init__(self, ui_manager, document_manager):
+        super().__init__()
         self.ui_manager = ui_manager
         self.document_manager = document_manager
+        self.lock = threading.Lock()
+
+        self.scan_started.connect(self._init_scanner)
+        self.scan_finished.connect(self.update_ui_with_scanned_documents)
+        self.show_message.connect(self._show_message)
+        self.scanning_dialog_closed.connect(self._close_scanning_dialog)
 
     def scan_document(self):
         self.scanning_dialog = ScanningDialog(self.ui_manager)
         self.scanning_dialog.show()
+        self.scan_started.emit()
         threading.Thread(target=self._scan_document_thread).start()
 
-    def _scan_document_thread(self):
+    def _init_scanner(self):
         pyinsane2.init()
-        scanned_files = []
-        try:
-            devices = pyinsane2.get_devices()
-            if not devices:
-                self._show_message("No Scanner Found", "No scanners were found on your system.", QMessageBox.Warning)
-                self.scanning_dialog.accept()
-                return
 
-            if len(devices) > 1:
-                device_names = [device.model for device in devices]  # Use model name for display
-                scanner_model, ok = QInputDialog.getItem(self.ui_manager, "Select Scanner", "Available Scanners:", device_names, 0, False)
-                if not ok:
-                    self.scanning_dialog.accept()
+    def _scan_document_thread(self):
+        with self.lock:
+            scanned_files = []
+            try:
+                devices = pyinsane2.get_devices()
+                if not devices:
+                    self.show_message.emit("No Scanner Found", "No scanners were found on your system.", QMessageBox.Warning)
+                    self.scanning_dialog_closed.emit()
                     return
-                scanner = next(device for device in devices if device.model == scanner_model)
-            else:
-                scanner = devices[0]
 
-            print(f"Selected scanner: {scanner.model}")
+                if len(devices) > 1:
+                    device_names = [device.model for device in devices]  # Use model name for display
+                    scanner_model, ok = QInputDialog.getItem(self.ui_manager, "Select Scanner", "Available Scanners:", device_names, 0, False)
+                    if not ok:
+                        self.scanning_dialog_closed.emit()
+                        return
+                    scanner = next(device for device in devices if device.model == scanner_model)
+                else:
+                    scanner = devices[0]
 
-            self._set_scanner_options(scanner)
+                print(f"Selected scanner: {scanner.model}")
 
-            scan_session = scanner.scan(multiple=True)
+                self._set_scanner_options(scanner)
 
-            directory = os.path.join(os.getcwd(), "Scanned Docs")
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-            else:
-                shutil.rmtree(directory)
-                os.makedirs(directory)
-            print(f"Directory created at: {directory}")
+                scan_session = scanner.scan(multiple=True)
 
-            while True:
-                try:
-                    scan_session.scan.read()
-                except EOFError:
-                    print(f"Got page {len(scan_session.images)}")
-                    if scan_session.images:
-                        image = scan_session.images[-1]
-                        scanned_image_path = os.path.join(directory, f"scanned_document_page_{len(scan_session.images)}.jpg")
-                        image.save(scanned_image_path, 'JPEG')
-                        print(f"Image saved at: {scanned_image_path}")
-                        self._compress_image(scanned_image_path)
-                        scanned_files.append(scanned_image_path)
-                except StopIteration:
-                    print(f"Got {len(scan_session.images)} pages")
-                    break
-                except Exception as e:
-                    print(f"Error reading scan: {str(e)}")
-                    break
+                directory = os.path.join(os.getcwd(), "Scanned Docs")
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                else:
+                    shutil.rmtree(directory)
+                    os.makedirs(directory)
+                print(f"Directory created at: {directory}")
 
-            print(f"Finished scanning. Total pages: {len(scanned_files)}")
+                while True:
+                    try:
+                        scan_session.scan.read()
+                    except EOFError:
+                        print(f"Got page {len(scan_session.images)}")
+                        if scan_session.images:
+                            image = scan_session.images[-1]
+                            scanned_image_path = os.path.join(directory, f"scanned_document_page_{len(scan_session.images)}.jpg")
+                            image.save(scanned_image_path, 'JPEG')
+                            print(f"Image saved at: {scanned_image_path}")
+                            self._compress_image(scanned_image_path)
+                            scanned_files.append(scanned_image_path)
+                    except StopIteration:
+                        print(f"Got {len(scan_session.images)} pages")
+                        break
+                    except Exception as e:
+                        print(f"Error reading scan: {str(e)}")
+                        break
 
-            if not scanned_files:
-                self._show_message("Scan Error", "No images were scanned.", QMessageBox.Warning)
-                return
+                print(f"Finished scanning. Total pages: {len(scanned_files)}")
 
-        except (pyinsane2.WIAException, pyinsane2.SaneException, Exception) as e:
-            print(f"Scan Error: {str(e)}")
-            self._show_message("Scan Error", f"An error occurred during scanning: {str(e)}", QMessageBox.Critical)
-        finally:
-            self.update_ui_with_scanned_documents(scanned_files)
-            self.scanning_dialog.accept()  # Close the scanning dialog
-            # pyinsane2.exit()
+                if not scanned_files:
+                    self.show_message.emit("Scan Error", "No images were scanned.", QMessageBox.Warning)
+                    return
+
+            except (pyinsane2.WIAException, pyinsane2.SaneException, Exception) as e:
+                print(f"Scan Error: {str(e)}")
+                self.show_message.emit("Scan Error", f"An error occurred during scanning: {str(e)}", QMessageBox.Critical)
+            finally:
+                self.scan_finished.emit(scanned_files)
+                self.scanning_dialog_closed.emit()
 
     def _set_scanner_options(self, scanner):
         def set_option(option_name, value):
@@ -440,6 +454,9 @@ class ScannerManager:
 
     def _show_message(self, title, message, icon):
         QMessageBox(icon, title, message, QMessageBox.Ok, self.ui_manager).exec_()
+
+    def _close_scanning_dialog(self):
+        self.scanning_dialog.accept()
 
 
 # noinspection PyUnresolvedReferences

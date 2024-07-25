@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 
-import fitz  # PyMuPDF
+import fitz
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QRect
 from PyQt5.QtGui import QImage, QPainter
@@ -21,6 +21,8 @@ if hasattr(sys, '_MEIPASS'):
 else:
     bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
+
+# noinspection PyUnresolvedReferences
 class RetrieveFaxes(QThread):
     finished = pyqtSignal(list)
 
@@ -154,7 +156,6 @@ class RetrieveFaxes(QThread):
                     else:
                         continue
 
-
                     all_faxes_downloaded = False
 
                     if not os.path.exists(file_path) and not os.path.exists(printed_pdf_path):
@@ -260,7 +261,6 @@ class RetrieveFaxes(QThread):
         except Exception as e:
             self.log_system.log_message('error', f"Exception in print_fax: {str(e)}")
 
-
     def delete_fax(self, fax_id):
         try:
             delete_url = f"https://telco-api.skyswitch.com/users/{self.fax_account}/faxes/{fax_id}/delete"
@@ -278,8 +278,27 @@ class RetrieveFaxes(QThread):
             notification.notify(
                 title='New Faxes Received',
                 message=f'{fax_count} new faxes have been downloaded.',
-                app_name='Clinic Voice',
+                app_name='FaxRetriever',
                 timeout=10
             )
+            self.log_system.log_message('info', 'Notification sent successfully.')
         except Exception as e:
             self.log_system.log_message('error', f"Failed to send notification: {str(e)}")
+            self._log_notification_debug_info()
+
+    def _log_notification_debug_info(self):
+        try:
+            import plyer.platforms.win.notification
+            self.log_system.log_message('debug', 'Windows notification backend is available.')
+        except ImportError:
+            self.log_system.log_message('debug', 'Windows notification backend is not available.')
+
+        # Additional check to see if the notification function is available
+        if hasattr(notification, 'notify'):
+            self.log_system.log_message('debug', 'Notification function is available in plyer.')
+        else:
+            self.log_system.log_message('debug', 'Notification function is NOT available in plyer.')
+
+        # Log the platform-specific backend used by plyer
+        from plyer.utils import platform
+        self.log_system.log_message('debug', f"Plyer platform: {platform}")
