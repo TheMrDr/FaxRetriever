@@ -1,6 +1,8 @@
 import os
 import sys
 
+# from ImportConfig import ImportConfig
+
 from ProgressBars import FaxPollTimerProgressBar
 
 from PyQt5 import QtGui
@@ -8,9 +10,13 @@ from PyQt5.QtPrintSupport import QPrintDialog
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
 
+from RetrieveToken import RetrieveToken
+
 from SaveManager import SaveManager
 
 from SystemLog import SystemLog
+
+from Validation import validate_fax_user
 
 
 # Determine if running as a bundled executable
@@ -24,9 +30,10 @@ class OptionsDialog(QDialog):
     def __init__(self, main_window, token_progress_bar=None):
         super().__init__(parent=main_window)
         self.log_system = SystemLog()
+        self.retrieve_token = RetrieveToken(self)
+        self.main_window = main_window
 
         try:
-            self.main_window = main_window
             self.save_manager = SaveManager(self.main_window)
             self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
 
@@ -37,6 +44,11 @@ class OptionsDialog(QDialog):
             self.fax_timer_progress_bar = FaxPollTimerProgressBar(self.main_window, token_progress_bar)
 
             self.selected_printer_full_name = None
+
+            # Initialize to store the previous fax_user value
+            self.previous_fax_user = self.save_manager.get_config_value('Account', 'fax_user')
+            self._license_valid = self.save_manager.get_config_value('Account', 'validation_status') == 'True'
+
         except Exception as e:
             self.log_system.log_message('error', f"Failed to initialize OptionsDialog: {e}")
             if self.main_window:
@@ -45,6 +57,7 @@ class OptionsDialog(QDialog):
     def setup_ui(self):
         try:
             form_layout = QFormLayout()
+            self.setFixedWidth(400)
 
             # Checkbox to enable editing sensitive settings
             self.edit_sensitive_checkbox = QCheckBox("Edit Account Settings")
@@ -53,6 +66,11 @@ class OptionsDialog(QDialog):
             # New Checkbox to disable fax retrieval
             self.disable_fax_retrieval_checkbox = QCheckBox("Disable Fax Retrieval")
             self.disable_fax_retrieval_checkbox.toggled.connect(self.toggle_download_options)
+
+            # # Import Config Button
+            # self.import_config_button = QPushButton("Import Config String")
+            # self.import_config_button.clicked.connect(self.import_config_string)
+            # self.import_config_button.setEnabled(False)
 
             # API Credentials Section
             self.username_label = QLabel("API Username:")
@@ -242,6 +260,7 @@ class OptionsDialog(QDialog):
             logging_level = self.save_manager.get_config_value('UserSettings', 'logging_level')
             self.logging_level_combo.setCurrentText(logging_level)
         except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to populate settings: {e}")
             self.log_system.log_message('error', f"Failed to populate settings: {e}")
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
@@ -273,12 +292,29 @@ class OptionsDialog(QDialog):
 
     def save_settings(self):
         try:
-            # Save all settings to config file
             username = self.username_input.text().strip()
             password = self.password_input.text().strip()
             client_id = self.client_id_input.text().strip()
             client_secret = self.client_secret_input.text().strip()
             fax_user = self.fax_user_input.text().strip()
+
+            # Flag to check if fax_user has been modified
+            fax_user_modified = fax_user != self.previous_fax_user
+
+            # Validate the new fax_user if it has been modified
+            if fax_user_modified:
+                valid, status = validate_fax_user(fax_user)
+                if valid:
+                    self._license_valid = True
+                    print("Application Activated!")
+                    QMessageBox.information(self, "Success", "The application has validated successfully!")
+                    self.previous_fax_user = fax_user
+                else:
+                    self._license_valid = False
+                    QMessageBox.critical(self, "Activation Error",
+                                         "Account Inactive or not found. Please contact your Voice provider for assistance.")
+                    return
+
             retrieval_disabled = self.disable_fax_retrieval_checkbox.isChecked()
             download_method = self.download_method_button_group.checkedButton().text() if (
                 self.download_method_button_group.checkedButton()) else ""
@@ -288,50 +324,49 @@ class OptionsDialog(QDialog):
             print_faxes = 'Yes' if self.print_faxes_checkbox.isChecked() else 'No'
 
             if self.print_faxes_checkbox.isChecked() and not self.selected_printer_full_name:
-                QMessageBox.critical(self, "Error",
-                                     "You must select a printer if the 'Print Faxes' option is enabled.")
+                QMessageBox.critical(self, "Error", "You must select a printer if the 'Print Faxes' option is enabled.")
                 return
 
             printer_name = self.select_printer_button.text() if self.print_faxes_checkbox.isChecked() else ""
             printer_full_name = self.selected_printer_full_name if self.print_faxes_checkbox.isChecked() else ""
 
-            for section in ['API', 'Client', 'Account', 'Fax Options', 'Debug', 'UserSettings']:
+            settings_to_save = {
+                'API': {'username': username, 'password': password},
+                'Client': {'client_id': client_id, 'client_secret': client_secret},
+                'Account': {'fax_user': fax_user, 'validation_status': 'True' if self._license_valid else 'False'},
+                'Fax Options': {'download_method': download_method, 'delete_faxes': delete_faxes,
+                                'print_faxes': print_faxes, 'printer_name': printer_name,
+                                'printer_full_name': printer_full_name},
+                'UserSettings': {'logging_level': log_level},
+                'Retrieval': {'auto_retrieve': 'Disabled' if retrieval_disabled else 'Enabled'}
+            }
+
+            for section, options in settings_to_save.items():
                 if not self.save_manager.config.has_section(section):
                     self.save_manager.config.add_section(section)
-
-            self.save_manager.config.set('API', 'username', username)
-            self.save_manager.config.set('API', 'password', password)
-            self.save_manager.config.set('Client', 'client_id', client_id)
-            self.save_manager.config.set('Client', 'client_secret', client_secret)
-            self.save_manager.config.set('Account', 'fax_user', fax_user)
-            self.save_manager.config.set('Fax Options', 'download_method', download_method)
-            self.save_manager.config.set('Fax Options', 'delete_faxes', delete_faxes)
-            self.save_manager.config.set('UserSettings', 'logging_level', log_level)
-            self.save_manager.config.set('Fax Options', 'print_faxes', print_faxes)
-            self.save_manager.config.set('Fax Options', 'printer_name', printer_name)
-            self.save_manager.config.set('Fax Options', 'printer_full_name', printer_full_name)
-
-            retrieval_status = 'Disabled' if retrieval_disabled else 'Enabled'
-            self.save_manager.config.set('Retrieval', 'auto_retrieve', retrieval_status)
+                for option, value in options.items():
+                    self.save_manager.config.set(section, option, value)
 
             try:
+                self.retrieve_token.retrieve_token()
                 self.save_manager.save_changes()
                 self.save_manager.read_encrypted_ini()  # Reload configuration after saving
                 QMessageBox.information(self, "Settings Updated", "Settings have been updated successfully.")
-                if self.main_window.isVisible():
-                    self.main_window.update_status_bar("Settings saved successfully.", 5000)
+                self.edit_sensitive_checkbox.setChecked(False)
+                # if self.main_window():
+                #     self.main_window.update_status_bar("Settings saved successfully.", 5000)
                 self.main_window.reload_ui()
                 self.fax_timer_progress_bar.restart_progress()
             except Exception as e:
                 QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
-                if self.main_window.isVisible():
-                    self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+                # if self.main_window():
+                #     self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
                 return
             self.accept()  # Close the dialog
         except Exception as e:
             self.log_system.log_message('error', f"Failed to save settings: {e}")
-            if self.main_window:
-                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+            # if self.main_window:
+            #     self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
             QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
 
 if __name__ == "__main__":

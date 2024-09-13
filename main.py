@@ -22,7 +22,7 @@ else:
 
 from AboutDialog import AboutDialog
 from AutoUpdate import CheckForUpdate, UpgradeApplication
-from Customizations import CustomPushButton, SelectInboxDialog
+from Customizations import CustomPushButton, SelectInboxDialog, PhoneNumberInputDialog
 from FaxStatusDialog import FaxStatusDialog
 from Options import OptionsDialog
 from ProgressBars import TokenLifespanProgressBar, FaxPollTimerProgressBar
@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """Setup the main window UI components"""
         try:
-            self.setWindowTitle("Clinic Voice Instant Fax")
+            self.setWindowTitle("FaxRetriever - Cloud Fax")
             self.setFixedWidth(600)
             self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
             self.initialize_components()
@@ -100,7 +100,7 @@ class MainWindow(QMainWindow):
 
     def connect_signals(self):
         try:
-            self.settingsLoaded.connect(self.reload_ui)  # Connect signal to slot
+            # self.settingsLoaded.connect(self.reload_ui)
             self.retrieve_token.token_retrieved.connect(self.tokenLifespanProgressBar.restart_progress)
             self.retrieve_token.token_retrieved.connect(self.faxPollTimerProgressBar.restart_progress)
         except Exception as e:
@@ -108,14 +108,31 @@ class MainWindow(QMainWindow):
             print(f"Failed to connect signals: {e}")
 
     def load_initial_data(self):
-        """Load data and setup initial state of the application"""
+        """Load data and setup the initial state of the application"""
         try:
             self.check_for_updates()
-            self.initialize_ui()
-            self.setup_periodic_update_check()  # Set up periodic update check
+            self.validation_status = self.save_manager.get_config_value('Account', 'validation_status')
+            if not self.validation_status:
+                self.disable_functionality()
+            else:
+                self.initialize_ui()
+                self.setup_periodic_update_check()  # Set up periodic update check
         except Exception as e:
             self.log_system.log_message('error', f"Failed to load initial data: {e}")
             print(f"Failed to load initial data: {e}")
+
+    def disable_functionality(self):
+        """Disable the main functionality if the validation status is False"""
+        try:
+            self.faxPollButton.setEnabled(False)
+            self.send_fax_button.setEnabled(False)
+            self.tokenLifespanProgressBar.setVisible(False)
+            self.faxPollTimerProgressBar.setVisible(False)
+            self.log_system.log_message('info', 'Application functionality disabled due to failed validation status')
+            self.update_status_bar("Validation failed. Please configure your account in settings.", 10000)
+        except Exception as e:
+            self.log_system.log_message('error', f"Failed to disable functionality: {e}")
+            print(f"Failed to disable functionality: {e}")
 
     def finalize_initialization(self):
         """Final steps to initialize the UI based on loaded data"""
@@ -276,7 +293,7 @@ class MainWindow(QMainWindow):
             self.options_button = QAction("Options", self)
             self.options_button.triggered.connect(self.show_options_dialog)
             self.file_menu.addAction(self.options_button)
-            self.options_button.setEnabled(True)
+            self.options_button.setEnabled(True)  # Ensure settings are enabled
 
             self.minimize_app_button = QAction("Minimize", self)
             self.minimize_app_button.triggered.connect(self.minimize_to_tray)
@@ -339,8 +356,6 @@ class MainWindow(QMainWindow):
     def create_central_widget(self):
         try:
             self.centralWidget = QWidget()
-
-            # Main layout
             layout = QGridLayout(self.centralWidget)
 
             self.load_data_from_config()
@@ -389,7 +404,6 @@ class MainWindow(QMainWindow):
             if self.isVisible():
                 self.update_status_bar('System Started', 1000)
 
-            # Set central widget and layout
             self.setCentralWidget(self.centralWidget)
             self.centralWidget.setLayout(layout)
 
@@ -407,6 +421,16 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.log_system.log_message('error', f"Failed to show about dialog: {e}")
             print(f"Failed to show about dialog: {e}")
+
+    def open_select_inbox_dialog(self):
+        try:
+            if not self.retrieve_numbers_thread.isRunning():
+                self.retrieve_numbers_thread.start()
+            else:
+                self.update_status_bar("Retrieval already in progress", 5000)
+        except Exception as e:
+            self.log_system.log_message('error', f"Failed to open select inbox dialog: {e}")
+            self.update_status_bar(f"Failed to open select inbox dialog: {str(e)}", 10000)
 
     def show_send_fax_dialog(self):
         try:
@@ -439,6 +463,8 @@ class MainWindow(QMainWindow):
             self.delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
 
             self.save_path = self.save_manager.get_config_value('UserSettings', 'save_path')
+
+            self.validation_status = self.save_manager.get_config_value('Account', 'validation_status')
         except Exception as e:
             self.log_system.log_message('error', f"Failed to load data from config: {e}")
             print(f"Failed to load data from config: {e}")
@@ -467,6 +493,8 @@ class MainWindow(QMainWindow):
             self.delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
 
             self.save_path = self.save_manager.get_config_value('UserSettings', 'save_path')
+
+            self.validation_status = self.save_manager.get_config_value('Account', 'validation_status')
 
             self.populate_caller_ids(self.fax_caller_id)
         except Exception as e:
@@ -543,23 +571,25 @@ class MainWindow(QMainWindow):
             self.log_system.log_message('error', f"Failed to handle token response: {e}")
             self.update_status_bar(f"Failed to handle token response: {str(e)}", 10000)
 
-    def open_select_inbox_dialog(self):
-        try:
-            if not self.retrieve_numbers_thread.isRunning():
-                self.retrieve_numbers_thread.start()
-            else:
-                self.update_status_bar("Retrieval already in progress", 5000)
-        except Exception as e:
-            self.log_system.log_message('error', f"Failed to open select inbox dialog: {e}")
-            self.update_status_bar(f"Failed to open select inbox dialog: {str(e)}", 10000)
-
     def update_inbox_selection(self, numbers):
         try:
-            formatted_numbers = [self.format_phone_number(num) for num in numbers]
+            formatted_numbers = [self.format_phone_number(num) for num in numbers] if numbers else []
+
+            if not formatted_numbers:
+                # No numbers retrieved, prompt for user input
+                user_number = self.prompt_for_fax_number()
+                if user_number:
+                    formatted_numbers = [self.format_phone_number(user_number)]  # Ensure user number is formatted
+                else:
+                    self.inbox_button.setText("No Inboxes Available")
+                    return
+
+            all_numbers = ','.join(formatted_numbers)  # Join all numbers into a single string separated by commas
+            self.save_manager.config.set('Account', 'all_numbers', all_numbers)  # Save the numbers immediately
+
             dialog = SelectInboxDialog(formatted_numbers, self)
             if dialog.exec() == QDialog.Accepted:
                 selected_inboxes = dialog.selected_inboxes()
-                all_numbers = ','.join(numbers)  # Join all numbers into a single string separated by commas
 
                 if selected_inboxes:
                     if len(selected_inboxes) == 1:
@@ -573,24 +603,32 @@ class MainWindow(QMainWindow):
                     self.save_manager.config.set('Retrieval', 'fax_caller_id', '')
 
                 self.inbox_button.setText(button_text)
-                self.save_manager.config.set('Account', 'all_numbers', all_numbers)
-                try:
-                    self.save_manager.save_changes()
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
-                    self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-            if len(numbers) == 1:
-                self.inbox_button.setText(self.format_phone_number(numbers[0]))
-                self.save_manager.config.set('Retrieval', 'fax_caller_id', numbers[0])
+                try:
+                    self.save_manager.save_changes()  # Save settings
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
+                    self.update_status_bar(f"Error: {str(e)}", 10000)
+            else:
+                # If the dialog was rejected, ensure any new numbers are still saved
                 try:
                     self.save_manager.save_changes()
                 except Exception as e:
                     QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
-                    self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+                    self.update_status_bar(f"Error: {str(e)}", 10000)
+
         except Exception as e:
             self.log_system.log_message('error', f"Failed to update inbox selection: {e}")
             QMessageBox.critical(self, "Error", f"Failed to update inbox selection: {str(e)}")
+
+    def prompt_for_fax_number(self):
+        """Prompts the user to enter a formatted USA fax number."""
+        dialog = PhoneNumberInputDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            phone_number = dialog.get_phone_number()
+            if phone_number:
+                return phone_number
+        return None
 
     def populate_caller_ids(self, caller_ids):
         try:
@@ -609,10 +647,11 @@ class MainWindow(QMainWindow):
     def format_phone_number(self, phone_number):
         """Format a U.S. phone number into the format 1 (NNN) NNN-NNNN."""
         try:
-            if len(phone_number) == 10 and phone_number.isdigit():
-                return f"1 ({phone_number[:3]}) {phone_number[3:6]}-{phone_number[6:]}"
-            elif len(phone_number) == 11 and phone_number.isdigit() and phone_number.startswith('1'):
-                return f"1 ({phone_number[1:4]}) {phone_number[4:7]}-{phone_number[7:]}"
+            digits = ''.join(filter(str.isdigit, phone_number))  # Remove all non-digit characters
+            if len(digits) == 10:
+                return f"1 ({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+            elif len(digits) == 11 and digits.startswith('1'):
+                return f"1 ({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
             return phone_number  # Return the original if it doesn't meet the criteria
         except Exception as e:
             self.log_system.log_message('error', f"Failed to format phone number: {e}")

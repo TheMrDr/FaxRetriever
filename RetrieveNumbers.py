@@ -33,6 +33,10 @@ class RetrieveNumbers(QThread):
             self.log_system.log_message('error', f"Exception in run method: {e}")
 
     def retrieve_numbers(self):
+        # Fetch the latest access token before making the API call
+        self.access_token = self.save_manager.get_config_value('Token', 'access_token')
+        self.user_id = self.save_manager.get_config_value('Account', 'fax_user')
+
         if not self.access_token or not self.user_id:
             self.finished.emit("Failure", "Essential credentials are not properly set.")
             self.log_system.log_message('error', "Essential credentials are not set properly for number retrieval.")

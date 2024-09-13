@@ -86,6 +86,7 @@ class RetrieveToken(QThread):
                     self.save_manager.config.set('Token', 'token_expiration', formatted_expiration)
                     self.save_manager.config.set('Token', 'token_retrieved', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))  # Add this line
                     self.save_manager.save_changes()
+                    self.main_window.reload_ui()
 
                     self.finished.emit("Success", "Token retrieved and saved successfully.")
                     self.log_system.log_message('info', "Token retrieved and saved successfully.")

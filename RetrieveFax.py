@@ -275,11 +275,13 @@ class RetrieveFaxes(QThread):
 
     def notify_user(self, fax_count):
         try:
+            icon_path = os.path.join(bundle_dir, "images", "fax_thumbnail.ico")
             notification.notify(
                 title='New Faxes Received',
                 message=f'{fax_count} new faxes have been downloaded.',
                 app_name='FaxRetriever',
-                timeout=10
+                timeout=10,
+                app_icon=icon_path  # Add the icon path here
             )
             self.log_system.log_message('info', 'Notification sent successfully.')
         except Exception as e:
