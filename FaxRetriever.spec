@@ -5,14 +5,16 @@ block_cipher = None
 
 
 a = Analysis(
-    ['AboutDialog.py', 'AutoUpdate.py', 'Customizations.py', 'FaxStatusDialog.py', 'main.py', 'options.py',
-     'ProgressBars.py', 'RetrieveFax.py', 'RetrieveNumbers.py', 'SaveManager.py', 'SendFax.py', 'SystemLog.py'],
-    pathex=['U:\\jfreeman\\Software Development\\FaxRetriever'],
+    ['AboutDialog.py', 'ArchiveManager.py', 'AutoUpdate.py', 'Customizations.py', 'FaxStatusDialog.py',
+     'main.py', 'Options.py', 'ProgressBars.py', 'RetrieveFax.py', 'RetrieveNumbers.py', 'RetrieveToken.py',
+     'SaveManager.py', 'SendFax.py', 'SystemLog.py', 'Validation.py', 'WhatsNew.py'],
+    pathex=['D:\\Projects\\FaxRetriever'],
     binaries=[],
     datas=[
         ('images', 'images'),
-        ('ReadMe', '.'),
-        ('poppler', 'poppler')
+        ('readme.md', '.'),
+        ('poppler', 'poppler'),
+        ('changes.md', '.')
     ],
     hiddenimports=['pdf2image', 'pdf2image.backends', 'pdf2image.backends.poppler', 'plyer', 'plyer.notification',
     'fitz', 'pymupdf', 'pyinsane2', 'docx', 'python-docx'],
@@ -47,5 +49,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['U:\\jfreeman\\Software Development\\FaxRetriever\\images\\logo.ico'],
+    icon=['D:\\Projects\\FaxRetriever\\images\\logo.ico'],
 )

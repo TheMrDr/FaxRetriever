@@ -2,19 +2,24 @@ import os
 import shutil
 import subprocess
 import sys
+
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QApplication
 
+from ArchiveManager import ArchiveManager
 from SystemLog import SystemLog
 from Version import __version__
 
 
+# noinspection PyUnresolvedReferences
 class CheckForUpdate(QThread):
     new_version_available = pyqtSignal(str, str)  # signals with the download URL
 
     def __init__(self, main_window=None):
         super().__init__()
+        archive_manager = ArchiveManager()
+        archive_manager.cleanup_old_archives()
         self.main_window = main_window
 
     def run(self):
@@ -22,9 +27,7 @@ class CheckForUpdate(QThread):
             if self.main_window:
                 current_version = __version__
                 url = "https://api.github.com/repos/TheMrDr/FaxRetriever/releases/latest"  # Use this for deployment of the software.
-                # url = "https://api.github.com/repos/test/test/test"  # Use this for development to test the application
                 response = requests.get(url)
-                # self.save_full_response(response)  # Save the full response for troubleshooting
 
                 if response.status_code == 200:
                     data = response.json()

@@ -240,7 +240,7 @@ class FaxPollTimerProgressBar(QWidget):
         # Ensure progress_percentage is within the valid range [0, 100]
         progress_percentage = min(max(progress_percentage, 0), 100)
 
-        self.faxPollTimer_bar.setValue(progress_percentage)
+        self.faxPollTimer_bar.setValue(int(progress_percentage))
 
         seconds_left = int(remaining_time.total_seconds())
         self.time_remaining_label.setText(str(timedelta(seconds=seconds_left))[2:7])

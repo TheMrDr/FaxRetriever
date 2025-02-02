@@ -1,20 +1,22 @@
-import io
 import os
-import pyinsane2
 import shutil
 import sys
-import requests
+import tempfile
 import threading
 
-from docx import Document
-
+import pyinsane2
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import requests
 from PIL import Image, ImageDraw
-
+from pypdf import PdfReader, PdfWriter
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt, QObject
-from PyQt5.QtGui import QPixmap, QImage, QPainter
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QTransform
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QInputDialog,
-                             QComboBox, QListWidget, QGridLayout, QMessageBox, QMenu, QAction, QHBoxLayout)
+                             QComboBox, QListWidget, QGridLayout, QMessageBox, QMenu, QAction, QHBoxLayout, QGraphicsView,
+                             QGraphicsScene, QGraphicsPixmapItem)
+from docx import Document
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
@@ -33,6 +35,7 @@ else:
 class UIManager(QDialog):
     finished = pyqtSignal(str, str)  # Signal to indicate the fax send result
 
+
     def __init__(self, main_window=None, parent=None):
         super().__init__(parent)
         try:
@@ -40,6 +43,55 @@ class UIManager(QDialog):
             self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
             self.setWindowTitle("Send Fax")
             self.setup_ui()
+            self.current_page_index = 0
+
+            self.caller_id_label.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+            self.caller_id_combo.setFont(QtGui.QFont("Arial", 12))
+            self.caller_id_combo.setMinimumHeight(35)
+
+            font = QtGui.QFont("Arial", 14, QtGui.QFont.Bold)
+            self.destination_label.setFont(font)
+            self.phone_label.setFont(font)
+            self.area_code_input.setFont(font)
+            self.first_three_input.setFont(font)
+            self.last_four_input.setFont(font)
+            self.document_label.setFont(font)
+            self.document_button.setFont(font)
+            self.preview_label.setFont(font)
+            self.document_preview.setFont(font)
+            self.scan_button.setFont(font)
+            self.prev_page_button.setFont(font)
+            self.next_page_button.setFont(font)
+
+            self.area_code_input.setMinimumHeight(40)
+            self.first_three_input.setMinimumHeight(40)
+            self.last_four_input.setMinimumHeight(40)
+
+            self.document_button.setFont(QtGui.QFont("Arial", 12))
+            self.scan_button.setFont(QtGui.QFont("Arial", 12))
+            self.prev_page_button.setFont(QtGui.QFont("Arial", 12))
+            self.next_page_button.setFont(QtGui.QFont("Arial", 12))
+            self.document_button.setMinimumHeight(40)
+            self.scan_button.setMinimumHeight(40)
+            self.prev_page_button.setMinimumHeight(40)
+            self.next_page_button.setMinimumHeight(40)
+
+            self.document_preview.setFixedSize(400, 400)  # Increase preview size
+
+            self.send_button.setFont(QtGui.QFont("Arial", 14, QtGui.QFont.Bold))
+            self.send_button.setMinimumHeight(50)
+            self.send_button.setStyleSheet("background-color: #2a81dc; color: white; border-radius: 10px;")
+
+            self.cancel_button.setFont(QtGui.QFont("Arial", 14))
+            self.cancel_button.setMinimumHeight(50)
+            self.cancel_button.setStyleSheet("background-color: #dc2a2a; color: white; border-radius: 10px;")
+
+            self.send_button.setToolTip("Click to send the fax.")
+            self.cancel_button.setToolTip("Cancel and return to the main menu.")
+
+            self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+            self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint | Qt.MSWindowsFixedSizeDialogHint)
+
         except Exception as e:
             print(f"Initialization error: {e}")
 
@@ -48,11 +100,11 @@ class UIManager(QDialog):
             layout = QVBoxLayout(self)
             self.setup_caller_id_section(layout)
             self.setup_destination_number_section(layout)
-            # self.setup_cover_sheet_section(layout)
             self.setup_document_section(layout)
             self.setup_action_buttons(layout)
         except Exception as e:
             print(f"Setup UI error: {e}")
+
 
     def setup_caller_id_section(self, layout):
         try:
@@ -102,7 +154,7 @@ class UIManager(QDialog):
         try:
             h_layout = QHBoxLayout()
 
-            # Left side for list and buttons
+            # Left side: list and attach/scan buttons.
             v_layout = QVBoxLayout()
             self.document_label = QLabel("Attached Documents:")
             self.document_list = QListWidget()
@@ -117,15 +169,67 @@ class UIManager(QDialog):
             v_layout.addLayout(document_buttons_layout)
             h_layout.addLayout(v_layout)
 
-            # Right side for image
-            self.document_image_label = QLabel()
-            self.document_image_label.setFixedSize(200, 200)  # Adjust size as needed
-            self.document_image_label.setStyleSheet("border: 1px solid black;")
-            h_layout.addWidget(self.document_image_label)
+            # Right side: preview with navigation.
+            preview_layout = QVBoxLayout()
+            # Add a heading for Image Preview
+            self.preview_label = QLabel("Image Preview")
+            self.preview_label.setAlignment(Qt.AlignLeft)  # Align with "Attached Documents"
+            preview_layout.addWidget(self.preview_label)
 
+            nav_buttons_layout = QHBoxLayout()
+            self.prev_page_button = QPushButton("<")
+            self.next_page_button = QPushButton(">")
+            nav_buttons_layout.addWidget(self.prev_page_button)
+            nav_buttons_layout.addWidget(self.next_page_button)
+
+            # Replace the QLabel preview with our zoomable preview widget.
+            self.document_preview = DocumentPreviewWidget()
+            self.document_preview.setFixedSize(400, 400)  # Adjust preview size as needed
+
+            preview_layout.addWidget(self.document_preview)
+            preview_layout.addLayout(nav_buttons_layout)
+            h_layout.addLayout(preview_layout)
             layout.addLayout(h_layout)
+
+            # Connect navigation buttons.
+            self.prev_page_button.clicked.connect(self.show_previous_page)
+            self.next_page_button.clicked.connect(self.show_next_page)
+
+            # When the user selects a document from the list, reset the page index.
+            self.document_list.itemSelectionChanged.connect(self.document_selection_changed)
         except Exception as e:
             print(f"Setup document section error: {e}")
+
+    def document_selection_changed(self):
+        # When a new document is selected, reset the preview to page 0.
+        self.current_page_index = 0
+        selected_items = self.document_list.selectedItems()
+        if selected_items:
+            # Retrieve the full file path (assumed to be stored in DocumentManager.documents_paths)
+            index = self.document_list.row(selected_items[0])
+            doc_path = self.document_manager.documents_paths[index]
+            self.document_manager.update_image_label(doc_path, self.document_preview, page=self.current_page_index)
+
+    def show_previous_page(self):
+        # Decrement page index and update preview if possible.
+        if self.current_page_index > 0:
+            self.current_page_index -= 1
+            selected_items = self.document_list.selectedItems()
+            if selected_items:
+                index = self.document_list.row(selected_items[0])
+                doc_path = self.document_manager.documents_paths[index]
+                self.document_manager.update_image_label(doc_path, self.document_preview, page=self.current_page_index)
+
+    def show_next_page(self):
+        # Increment page index if the document has additional pages.
+        selected_items = self.document_list.selectedItems()
+        if selected_items:
+            index = self.document_list.row(selected_items[0])
+            doc_path = self.document_manager.documents_paths[index]
+            num_pages = self.document_manager.get_page_count(doc_path)
+            if self.current_page_index < num_pages - 1:
+                self.current_page_index += 1
+                self.document_manager.update_image_label(doc_path, self.document_preview, page=self.current_page_index)
 
     def setup_action_buttons(self, layout):
         try:
@@ -137,14 +241,18 @@ class UIManager(QDialog):
             print(f"Setup action buttons error: {e}")
 
     def closeEvent(self, event):
-        """Override the close event to clear the document list"""
+        """Override the close event to clear the document list and prevent crashes."""
         self.clear_document_list()
+
+        # Explicitly reset the preview image before closing
+        self.pixmap_item = None
+
         super().closeEvent(event)
 
     def clear_document_list(self):
-        """Clear the document list and reset the document image label"""
+        """Clear the document list and reset the document preview widget"""
         self.document_list.clear()
-        self.document_image_label.clear()
+        self.document_preview.scene.clear()
 
 
 class DocumentManager:
@@ -152,6 +260,7 @@ class DocumentManager:
         try:
             self.ui_manager = ui_manager
             self.cover_sheet_path = None
+            # We'll store paths to our normalized (or original, for DOCX) documents.
             self.documents_paths = []
         except Exception as e:
             print(f"Initialization error: {e}")
@@ -159,14 +268,20 @@ class DocumentManager:
     def attach_document(self):
         try:
             options = QFileDialog.Options()
-            files, _ = QFileDialog.getOpenFileNames(self.ui_manager, "Select one or more files to fax", "",
-                                                    "Documents (*.pdf *.doc *.docx *.jpg *.png *.tif *.tiff *.txt)",
-                                                    options=options)
+            files, _ = QFileDialog.getOpenFileNames(
+                self.ui_manager,
+                "Select one or more files to fax",
+                "",
+                "Documents (*.pdf *.doc *.docx *.jpg *.png *.tif *.tiff *.txt)",
+                options=options
+            )
             if files:
                 for file in files:
-                    self.documents_paths.append(file)
-                    self.ui_manager.document_list.addItem(self.format_display_name(file))
-                    self.update_document_image(file)
+                    converted = self.convert_to_pdf(file)
+                    if converted:
+                        self.documents_paths.append(converted)
+                        self.ui_manager.document_list.addItem(self.format_display_name(file))
+                        self.update_document_image(converted)
         except Exception as e:
             print(f"Attach document error: {e}")
 
@@ -177,9 +292,16 @@ class DocumentManager:
                 return
             for item in selected_items:
                 index = self.ui_manager.document_list.row(item)
+                # Remove the temporary file only if it's a converted PDF.
+                temp_file = self.documents_paths[index]
+                if os.path.exists(temp_file) and temp_file.endswith('.pdf'):
+                    os.remove(temp_file)
                 del self.documents_paths[index]
                 self.ui_manager.document_list.takeItem(index)
-                self.update_document_image(None if not self.documents_paths else self.documents_paths[0])
+                if self.documents_paths:
+                    self.update_document_image(self.documents_paths[0])
+                else:
+                    self.ui_manager.document_image_label.clear()
         except Exception as e:
             print(f"Remove document error: {e}")
 
@@ -196,49 +318,172 @@ class DocumentManager:
     def update_document_image(self, filepath):
         try:
             if filepath:
+                # Reload the (possibly converted) PDF for preview.
                 self.update_image_label(filepath, self.ui_manager.document_image_label)
             else:
                 self.ui_manager.document_image_label.clear()
         except Exception as e:
             print(f"Update document image error: {e}")
 
-    def update_image_label(self, filepath, label):
+    def update_image_label(self, filepath, preview_widget, page=0):
         try:
-            if filepath.lower().endswith(('.pdf', '.doc', '.docx', '.txt')):
-                if filepath.lower().endswith('.pdf'):
-                    import fitz
-                    doc = fitz.open(filepath)
-                    page = doc.load_page(0)
-                    pix = page.get_pixmap()
-                    image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
-                    pixmap = QPixmap.fromImage(image)
-                elif filepath.lower().endswith('.docx'):
-                    doc = Document(filepath)
-                    text = "\n".join([p.text for p in doc.paragraphs[:10]])  # Adjust number of paragraphs as needed
-                    image = Image.new('RGB', (800, 1000), color='white')
-                    d = ImageDraw.Draw(image)
-                    d.text((10, 10), text, fill='black')
-                    byte_arr = io.BytesIO()
-                    image.save(byte_arr, format='PNG')
-                    byte_arr.seek(0)
-                    image = QImage.fromData(byte_arr.read())
-                    pixmap = QPixmap.fromImage(image)
-                else:  # .txt
-                    with open(filepath, 'r') as file:
-                        text = file.read()
-                    image = QImage(800, 1000, QImage.Format_RGB32)
-                    image.fill(Qt.white)
-                    painter = QPainter(image)
-                    painter.setPen(Qt.black)
-                    painter.drawText(image.rect(), Qt.AlignLeft | Qt.AlignTop, text)
-                    painter.end()
-                    pixmap = QPixmap.fromImage(image)
+            # For PDFs, load the specified page.
+            if filepath.lower().endswith('.pdf'):
+                import fitz
+                doc = fitz.open(filepath)
+                if page < 0 or page >= doc.page_count:
+                    page = 0
+                page_obj = doc.load_page(page)
+                pix = page_obj.get_pixmap()
+                image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(image)
+            # For DOC/DOCX files, load the DOCX icon.
+            elif filepath.lower().endswith(('.doc', '.docx')):
+                # Adjust the path as necessary (relative to your application's root or resource folder)
+                docx_icon_path = os.path.join("images", "docx.png")
+                pixmap = QPixmap(docx_icon_path)
             else:
+                # For other file types, load the image directly.
                 pixmap = QPixmap(filepath)
-            label.setPixmap(pixmap.scaled(label.size(), Qt.KeepAspectRatio))
+
+            # Use the preview widget's method if available.
+            if hasattr(preview_widget, "set_pixmap"):
+                preview_widget.set_pixmap(pixmap)
+            else:
+                preview_widget.setPixmap(pixmap.scaled(preview_widget.size(), Qt.KeepAspectRatio))
         except Exception as e:
             print(f"Failed to load image: {str(e)}")
-            label.clear()
+            if hasattr(preview_widget, "scene"):
+                preview_widget.scene.clear()
+            else:
+                preview_widget.clear()
+
+    def get_page_count(self, filepath):
+        # For PDFs, use fitz to get the number of pages.
+        if filepath.lower().endswith('.pdf'):
+            import fitz
+            doc = fitz.open(filepath)
+            return doc.page_count
+        # For other types, assume a single page.
+        return 1
+
+    def convert_to_pdf(self, filepath):
+        """
+        Converts the input file to a high-quality, portrait-oriented PDF when possible.
+        For DOC and DOCX files, we handle them as delivered and display a warning.
+        Returns the path to the temporary PDF file or the original filepath if not converted.
+        """
+        try:
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext == '.pdf':
+                # Normalize the existing PDF.
+                temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf')
+                os.close(temp_fd)
+                self.normalize_pdf_to_portrait(filepath, temp_path)
+                return temp_path
+            elif ext in ['.doc', '.docx']:
+                # Instead of converting, warn the user and return the original file.
+                QMessageBox.warning(
+                    self.ui_manager,
+                    "Document Warning",
+                    "DOC/DOCX files will be sent as-is. Please verify that the orientation is correct before sending."
+                )
+                return filepath
+            elif ext in ['.jpg', '.jpeg', '.png', '.tif', '.tiff']:
+                # Convert image to PDF using PIL.
+                with Image.open(filepath) as img:
+                    img = img.convert('RGB')
+                    temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf')
+                    os.close(temp_fd)
+                    img.save(temp_path, 'PDF', resolution=100.0)
+                    return temp_path
+            elif ext == '.txt':
+                # Use ReportLab to generate a PDF from text.
+                temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf')
+                os.close(temp_fd)
+                c = canvas.Canvas(temp_path, pagesize=letter)
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    text = f.read()
+                # Write the text; for a real-world scenario, implement proper pagination.
+                c.drawString(10, 750, text)
+                c.save()
+                return temp_path
+            else:
+                print(f"Unsupported file type: {ext}")
+                return None
+        except Exception as e:
+            print(f"Error converting file {filepath} to PDF: {e}")
+            return None
+
+    def normalize_pdf_to_portrait(self, input_pdf_path, output_pdf_path):
+        """
+        Reads the PDF at input_pdf_path, rotates any landscape pages
+        so that they are in portrait orientation, and writes the result
+        to output_pdf_path.
+        """
+        try:
+            reader = PdfReader(input_pdf_path)
+            writer = PdfWriter()
+            for page in reader.pages:
+                width = float(page.mediabox.width)
+                height = float(page.mediabox.height)
+                if width > height:
+                    page.rotate_clockwise(90)
+                writer.add_page(page)
+            with open(output_pdf_path, 'wb') as f:
+                writer.write(f)
+        except Exception as e:
+            print(f"Error normalizing PDF: {e}")
+
+
+class DocumentPreviewWidget(QGraphicsView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.scene = QGraphicsScene(self)
+        self.setScene(self.scene)
+        self.pixmap_item = None
+        self._hover_zoom = 2.0  # Zoom factor when the mouse is over the widget
+        self.setMouseTracking(True)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setViewportUpdateMode(QGraphicsView.SmartViewportUpdate)
+
+    def set_pixmap(self, pixmap):
+        """Set the pixmap to display and fit it into the view."""
+        self.scene.clear()
+        self.pixmap_item = QGraphicsPixmapItem(pixmap)
+        self.scene.addItem(self.pixmap_item)
+        self.setSceneRect(self.pixmap_item.boundingRect())
+        self.fit_image()
+
+    def fit_image(self):
+        """Scale the view so that the entire pixmap_item fits into the viewport."""
+        if hasattr(self, "pixmap_item") and self.pixmap_item and not self.pixmap_item.scene() is None:
+            # This call automatically scales the view to keep the pixmap in view.
+            self.fitInView(self.pixmap_item, Qt.KeepAspectRatio)
+
+    def enterEvent(self, event):
+        # When the mouse enters, zoom in by applying a hover zoom factor.
+        if self.pixmap_item:
+            # Save the fitted transformation before zooming
+            current_transform = self.transform()
+            # Apply an extra zoom on top of the fitted view.
+            self.setTransform(QTransform().scale(self._hover_zoom, self._hover_zoom))
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        # When the mouse leaves, revert to the full-fit view only if the item still exists.
+        if hasattr(self, "pixmap_item") and self.pixmap_item and not self.pixmap_item.scene() is None:
+            self.fit_image()
+
+        super().leaveEvent(event)
+
+    def mouseMoveEvent(self, event):
+        # Pan the view so that the area under the cursor stays centered.
+        scene_pos = self.mapToScene(event.pos())
+        self.centerOn(scene_pos)
+        super().mouseMoveEvent(event)
+
 
 
 class FaxSender:
@@ -255,17 +500,33 @@ class FaxSender:
             fax_user = self.encryption_manager.get_config_value('Account', 'fax_user')
             token = self.encryption_manager.get_config_value('Token', 'access_token')
             caller_id = self.ui_manager.caller_id_combo.currentText().strip()
-            destination = '1' + self.ui_manager.area_code_input.text() + self.ui_manager.first_three_input.text() + self.ui_manager.last_four_input.text()
+            destination = ('1' + self.ui_manager.area_code_input.text() +
+                           self.ui_manager.first_three_input.text() +
+                           self.ui_manager.last_four_input.text())
             url = f"https://telco-api.skyswitch.com/users/{fax_user}/faxes/send"
             headers = {"Authorization": f"Bearer {token}"}
             files = {}
             data = {"caller_id": caller_id, "destination": destination}
 
+            temp_files = []  # to keep track of temporary files
+
             for idx, doc_path in enumerate(self.document_manager.documents_paths):
-                file_extension = os.path.splitext(doc_path)[1]
-                mime_type = 'application/pdf' if file_extension == '.pdf' else 'image/' + file_extension.strip('.')
+                file_extension = os.path.splitext(doc_path)[1].lower()
+                # Process PDFs to ensure portrait orientation
+                if file_extension == '.pdf':
+                    # Create a temporary file for the normalized PDF
+                    temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf')
+                    os.close(temp_fd)  # we will write to this path
+                    self.normalize_pdf_to_portrait(doc_path, temp_path)
+                    doc_to_send = temp_path
+                    temp_files.append(temp_path)
+                    mime_type = 'application/pdf'
+                else:
+                    doc_to_send = doc_path
+                    mime_type = 'image/' + file_extension.strip('.')
+
                 file_key = f'filename[{idx + 1}]' if self.document_manager.cover_sheet_path else f'filename[{idx}]'
-                files[file_key] = (os.path.basename(doc_path), open(doc_path, 'rb'), mime_type)
+                files[file_key] = (os.path.basename(doc_to_send), open(doc_to_send, 'rb'), mime_type)
 
             try:
                 response = requests.post(url, files=files, data=data, headers=headers)
@@ -279,9 +540,25 @@ class FaxSender:
             finally:
                 for _, file_tuple in files.items():
                     file_tuple[1].close()
+                # Clean up temporary files
+                for temp_file in temp_files:
+                    os.remove(temp_file)
         except Exception as e:
             print(f"Send fax error: {e}")
-            QMessageBox.critical(self.ui_manager, "Error", f"An error occurred while preparing to send the fax: {str(e)}")
+            QMessageBox.critical(self.ui_manager, "Error",
+                                 f"An error occurred while preparing to send the fax: {str(e)}")
+
+    def normalize_pdf_to_portrait(self, input_pdf_path, output_pdf_path):
+        reader = PdfReader(input_pdf_path)
+        writer = PdfWriter()
+        for page in reader.pages:
+            width = float(page.mediabox.width)
+            height = float(page.mediabox.height)
+            if width > height:
+                page.rotate_clockwise(90)
+            writer.add_page(page)
+        with open(output_pdf_path, 'wb') as f:
+            writer.write(f)
 
 
 class ScanningDialog(QDialog):
@@ -471,6 +748,7 @@ class SendFax(UIManager):
             self.scanner_manager = ScannerManager(self, self.document_manager)
             self.setup_connections()
             self.populate_caller_id_combo_box()
+            self.clear_document_list()
         except Exception as e:
             print(f"Initialization error: {e}")
 

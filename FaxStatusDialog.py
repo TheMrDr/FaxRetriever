@@ -3,8 +3,8 @@ import re
 import sys
 from datetime import datetime, timezone
 
-import requests
 import pytz
+import requests
 from PyQt5.QtCore import pyqtSignal, QThread, QTimer, Qt, QUrl
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply

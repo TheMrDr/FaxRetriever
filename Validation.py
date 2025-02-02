@@ -1,11 +1,12 @@
-from pymongo import MongoClient
 import re
 from urllib.parse import quote_plus
+
+from pymongo import MongoClient
 
 # Define the MongoDB connection
 username = quote_plus("Overflow6847")
 password = quote_plus("tjZF2T%^q8aNh5^n*6^4!jjmPXD3%eDZbefzK64bhjhmY6RrBVH^5M6qH!QUQSNL")
-host = "vpn.clinicnetworking.com"
+host = "licensing.clinicnetworking.com"
 port = 27017
 database = "FaxRetriever"
 

@@ -1,3 +1,4 @@
+import datetime
 import os
 import platform
 import re
@@ -42,6 +43,13 @@ class RetrieveFaxes(QThread):
         self.print_faxes = self.encryption_manager.get_config_value('Fax Options', 'print_faxes') == 'Yes'
         self.printer_name = self.encryption_manager.get_config_value('Fax Options', 'printer_full_name')
         self.allowed_caller_ids = self.load_allowed_caller_ids()
+
+        # Load archival settings
+        self.archive_enabled = self.encryption_manager.get_config_value('Fax Options', 'archive_enabled') == "Yes"
+        self.archive_duration = int(self.encryption_manager.get_config_value('Fax Options', 'archive_duration') or 30)
+        self.archive_path = os.path.join(os.getcwd(), "Archive")
+
+        os.makedirs(self.archive_path, exist_ok=True)
 
     def add_poppler_to_path(self):
         if platform.system() == "Windows":
@@ -127,6 +135,7 @@ class RetrieveFaxes(QThread):
                         continue
 
                     fax_id = fax['id']
+                    file_name = f"{fax_id}.pdf"
                     pdf_path = os.path.join(self.save_path, f"{fax_id}.pdf")
                     printed_pdf_path = os.path.join(self.printed_path, f"{fax_id}.pdf")
 
@@ -185,6 +194,10 @@ class RetrieveFaxes(QThread):
                             if self.print_faxes:
                                 self.print_fax(file_path)
 
+                            # Archive a copy if enabled
+                            if self.archive_enabled:
+                                self.archive_fax(file_path, file_name)
+
                             download_results.append((fax_id, 'Downloaded', file_path if self.download_type != 'JPG' else 'Converted to JPG'))
                             downloaded_faxes_count += 1
                         else:
@@ -223,6 +236,21 @@ class RetrieveFaxes(QThread):
         except Exception as e:
             self.log_system.log_message('error', f"Exception in download_fax_pdfs: {str(e)}")
             self.finished.emit([])
+
+    def archive_fax(self, file_path, file_name):
+        """Copy the downloaded fax to the archive folder structured by date and hour."""
+        try:
+            now = datetime.datetime.now()
+            archive_dir = os.path.join(self.archive_path, now.strftime("%Y-%m-%d"), now.strftime("%H"))
+
+            os.makedirs(archive_dir, exist_ok=True)  # Ensure archive directory exists
+            archive_path = os.path.join(archive_dir, file_name)
+
+            shutil.copy(file_path, archive_path)  # Copy file to archive directory
+            self.log_system.log_message('info', f"Archived fax to {archive_path}")
+
+        except Exception as e:
+            self.log_system.log_message('error', f"Failed to archive fax: {e}")
 
     def print_fax(self, file_path):
         try:

@@ -24,6 +24,7 @@ class CustomPushButton(QPushButton):
         """)
 
 
+# noinspection PyUnresolvedReferences
 class SelectInboxDialog(QDialog):
     def __init__(self, inboxes, parent=None):
         super().__init__(parent)

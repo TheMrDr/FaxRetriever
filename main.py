@@ -13,7 +13,6 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QAction, QLabel, QLineEdit, QPushButton, QFileDialog,
                              QGridLayout, QSystemTrayIcon, QMenu, QMessageBox, QDialog)
 
-# Import other modules after setting bundle_dir
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):
     bundle_dir = sys._MEIPASS
@@ -32,7 +31,7 @@ from SaveManager import SaveManager
 from SendFax import SendFax
 from SystemLog import SystemLog
 from Version import __version__
-
+from WhatsNew import check_and_display_whats_new, display_whats_new
 
 # noinspection PyUnresolvedReferences
 class MainWindow(QMainWindow):
@@ -51,6 +50,23 @@ class MainWindow(QMainWindow):
             self.connect_signals()
             self.load_initial_data()
             self.finalize_initialization()
+
+            self.setFont(QtGui.QFont("Arial", 12))
+            self.faxPollButton.setFont(QtGui.QFont("Arial", 12))
+            self.send_fax_button.setFont(QtGui.QFont("Arial", 12))
+
+            self.faxPollButton.setMinimumHeight(50)
+            self.send_fax_button.setMinimumHeight(50)
+            self.inbox_button.setMinimumHeight(40)
+            self.options_button.setMinimumHeight(40)
+
+            layout.setContentsMargins(20, 20, 20, 20)
+            layout.setSpacing(15)
+
+            self.status_bar.setStyleSheet("font-size: 12pt; padding: 5px;")
+
+            QTimer.singleShot(500, lambda: check_and_display_whats_new(__version__))
+
         except Exception as e:
             if self.log_system:
                 self.log_system.log_message('error', f"Initialization error: {e}")
@@ -72,7 +88,7 @@ class MainWindow(QMainWindow):
         """Setup the main window UI components"""
         try:
             self.setWindowTitle("FaxRetriever - Cloud Fax")
-            self.setFixedWidth(600)
+            # self.setFixedWidth(600)
             self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
             self.initialize_components()
             self.initialize_tray_menu()
@@ -308,12 +324,12 @@ class MainWindow(QMainWindow):
 
     def populate_tools_menu(self):
         try:
-            self.fax_status_button = QAction("Fax Status", self)
-            self.fax_status_button.triggered.connect(self.show_fax_status_dialog)
-            self.tools_menu.addAction(self.fax_status_button)
-            self.fax_status_button.setEnabled(True)
+            # self.fax_status_button = QAction("Fax Status", self)
+            # self.fax_status_button.triggered.connect(self.show_fax_status_dialog)
+            # self.tools_menu.addAction(self.fax_status_button)
+            # self.fax_status_button.setEnabled(True)
 
-            self.retrieve_token_button = QAction("Retrieve Token", self)
+            self.retrieve_token_button = QAction("Refresh Login Token", self)
             self.retrieve_token_button.triggered.connect(self.startTokenRetrieval)
             self.tools_menu.addAction(self.retrieve_token_button)
             self.retrieve_token_button.setEnabled(True)
@@ -323,6 +339,11 @@ class MainWindow(QMainWindow):
 
     def populate_help_menu(self):
         try:
+            self.whats_new_button = QAction("What's New", self)
+            self.whats_new_button.triggered.connect(display_whats_new)
+            self.help_menu.addAction(self.whats_new_button)
+            self.whats_new_button.setEnabled(True)
+
             self.about_button = QAction("About", self)
             self.about_button.triggered.connect(self.about)
             self.help_menu.addAction(self.about_button)
@@ -365,9 +386,7 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap(os.path.join(bundle_dir, "images", "banner_small.png"))  # Update the path as needed
             banner.setPixmap(pixmap)
             banner.setAlignment(Qt.AlignCenter)
-            banner.setFixedHeight(150)
-            banner.setContentsMargins(0, 0, 0, 0)
-            layout.addWidget(banner, 0, 0, 2, 2)
+            layout.addWidget(banner, 0, 0, 1, 2)
 
             # Save Location
             saveLocationLayout = QGridLayout()
@@ -673,7 +692,7 @@ class MainWindow(QMainWindow):
     def reset_status_bar(self):
         try:
             # Display the copyright message indefinitely (or with a specific timeout if needed)
-            self.status_bar.showMessage(f"Clinic Networking, LLC © 2024 - App Version: {self.version}")
+            self.status_bar.showMessage(f"Clinic Networking, LLC © 2025 - App Version: {self.version}")
         except Exception as e:
             self.log_system.log_message('error', f"Failed to reset status bar: {e}")
             print(f"Failed to reset status bar: {e}")
