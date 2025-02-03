@@ -1,3 +1,13 @@
+# 🚀 FaxRetriever Update - Version 1.15.01
+
+## 🆕 **Expanded Fax Archival Options**
+- 📂 **Fax archival durations now include additional options**:
+  - 🗂️ **120 days**
+  - 🗂️ **365 days**
+- 🔹 *This feature is available in System → Options → Fax Retrieval Settings → Archival.*
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.15.00
 
 ## 🎉 What's New?
@@ -32,6 +42,8 @@
   - 🗂️ **30 days**
   - 🗂️ **60 days**
   - 🗂️ **90 days**
+  - 🗂️ **120 days** (*New in 1.15.01!*)
+  - 🗂️ **365 days** (*New in 1.15.01!*)
 - **How to Enable**:
   1. Go to **System → Options**.
   2. Navigate to **Fax Retrieval Settings**.
