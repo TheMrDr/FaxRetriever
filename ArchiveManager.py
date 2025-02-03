@@ -10,11 +10,17 @@ class ArchiveManager:
         self.main_window = main_window
         self.log_system = SystemLog()
         self.save_manager = SaveManager(self.main_window)
+        raw_duration = self.save_manager.get_config_value('Fax Options', 'archive_duration')
 
         # Load archival settings
         self.archive_enabled = self.save_manager.get_config_value('Fax Options', 'archive_enabled') == "Yes"
-        self.archive_duration = int(
-            self.save_manager.get_config_value('Fax Options', 'archive_duration') or 30)  # Default to 30 days
+        try:
+            self.archive_duration = int(raw_duration)
+        except (ValueError, TypeError):
+            self.log_system.log_message('warning',
+                                        f"Invalid archive duration value: {raw_duration}. Defaulting to 30 days.")
+            self.archive_duration = 30  # Set default value if conversion fails
+
         self.archive_path = os.path.join(os.getcwd(), "Archive")
 
     def cleanup_old_archives(self):
