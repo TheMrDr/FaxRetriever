@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 from PyQt5 import QtGui
@@ -180,12 +181,6 @@ class OptionsDialog(QDialog):
         """
         try:
             self.select_printer_button.setVisible(checked)  # Show if checked, hide if unchecked
-
-        except Exception as e:
-            self.log_system.log_message('error', f"Failed to toggle print options: {e}")
-            if self.main_window:
-                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
-
 
         except Exception as e:
             self.log_system.log_message('error', f"Failed to toggle print options: {e}")
