@@ -1,3 +1,21 @@
+# 🚀 FaxRetriever Update - Version 1.15.03
+
+## 🛠️ **Bug Fixes & Stability Improvements**
+- Fixed **Options menu population** to ensure proper loading and display.
+- Archival settings now correctly define and retain variables.
+- Settings now properly **save across sessions** without resets.
+- **Faxes now correctly delete from the server** when deletion is selected.
+
+---
+
+# 🚀 FaxRetriever Update - Version 1.15.02
+
+## 🛠️ **Minor Bug Fixes**
+- Fixed an import issue in **Options menu**.
+- Other minor stability and reliability improvements.
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.15.01
 
 ## 🆕 **Expanded Fax Archival Options**

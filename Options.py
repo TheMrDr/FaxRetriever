@@ -25,10 +25,10 @@ else:
 
 # noinspection PyUnresolvedReferences
 class OptionsDialog(QDialog):
-    def __init__(self, main_window, token_progress_bar=None):
-        super().__init__(parent=main_window)
+    def __init__(self, main_window, token_progress_bar=None, parent=None):
+        super().__init__(main_window or parent)
         self.log_system = SystemLog()
-        self.retrieve_token = RetrieveToken(self)
+        self.retrieve_token = RetrieveToken(main_window)
         self.main_window = main_window
 
         try:
@@ -468,12 +468,10 @@ class OptionsDialog(QDialog):
                                                                                             'disable_fax_retrieval_checkbox') else False
 
             # Ensure Download and Delete Faxes settings are properly retrieved
-            download_method = self.download_method_button_group.checkedButton().text() if (
-                    hasattr(self,
-                            'download_method_button_group') and self.download_method_button_group.checkedButton()) else "PDF"
-            delete_faxes = self.delete_faxes_button_group.checkedButton().text() if (
-                    hasattr(self,
-                            'delete_faxes_button_group') and self.delete_faxes_button_group.checkedButton()) else "No"
+            download_method = self.download_method_combo.currentText() if hasattr(self,
+                                                                                  'download_method_combo') else "PDF"
+
+            delete_faxes = "Yes" if self.delete_faxes_checkbox.isChecked() else "No"
 
             # Logging level
             log_level = self.logging_level_combo.currentText() if hasattr(self, 'logging_level_combo') else "Info"

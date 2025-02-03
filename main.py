@@ -58,10 +58,10 @@ class MainWindow(QMainWindow):
             self.faxPollButton.setMinimumHeight(50)
             self.send_fax_button.setMinimumHeight(50)
             self.inbox_button.setMinimumHeight(40)
-            self.options_button.setMinimumHeight(40)
+            # self.options_button.setMinimumHeight(40)
 
-            layout.setContentsMargins(20, 20, 20, 20)
-            layout.setSpacing(15)
+            # layout.setContentsMargins(20, 20, 20, 20)
+            # layout.setSpacing(15)
 
             self.status_bar.setStyleSheet("font-size: 12pt; padding: 5px;")
 
