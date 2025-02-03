@@ -243,7 +243,7 @@ class OptionsDialog(QDialog):
         # Archive Duration Dropdown
         self.archive_duration_label = QLabel("Archive Incoming Faxes For:")
         self.archive_duration_combo = QComboBox()
-        self.archive_duration_combo.addItems(["30 Days", "60 Days", "90 Days"])
+        self.archive_duration_combo.addItems(["30 Days", "60 Days", "90 Days", "120 Days", "365 Days"])
         self.archive_duration_combo.setEnabled(False)  # Initially disabled
 
         # Add widgets to the layout
@@ -446,8 +446,10 @@ class OptionsDialog(QDialog):
             # Archive settings
             archive_enabled = "Yes" if hasattr(self,
                                                'archive_enabled_checkbox') and self.archive_enabled_checkbox.isChecked() else "No"
-            archive_duration = self.archive_duration_combo.currentText().split()[0] if hasattr(self,
-                                                                                               'archive_duration_combo') else "30"
+
+            # Extract full numeric value from the dropdown selection
+            archive_duration_match = re.search(r'\d+', self.archive_duration_combo.currentText())
+            archive_duration = archive_duration_match.group() if archive_duration_match else "30"  # Default to 30 days if parsing fails
 
             # Flag to check if fax_user has been modified
             fax_user_modified = fax_user != self.previous_fax_user
