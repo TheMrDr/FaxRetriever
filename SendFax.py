@@ -12,10 +12,10 @@ from PIL import Image, ImageDraw
 from pypdf import PdfReader, PdfWriter
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt, QObject
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QTransform
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QTransform, QMovie
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QInputDialog,
                              QComboBox, QListWidget, QGridLayout, QMessageBox, QMenu, QAction, QHBoxLayout, QGraphicsView,
-                             QGraphicsScene, QGraphicsPixmapItem)
+                             QGraphicsScene, QGraphicsPixmapItem, QProgressBar)
 from docx import Document
 
 from SaveManager import SaveManager
@@ -564,16 +564,47 @@ class FaxSender:
 class ScanningDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Scanning...")
-        self.setFixedSize(200, 100)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)  # Remove window decorations
-        self.setWindowModality(Qt.ApplicationModal)  # Make it modal
+        self.setWindowTitle("Scanning Document")
+        self.setFixedSize(300, 150)
+        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f0f0f0;
+                border-radius: 8px;
+                padding: 10px;
+            }
+            QLabel {
+                font-size: 14px;
+            }
+        """)
+
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 10)  # Set minimal padding around the text
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        # Add an animated GIF
+        self.icon_label = QLabel(self)
+        self.scanner_animation = QMovie(os.path.join(bundle_dir, "images", "scanner.gif"))  # Use your GIF file
+        self.icon_label.setMovie(self.scanner_animation)
+        self.icon_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.icon_label)
+
+        # Start the animation
+        self.scanner_animation.start()
+
+        # Status Label
         self.label = QLabel("Scanning, please wait...", self)
-        layout.addWidget(self.label, alignment=Qt.AlignCenter)  # Center align the text
+        self.label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.label)
+
+        # Progress Bar
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        layout.addWidget(self.progress_bar)
+
         self.setLayout(layout)
 
+
+# noinspection PyUnresolvedReferences
 class ScannerManager(QObject):
     scan_started = pyqtSignal()
     scan_finished = pyqtSignal(list)
@@ -598,7 +629,38 @@ class ScannerManager(QObject):
         threading.Thread(target=self._scan_document_thread).start()
 
     def _init_scanner(self):
-        pyinsane2.init()
+        try:
+            pyinsane2.init()  # Try initializing WIA first
+
+            devices = pyinsane2.get_devices()
+            if devices:
+                print(f"Found {len(devices)} WIA scanner(s).")
+                return  # Exit if WIA is working
+
+            # If no WIA scanners are found, reinitialize for TWAIN
+            print("No WIA devices found, switching to TWAIN mode...")
+            pyinsane2.exit()  # Shut down WIA
+            pyinsane2.init(driver="twain")  # Reinitialize for TWAIN
+
+            devices = pyinsane2.get_devices()
+            if devices:
+                print(f"Found {len(devices)} TWAIN scanner(s).")
+                return  # Exit if TWAIN is working
+
+            # If no devices are found in either mode, notify user
+            self.show_message.emit(
+                "No Scanner Found",
+                "No scanners were detected. Ensure your scanner is connected and powered on.",
+                QMessageBox.Warning,
+            )
+
+        except Exception as e:
+            print(f"Scanner Initialization Error: {e}")
+            self.show_message.emit(
+                "Scanner Error",
+                f"An error occurred while initializing the scanner: {str(e)}",
+                QMessageBox.Critical,
+            )
 
     def _scan_document_thread(self):
         with self.lock:

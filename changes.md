@@ -1,3 +1,13 @@
+# 🚀 FaxRetriever Update - Version 1.15.04
+
+## 🖨️ **Reworked Scanning Module in Send Fax**
+- Now supports **both WIA and TWAIN scanners** with **automatic switching** between the two.
+- Improved **UI for the scanning utility**, making it more intuitive and user-friendly.
+- Faster and more reliable scanning experience for faxing documents.
+
+---
+
+
 # 🚀 FaxRetriever Update - Version 1.15.03
 
 ## 🛠️ **Bug Fixes & Stability Improvements**
