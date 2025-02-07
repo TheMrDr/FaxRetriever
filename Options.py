@@ -4,7 +4,7 @@ import sys
 
 from PyQt5 import QtGui
 from PyQt5.QtPrintSupport import QPrintDialog
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
 
 from ProgressBars import FaxPollTimerProgressBar
@@ -30,20 +30,19 @@ class OptionsDialog(QDialog):
         self.log_system = SystemLog()
         self.retrieve_token = RetrieveToken(main_window)
         self.main_window = main_window
+        self.selected_printer_full_name = None
 
         try:
             self.save_manager = SaveManager(self.main_window)
             self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
 
             self.setWindowTitle("Options")
-            self.setFixedWidth(400)
+            self.setFixedWidth(500)
 
             self.layout = QVBoxLayout()
             self.setup_ui()
             self.populate_settings()
             self.fax_timer_progress_bar = FaxPollTimerProgressBar(self.main_window, token_progress_bar)
-
-            self.selected_printer_full_name = None
 
             # Initialize to store the previous fax_user value
             self.previous_fax_user = self.save_manager.get_config_value('Account', 'fax_user')
@@ -60,21 +59,25 @@ class OptionsDialog(QDialog):
 
             self.fax_retrieval_group = QGroupBox("Fax Retrieval Settings")
             fax_retrieval_group_layout = QVBoxLayout()
-            self.setup_disable_fax(fax_retrieval_group_layout)
-            self.setup_download_options_group(fax_retrieval_group_layout)
-            # self.setup_print_options_group(fax_retrieval_group_layout)
-            self.setup_delete_faxes_group(fax_retrieval_group_layout)
+            self.setup_fax_retrieval_options(fax_retrieval_group_layout)
             self.fax_retrieval_group.setLayout(fax_retrieval_group_layout)
-
-            # # Import Config Button
-            # self.import_config_button = QPushButton("Import Config String")
-            # self.import_config_button.clicked.connect(self.import_config_string)
-            # self.import_config_button.setEnabled(False)
 
             self.account_info_group = QGroupBox("Account Settings")
             account_settings_layout = QVBoxLayout()
             self.setup_account_settings_group(account_settings_layout)
             self.account_info_group.setLayout(account_settings_layout)
+
+            self.logging_level_group = QGroupBox("Logging Level")
+            self.setup_logging_level_group(self.logging_level_group)  # Pass group box itself
+            #
+            # logging_level_layout = QVBoxLayout()
+            # self.setup_logging_level_group(logging_level_group)
+            # self.logging_level_group.setLayout(logging_level_layout)
+
+            # # Import Config Button
+            # self.import_config_button = QPushButton("Import Config String")
+            # self.import_config_button.clicked.connect(self.import_config_string)
+            # self.import_config_button.setEnabled(False)
 
             # Save button
             self.save_button = QPushButton("Save")
@@ -86,20 +89,21 @@ class OptionsDialog(QDialog):
 
             # Add widgets to the form
             form_layout.addRow(self.fax_retrieval_group)
-
             form_layout.addRow(self.account_info_group)
-
+            form_layout.addRow(self.logging_level_group)
             form_layout.addRow(self.save_button)
             form_layout.addRow(self.cancel_button)
 
             self.layout.addLayout(form_layout)
             self.setLayout(self.layout)
+            self.toggle_sensitive_settings(False)
+
         except Exception as e:
             self.log_system.log_message('error', f"Failed to set up UI: {e}")
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-    def setup_disable_fax(self, parent_layout):
+    def setup_fax_retrieval_options(self, parent_layout):
         try:
             # Create Fax Retrieval Group
             self.fax_retrieval_group = QGroupBox("Fax Retrieval Settings")
@@ -119,9 +123,34 @@ class OptionsDialog(QDialog):
             self.download_options_group.setLayout(download_options_layout)
             fax_retrieval_layout.addWidget(self.download_options_group)
 
+            # Fax Naming Group
+            self.fax_name_group = QGroupBox("File Name Options")
+            fax_name_layout = QGridLayout()  # Use QGridLayout for alignment
+
+            # Fax ID Option
+            self.fax_id_radio = QRadioButton("Use Fax ID")
+            fax_id_example = QLabel("Example: 1234567890.pdf")  # Example label
+            fax_id_example.setStyleSheet("font-size: 10px; color: gray;")  # Optional styling
+
+            # CID-MMDD-HHMM Option
+            self.cid_mmdd_hhmm_radio = QRadioButton("Use CID-MMDD-HHMM")
+            cid_example = QLabel("Example: 1231231234-0206-1645.pdf")  # Example label
+            cid_example.setStyleSheet("font-size: 10px; color: gray;")  # Optional styling
+
+            # Add to grid layout
+            fax_name_layout.addWidget(self.fax_id_radio, 0, 0)  # Row 0, Column 0
+            fax_name_layout.addWidget(self.cid_mmdd_hhmm_radio, 0, 1)  # Row 0, Column 1
+
+            fax_name_layout.addWidget(fax_id_example, 1, 0)  # Example text below Use Fax ID
+            fax_name_layout.addWidget(cid_example, 1, 1)  # Example text below Use CID-MMDD-HHMM
+
+            # Set layout before adding to parent
+            self.fax_name_group.setLayout(fax_name_layout)
+            fax_retrieval_layout.addWidget(self.fax_name_group)
+
             # Print Faxes Group
             self.print_options_group = QGroupBox("Print Faxes")
-            print_options_layout = QVBoxLayout()
+            print_options_layout = QHBoxLayout()
 
             self.print_faxes_checkbox = QCheckBox("Print Faxes")
             self.print_faxes_checkbox.toggled.connect(self.toggle_print_options)
@@ -136,11 +165,31 @@ class OptionsDialog(QDialog):
             fax_retrieval_layout.addWidget(self.print_options_group)
 
             # Archival Settings Group
-            self.setup_archival_group(fax_retrieval_layout)
+            # self.setup_archival_group(fax_retrieval_layout)
+            self.archival_group = QGroupBox("Fax Archival Settings")
+            archival_layout = QHBoxLayout()
+
+            # Archive Faxes Checkbox
+            self.archive_enabled_checkbox = QCheckBox("Archive Incoming Faxes")
+            self.archive_enabled_checkbox.toggled.connect(self.toggle_archive_duration)
+
+            # Archive Duration Dropdown
+            self.archive_duration_label = QLabel("Archive Incoming Faxes For:")
+            self.archive_duration_combo = QComboBox()
+            self.archive_duration_combo.addItems(["30 Days", "60 Days", "90 Days", "120 Days", "365 Days"])
+            self.archive_duration_combo.setEnabled(False)  # Initially disabled
+
+            # Add widgets to the layout
+            archival_layout.addWidget(self.archive_enabled_checkbox)
+            # archival_layout.addWidget(self.archive_duration_label)
+            archival_layout.addWidget(self.archive_duration_combo)
+            self.archival_group.setLayout(archival_layout)
+
+            fax_retrieval_layout.addWidget(self.archival_group)
 
             # Delete Faxes Group
             self.delete_faxes_group = QGroupBox("Delete Faxes After Download")
-            delete_faxes_layout = QVBoxLayout()
+            delete_faxes_layout = QHBoxLayout()
             self.delete_faxes_checkbox = QCheckBox("Delete Faxes")
             delete_faxes_layout.addWidget(self.delete_faxes_checkbox)
             self.delete_faxes_group.setLayout(delete_faxes_layout)
@@ -155,25 +204,25 @@ class OptionsDialog(QDialog):
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-    def setup_print_options_group(self, parent_layout):
-        try:
-            # Print Faxes Checkbox
-            self.print_faxes_checkbox = QCheckBox("Print Faxes")
-            self.print_faxes_checkbox.toggled.connect(self.toggle_print_options)
-
-            # Select Printer Button (Initially Hidden)
-            self.select_printer_button = QPushButton("Select Printer")
-            self.select_printer_button.clicked.connect(self.select_printer)
-            self.select_printer_button.setVisible(False)  # Start hidden
-
-            # Add to layout
-            parent_layout.addWidget(self.print_faxes_checkbox)
-            parent_layout.addWidget(self.select_printer_button)
-
-        except Exception as e:
-            self.log_system.log_message('error', f"Failed to set up print options group: {e}")
-            if self.main_window:
-                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+    # def setup_print_options_group(self, parent_layout):
+    #     try:
+    #         # Print Faxes Checkbox
+    #         self.print_faxes_checkbox = QCheckBox("Print Faxes")
+    #         self.print_faxes_checkbox.toggled.connect(self.toggle_print_options)
+    #
+    #         # Select Printer Button (Initially Hidden)
+    #         self.select_printer_button = QPushButton("Select Printer")
+    #         self.select_printer_button.clicked.connect(self.select_printer)
+    #         self.select_printer_button.setVisible(False)  # Start hidden
+    #
+    #         # Add to layout
+    #         parent_layout.addWidget(self.print_faxes_checkbox)
+    #         parent_layout.addWidget(self.select_printer_button)
+    #
+    #     except Exception as e:
+    #         self.log_system.log_message('error', f"Failed to set up print options group: {e}")
+    #         if self.main_window:
+    #             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
     def toggle_print_options(self, checked):
         """
@@ -187,71 +236,103 @@ class OptionsDialog(QDialog):
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-    def setup_download_options_group(self, parent_layout):
-        try:
-            self.download_method_group = QGroupBox("Download Method")
-            self.download_method_button_group = QButtonGroup(self)
-            download_layout = QHBoxLayout()
-            self.pdf_radio = QRadioButton("PDF")
-            self.jpg_radio = QRadioButton("JPG")
-            self.both_radio = QRadioButton("Both")
-            self.download_method_button_group.addButton(self.pdf_radio)
-            self.download_method_button_group.addButton(self.jpg_radio)
-            self.download_method_button_group.addButton(self.both_radio)
-            download_layout.addWidget(self.pdf_radio)
-            download_layout.addWidget(self.jpg_radio)
-            download_layout.addWidget(self.both_radio)
-            self.download_method_group.setLayout(download_layout)
-            parent_layout.addWidget(self.download_method_group)
-        except Exception as e:
-            self.log_system.log_message('error', f"Failed to set up download method group: {e}")
-            if self.main_window:
-                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+    # def setup_download_options_group(self, parent_layout):
+    #     try:
+    #         self.download_method_group = QGroupBox("Download Method")
+    #         self.download_method_button_group = QButtonGroup(self)
+    #         download_layout = QHBoxLayout()
+    #         self.pdf_radio = QRadioButton("PDF")
+    #         self.jpg_radio = QRadioButton("JPG")
+    #         self.both_radio = QRadioButton("Both")
+    #         self.download_method_button_group.addButton(self.pdf_radio)
+    #         self.download_method_button_group.addButton(self.jpg_radio)
+    #         self.download_method_button_group.addButton(self.both_radio)
+    #         download_layout.addWidget(self.pdf_radio)
+    #         download_layout.addWidget(self.jpg_radio)
+    #         download_layout.addWidget(self.both_radio)
+    #         self.download_method_group.setLayout(download_layout)
+    #         parent_layout.addWidget(self.download_method_group)
+    #     except Exception as e:
+    #         self.log_system.log_message('error', f"Failed to set up download method group: {e}")
+    #         if self.main_window:
+    #             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-    def setup_delete_faxes_group(self, parent_layout):
-        try:
-            self.delete_faxes_group = QGroupBox("Delete Faxes After Download")
-            self.delete_faxes_button_group = QButtonGroup(self)
-            delete_layout = QHBoxLayout()
-            self.delete_yes_radio = QRadioButton("Yes")
-            self.delete_no_radio = QRadioButton("No")
-            self.delete_faxes_button_group.addButton(self.delete_yes_radio)
-            self.delete_faxes_button_group.addButton(self.delete_no_radio)
-            delete_layout.addWidget(self.delete_yes_radio)
-            delete_layout.addWidget(self.delete_no_radio)
-            self.delete_faxes_group.setLayout(delete_layout)
-            parent_layout.addWidget(self.delete_faxes_group)
-        except Exception as e:
-            self.log_system.log_message('error', f"Failed to set up delete faxes group: {e}")
-            if self.main_window:
-                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+    # def setup_fax_naming_group(self, parent_layout):
+    #     try:
+    #         self.fax_naming_group = QGroupBox("Fax Naming")
+    #         self.fax_naming_button_group = QButtonGroup(self)
+    #         naming_layout = QHBoxLayout()
+    #         self.fax_id_radio = QRadioButton("Fax ID")
+    #         self.cid_mmdd_hhmm_radio = QRadioButton("CID-MMDD-HHMM")
+    #         naming_layout.addWidget(self.fax_id_radio)
+    #         naming_layout.addWidget(self.cid_mmdd_hhmm_radio)
+    #     except Exception as e:
+    #         self.log_system.log_message('error', f"Failed to set up fax naming group: {e}")
+    #         if self.main_window:
+    #             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-    def setup_archival_group(self, parent_layout):
-        """Set up the Fax Archival settings inside the Fax Retrieval group."""
-        self.archival_group = QGroupBox("Fax Archival Settings")
-        archival_layout = QVBoxLayout()
 
-        # Archive Faxes Checkbox
-        self.archive_enabled_checkbox = QCheckBox("Archive Incoming Faxes")
-        self.archive_enabled_checkbox.toggled.connect(self.toggle_archive_duration)
+    # def setup_delete_faxes_group(self, parent_layout):
+    #     try:
+    #         self.delete_faxes_group = QGroupBox("Delete Faxes After Download")
+    #         self.delete_faxes_button_group = QButtonGroup(self)
+    #         delete_layout = QHBoxLayout()
+    #         self.delete_yes_radio = QRadioButton("Yes")
+    #         self.delete_no_radio = QRadioButton("No")
+    #         self.delete_faxes_button_group.addButton(self.delete_yes_radio)
+    #         self.delete_faxes_button_group.addButton(self.delete_no_radio)
+    #         delete_layout.addWidget(self.delete_yes_radio)
+    #         delete_layout.addWidget(self.delete_no_radio)
+    #         self.delete_faxes_group.setLayout(delete_layout)
+    #         parent_layout.addWidget(self.delete_faxes_group)
+    #     except Exception as e:
+    #         self.log_system.log_message('error', f"Failed to set up delete faxes group: {e}")
+    #         if self.main_window:
+    #             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-        # Archive Duration Dropdown
-        self.archive_duration_label = QLabel("Archive Incoming Faxes For:")
-        self.archive_duration_combo = QComboBox()
-        self.archive_duration_combo.addItems(["30 Days", "60 Days", "90 Days", "120 Days", "365 Days"])
-        self.archive_duration_combo.setEnabled(False)  # Initially disabled
-
-        # Add widgets to the layout
-        archival_layout.addWidget(self.archive_enabled_checkbox)
-        archival_layout.addWidget(self.archive_duration_label)
-        archival_layout.addWidget(self.archive_duration_combo)
-        self.archival_group.setLayout(archival_layout)
-
-        parent_layout.addWidget(self.archival_group)
+    # def setup_archival_group(self, parent_layout):
+    #     """Set up the Fax Archival settings inside the Fax Retrieval group."""
+    #     self.archival_group = QGroupBox("Fax Archival Settings")
+    #     archival_layout = QVBoxLayout()
+    #
+    #     # Archive Faxes Checkbox
+    #     self.archive_enabled_checkbox = QCheckBox("Archive Incoming Faxes")
+    #     self.archive_enabled_checkbox.toggled.connect(self.toggle_archive_duration)
+    #
+    #     # Archive Duration Dropdown
+    #     self.archive_duration_label = QLabel("Archive Incoming Faxes For:")
+    #     self.archive_duration_combo = QComboBox()
+    #     self.archive_duration_combo.addItems(["30 Days", "60 Days", "90 Days", "120 Days", "365 Days"])
+    #     self.archive_duration_combo.setEnabled(False)  # Initially disabled
+    #
+    #     # Add widgets to the layout
+    #     archival_layout.addWidget(self.archive_enabled_checkbox)
+    #     archival_layout.addWidget(self.archive_duration_label)
+    #     archival_layout.addWidget(self.archive_duration_combo)
+    #     self.archival_group.setLayout(archival_layout)
+    #
+    #     parent_layout.addWidget(self.archival_group)
 
     def toggle_archive_duration(self, checked):
         """Enable or disable the archive duration dropdown based on checkbox state."""
         self.archive_duration_combo.setEnabled(checked)
+
+    def setup_logging_level_group(self, parent_layout):
+        try:
+            # Create a layout for logging settings
+            layout = QVBoxLayout()
+
+            # Combo Box for Logging Levels
+            self.logging_level_combo = QComboBox()
+            self.logging_level_combo.addItems(["Debug", "Info", "Warning", "Error", "Critical"])  # Restore all levels
+
+            layout.addWidget(self.logging_level_combo)
+            parent_layout.setLayout(layout)  # Properly set layout to the QGroupBox
+
+        except Exception as e:
+            self.log_system.log_message('error', f"Failed to set up Logging Level Group: {e}")
+            if self.main_window:
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
     def setup_account_settings_group(self, parent_layout):
         try:
@@ -293,31 +374,8 @@ class OptionsDialog(QDialog):
             parent_layout.addWidget(self.fax_user_label)
             parent_layout.addWidget(self.fax_user_input)
 
-            self.logging_level_label = QLabel("Logging Level:")
-            self.logging_level_combo = QComboBox()
-            # self.logging_level_combo.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
-            self.logging_level_combo.addItems(["Info"])
-            parent_layout.addWidget(self.logging_level_label)
-            parent_layout.addWidget(self.logging_level_combo)
-
         except Exception as e:
             self.log_system.log_message('error', f"Failed to set up Account Options Group: {e}")
-            if self.main_window:
-                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
-
-    def toggle_retrieval_settings(self, checked):
-        try:
-            # Ensure all child widgets inside "Fax Retrieval Settings" except the checkbox are disabled
-            for widget in self.fax_retrieval_group.findChildren((QComboBox, QCheckBox, QPushButton)):
-
-                # Keep the "Disable Fax Retrieval" checkbox enabled
-                if widget == self.disable_fax_retrieval_checkbox:
-                    continue
-
-                widget.setDisabled(checked)
-
-        except Exception as e:
-            self.log_system.log_message('error', f"Failed to toggle retrieval options: {e}")
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
@@ -375,6 +433,17 @@ class OptionsDialog(QDialog):
             self.print_faxes_checkbox.setChecked(print_faxes)  # Ensure state is properly restored
             self.toggle_print_options(print_faxes)  # Apply UI update immediately
 
+            # Set File Name Format
+            file_name_format = self.save_manager.get_config_value('Fax Options', 'file_name_format')
+
+            # Default to 'Fax ID' if file_name_format is None or an unexpected value
+            if file_name_format not in ['Fax ID', 'cid-mmdd-hhmm']:
+                file_name_format = 'Fax ID'
+
+            # Update the radio buttons based on the file_name_format value
+            self.fax_id_radio.setChecked(file_name_format == 'Fax ID')
+            self.cid_mmdd_hhmm_radio.setChecked(file_name_format == 'cid-mmdd-hhmm')
+
             # Restore selected printer
             if print_faxes:
                 printer_name = self.save_manager.get_config_value('Fax Options', 'printer_name')
@@ -405,26 +474,58 @@ class OptionsDialog(QDialog):
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
+    def toggle_retrieval_settings(self, checked):
+        try:
+            # List of group boxes inside the Fax Retrieval section that should be hidden
+            retrieval_groups = [
+                self.download_options_group,
+                self.fax_name_group,
+                self.print_options_group,
+                self.archival_group,
+                self.delete_faxes_group
+            ]
+
+            for group in retrieval_groups:
+                group.setVisible(not checked)  # Hide or show the entire group box
+
+            self.adjustSize()  # Resize window dynamically
+            self.setMinimumHeight(self.layout.sizeHint().height())  # Force minimum height
+            self.setMaximumHeight(self.layout.sizeHint().height())  # Prevent unnecessary expansion
+
+        except Exception as e:
+            self.log_system.log_message('error', f"Failed to toggle retrieval options: {e}")
+            if self.main_window:
+                self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+
     def toggle_sensitive_settings(self, checked):
         try:
             if checked:
-                if QMessageBox.warning(self, "Warning", "Changing these settings can cause the application to stop "
-                                                        "functioning properly.\n Continue only if you know what you are "
-                                                        "doing.",
+                if QMessageBox.warning(self, "Warning",
+                                       "Changing these settings can cause the application to stop functioning properly.\n"
+                                       "Continue only if you know what you are doing.",
                                        QMessageBox.Ok | QMessageBox.Cancel) == QMessageBox.Ok:
-                    self.username_input.setEnabled(True)
-                    self.password_input.setEnabled(True)
-                    self.client_id_input.setEnabled(True)
-                    self.client_secret_input.setEnabled(True)
-                    self.fax_user_input.setEnabled(True)
+                    for widget in self.account_info_group.findChildren((QLabel, QLineEdit, QComboBox)):
+                        if widget == self.edit_sensitive_checkbox:
+                            continue  # Keep the checkbox enabled
+
+                        widget.setEnabled(True)
+                        widget.setHidden(False)
                 else:
+                    # If the user cancels, uncheck the checkbox
                     self.edit_sensitive_checkbox.setChecked(False)
             else:
-                self.username_input.setEnabled(False)
-                self.password_input.setEnabled(False)
-                self.client_id_input.setEnabled(False)
-                self.client_secret_input.setEnabled(False)
-                self.fax_user_input.setEnabled(False)
+                # Hide and disable all sensitive settings when unchecked
+                for widget in self.account_info_group.findChildren((QLabel, QLineEdit)):
+                    if widget == self.edit_sensitive_checkbox:
+                        continue  # Keep the checkbox enabled
+
+                    widget.setEnabled(False)
+                    widget.setHidden(True)
+
+            self.adjustSize()  # Resize window dynamically
+            self.setMinimumHeight(self.layout.sizeHint().height())  # Force minimum height
+            self.setMaximumHeight(self.layout.sizeHint().height())  # Prevent unnecessary expansion
+
         except Exception as e:
             self.log_system.log_message('error', f"Failed to toggle sensitive settings: {e}")
             if self.main_window:
@@ -484,6 +585,9 @@ class OptionsDialog(QDialog):
             printer_full_name = self.selected_printer_full_name if hasattr(self,
                                                                            'selected_printer_full_name') and self.print_faxes_checkbox.isChecked() else ""
 
+            # Determine the selected file naming format
+            file_name_format = "Fax ID" if self.fax_id_radio.isChecked() else "cid-mmdd-hhmm"
+
             settings_to_save = {
                 'API': {'username': username or "None Set", 'password': password or "None Set"},
                 'Client': {'client_id': client_id or "None Set", 'client_secret': client_secret or "None Set"},
@@ -492,7 +596,7 @@ class OptionsDialog(QDialog):
                 'Fax Options': {'download_method': download_method, 'delete_faxes': delete_faxes,
                                 'print_faxes': print_faxes, 'printer_name': printer_name,
                                 'printer_full_name': printer_full_name, 'archive_enabled': archive_enabled,
-                                'archive_duration': archive_duration},
+                                'archive_duration': archive_duration, 'file_name_format': file_name_format},
                 'UserSettings': {'logging_level': log_level},
                 'Retrieval': {'auto_retrieve': 'Disabled' if retrieval_disabled else 'Enabled'}
             }

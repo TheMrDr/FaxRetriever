@@ -1,3 +1,36 @@
+# 🚀 FaxRetriever Update - Version 1.16.00  
+*Released 02/07/2025*
+
+## 🔥 **Computer-Rx Users, This One is for You!** 🔥  
+We've introduced **new file naming options** that will **eliminate extra work** and make managing faxes easier than ever!  
+
+### 📂 **New File Naming Conventions**
+- **Choose how your faxes are named!** You now have two options:
+  - **Fax ID (Default)** – Uses the original numeric fax ID.
+  - **CID-MMDD-HHMM Format** – A **detailed, structured naming system** including:
+    - **CID** – Caller ID of the sender.
+    - **MMDD** – Month and day the fax was received.
+    - **HHMM** – Hour and minute the fax was received.
+- **No more renaming faxes manually!** This update is designed **specifically for Computer-Rx users** who need a **clearer, more structured file system**.
+
+💡 **Interested in integrating incoming faxes directly into your pharmacy management software?**  
+Contact us for assistance in configuring this service and streamlining your workflow.
+
+## 🛠️ **Revamped Options Menu**
+- The **Options Menu** has been **completely restructured** for a **cleaner, more organized layout**.
+- **Easier navigation** and **clearer settings** for better user experience.
+
+## 🗄️ **Optimized Fax Archival**
+- Adjustments have been made to **prevent duplicate downloads**.
+- **Reduces unnecessary disk space usage** by ensuring unique file storage.
+
+## 🛠️ **New Tools in the Tools Menu**
+- **📄 Convert PDF to JPG** – Instantly convert any **PDF** into a **JPG image**.
+- **🖼️ Convert JPG to PDF** – Convert **JPG images** back into a **PDF format**.
+- These tools allow **quick conversion** between fax file formats.
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.15.04
 
 ## 🖨️ **Reworked Scanning Module in Send Fax**

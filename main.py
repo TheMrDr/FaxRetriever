@@ -4,12 +4,13 @@ This application was developed by Clinic Networking, LLC and is the property of 
 The purpose of this application is to retrieve faxes on the SkySwitch platform's Instant Fax API.
 """
 
+import fitz
 import os
 import sys
 
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QAction, QLabel, QLineEdit, QPushButton, QFileDialog,
                              QGridLayout, QSystemTrayIcon, QMenu, QMessageBox, QDialog)
 
@@ -329,13 +330,75 @@ class MainWindow(QMainWindow):
             # self.tools_menu.addAction(self.fax_status_button)
             # self.fax_status_button.setEnabled(True)
 
+            # self.convert_to_pdf = QAction("Convert Image to PDF", self)
+            # self.convert_to_pdf.triggered.connect(self.convert_to_pdf_dialog)
+            # self.tools_menu.addAction(self.convert_to_pdf)
+
+            self.convert_to_jpg = QAction("Convert PDF to JPG", self)
+            self.convert_to_jpg.triggered.connect(self.convert_to_jpg_dialog)
+            self.tools_menu.addAction(self.convert_to_jpg)
+
             self.retrieve_token_button = QAction("Refresh Login Token", self)
             self.retrieve_token_button.triggered.connect(self.startTokenRetrieval)
             self.tools_menu.addAction(self.retrieve_token_button)
-            self.retrieve_token_button.setEnabled(True)
+
         except Exception as e:
             self.log_system.log_message('error', f"Failed to populate tools menu: {e}")
             print(f"Failed to populate tools menu: {e}")
+
+    def convert_to_pdf_dialog(self):
+        """Prompt the user for a file and convert it to PDF"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select a document to convert", "",
+                                                   "Images and Text Files (*.jpg *.png *.txt)")
+
+        if not file_path:
+            return
+
+        output_pdf = os.path.splitext(file_path)[0] + ".pdf"
+
+        try:
+            if file_path.lower().endswith(('.jpg', '.jpeg', '.png')):
+                # Convert image to PDF
+                image = Image.open(file_path)
+                image = image.convert("RGB")
+                image.save(output_pdf, "PDF", resolution=100.0)
+
+            elif file_path.lower().endswith('.txt'):
+                # Convert text to PDF
+                with open(file_path, "r", encoding="utf-8") as txt_file:
+                    text = txt_file.read()
+                c = canvas.Canvas(output_pdf, pagesize=letter)
+                c.drawString(100, 700, text)  # Basic text placement
+                c.save()
+
+            QMessageBox.information(self, "Success", f"File converted successfully to {output_pdf}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Conversion Error", f"Failed to convert file: {e}")
+
+    def convert_to_jpg_dialog(self):
+        """Prompt the user for a PDF and convert it to separate JPG images for each page"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select a PDF to convert", "", "PDF Files (*.pdf)")
+
+        if not file_path:
+            return
+
+        base_name = os.path.splitext(file_path)[0]
+
+        try:
+            pdf_document = fitz.open(file_path)
+            for page_number in range(len(pdf_document)):
+                page = pdf_document.load_page(page_number)
+                pix = page.get_pixmap()
+                img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
+                output_image = f"{base_name}_{page_number + 1}.jpg"
+                img.save(output_image)
+
+            QMessageBox.information(self, "Success",
+                                    f"PDF converted to images: {base_name}_1.jpg, {base_name}_2.jpg, ...")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Conversion Error", f"Failed to convert PDF: {e}")
 
     def populate_help_menu(self):
         try:

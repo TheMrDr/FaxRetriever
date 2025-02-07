@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import platform
 import re
@@ -8,10 +9,13 @@ import sys
 
 import fitz
 import requests
+from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal, QRect
 from PyQt5.QtGui import QImage, QPainter
 from PyQt5.QtPrintSupport import QPrinter, QPrinterInfo
 from plyer import notification
+import pytz
+from tzlocal import get_localzone
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
@@ -43,6 +47,7 @@ class RetrieveFaxes(QThread):
         self.print_faxes = self.encryption_manager.get_config_value('Fax Options', 'print_faxes') == 'Yes'
         self.printer_name = self.encryption_manager.get_config_value('Fax Options', 'printer_full_name')
         self.allowed_caller_ids = self.load_allowed_caller_ids()
+        self.file_naming_option = self.encryption_manager.get_config_value('Fax Options', 'file_name_format')
 
         # Load archival settings
         self.archive_enabled = self.encryption_manager.get_config_value('Fax Options', 'archive_enabled') == "Yes"
@@ -77,9 +82,20 @@ class RetrieveFaxes(QThread):
             base_url = "https://telco-api.skyswitch.com"
             url = f"{base_url}/users/{self.fax_account}/faxes/inbound"
             headers = {"accept": "application/json", "authorization": f"Bearer {self.token}"}
+
             response = requests.get(url, headers=headers)
+
             if response.status_code == 200:
                 faxes_response = response.json()
+
+                # # Dump JSON response to a file
+                # app_dir = os.path.dirname(os.path.abspath(__file__))
+                # json_dump_path = os.path.join(app_dir, 'fax_dump.json')
+                # with open(json_dump_path, "w", encoding="utf-8") as json_file:
+                #     json.dump(faxes_response, json_file, indent=4)
+                #
+                # self.log_system.log_message('info', f"Fax response saved to {json_dump_path}")
+
                 if 'data' in faxes_response:
                     faxes = faxes_response['data']
                     self.download_fax_pdfs(faxes)
@@ -126,132 +142,149 @@ class RetrieveFaxes(QThread):
             all_faxes_downloaded = True
             downloaded_faxes_count = 0
 
+            # Detect the local time zone dynamically
+            local_zone = get_localzone()
+
             for fax in faxes:
                 try:
                     destination_number = str(fax['destination'])
 
                     if destination_number not in self.allowed_caller_ids:
-                        self.log_system.log_message('info', f'Destination number {destination_number} not in allowed caller IDs')
+                        self.log_system.log_message('info',
+                                                    f'Destination number {destination_number} not in allowed caller IDs')
                         continue
 
                     fax_id = fax['id']
-                    file_name = f"{fax_id}.pdf"
-                    pdf_path = os.path.join(self.save_path, f"{fax_id}.pdf")
-                    printed_pdf_path = os.path.join(self.printed_path, f"{fax_id}.pdf")
+                    caller_id = fax['caller_id']
+                    timestamp = fax['created_at']
 
-                    if self.download_type == 'PDF':
-                        file_path = pdf_path
-                    elif self.download_type == 'JPG':
-                        jpg_files = [file for file in os.listdir(self.save_path) if file.startswith(f"{fax_id}_") and file.endswith(".jpg")]
-                        if jpg_files:
-                            if self.main_window.isVisible():
-                                self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already converted to JPG", 5000)
-                            self.log_system.log_message('info', f"Fax PDF for ID {fax_id} already converted to JPG")
-                            continue
-                        file_path = os.path.join(self.save_path, f"{fax_id}_0.jpg")
-                    elif self.download_type == 'Both':
-                        if os.path.exists(pdf_path) or os.path.exists(printed_pdf_path):
-                            if self.main_window.isVisible():
-                                self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already downloaded", 5000)
-                            self.log_system.log_message('info', f"Fax PDF for ID {fax_id} already downloaded")
-                            continue
-                        jpg_files = [file for file in os.listdir(self.save_path) if file.startswith(f"{fax_id}_") and file.endswith(".jpg")]
-                        if jpg_files:
-                            if self.main_window.isVisible():
-                                self.main_window.update_status_bar(f"Fax PDF for ID {fax_id} already converted to JPG", 5000)
-                            self.log_system.log_message('info', f"Fax PDF for ID {fax_id} already converted to JPG")
-                            continue
-                        file_path = pdf_path
-                    else:
+                    # **Convert UTC timestamp to local time**
+                    try:
+                        utc_zone = pytz.utc
+                        if '.' in timestamp:
+                            dt_utc = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                        else:
+                            dt_utc = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ")
+
+                        dt_utc = dt_utc.replace(tzinfo=utc_zone)
+                        dt_local = dt_utc.astimezone(local_zone)  # Convert UTC → Local time
+                        formatted_timestamp = dt_local.strftime("%m%d-%H%M")
+                    except Exception as e:
+                        self.log_system.log_message('error',
+                                                    f"Failed to parse timestamp for fax ID {fax_id}: {timestamp} - {str(e)}")
+                        formatted_timestamp = "unknown"
+
+                    # **Determine possible file names**
+                    standard_file_name = f"{fax_id}.pdf"
+                    custom_file_name = f"{caller_id}-{formatted_timestamp}.pdf" if caller_id else standard_file_name
+
+                    # **Determine the file naming based on user settings**
+                    file_name = custom_file_name if self.file_naming_option == "cid-mmdd-hhmm" and caller_id else standard_file_name
+                    pdf_path = os.path.join(self.save_path, file_name)
+                    jpg_prefix = os.path.join(self.save_path,
+                                              file_name.replace(".pdf", ""))  # Prefix for JPG conversion
+
+                    # **Check for existing files before downloading**
+                    standard_file_path = os.path.join(self.save_path, standard_file_name)
+                    custom_file_path = os.path.join(self.save_path, custom_file_name)
+                    jpg_files = [f for f in os.listdir(self.save_path) if
+                                 f.startswith(jpg_prefix) and f.endswith(".jpg")]
+
+                    if os.path.exists(standard_file_path) or os.path.exists(custom_file_path) or (
+                            self.download_type in ["JPG", "Both"] and jpg_files):
+                        self.log_system.log_message('info', f"Skipping fax ID {fax_id}, already downloaded")
                         continue
 
                     all_faxes_downloaded = False
 
-                    if not os.path.exists(file_path) and not os.path.exists(printed_pdf_path):
-                        pdf_url = f"https://telco-api.skyswitch.com/users/{self.fax_account}/faxes/{fax_id}/pdf"
-                        headers = {"accept": "application/json", "authorization": f"Bearer {self.token}"}
-                        pdf_response = requests.get(pdf_url, headers=headers)
+                    # **Download the fax PDF**
+                    pdf_url = fax['pdf']
+                    headers = {"accept": "application/json", "authorization": f"Bearer {self.token}"}
+                    pdf_response = requests.get(pdf_url, headers=headers)
 
-                        if pdf_response.status_code == 200:
-                            with open(file_path, 'wb') as f:
-                                f.write(pdf_response.content)
-                            if self.main_window.isVisible():
-                                self.main_window.update_status_bar(f"Downloaded fax file for ID {fax_id}", 5000)
-                            self.log_system.log_message('info', f"Downloaded fax file for ID {fax_id} to {file_path}")
+                    if pdf_response.status_code == 200:
+                        with open(pdf_path, 'wb') as f:
+                            f.write(pdf_response.content)
+                        self.log_system.log_message('info', f"Downloaded fax file for ID {fax_id} to {pdf_path}")
 
-                            if self.download_type in ['JPG', 'Both']:
-                                command = ['pdftoppm', '-jpeg', file_path, os.path.join(self.save_path, f"{fax_id}")]
-                                process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
-                                process.communicate()
-                                if self.main_window.isVisible():
-                                    self.main_window.update_status_bar(f"Converted fax PDF to JPG for ID {fax_id}", 5000)
-                                self.log_system.log_message('info', f"Converted fax PDF to JPG for ID {fax_id}")
+                        # **Convert PDF to JPG if required**
+                        if self.download_type in ["JPG", "Both"]:
+                            command = ['pdftoppm', '-jpeg', pdf_path, jpg_prefix]
+                            process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
+                            process.communicate()
+                            self.log_system.log_message('info', f"Converted fax PDF to JPG for ID {fax_id}")
 
-                            if self.download_type == 'JPG':
-                                os.remove(file_path)
-                                self.log_system.log_message('info', f"Removed original fax PDF for ID {fax_id} after conversion to JPG")
+                            # Remove the original PDF if user only wants JPGs
+                            if self.download_type == "JPG":
+                                os.remove(pdf_path)
+                                self.log_system.log_message('info',
+                                                            f"Removed original fax PDF for ID {fax_id} after conversion to JPG")
 
-                            if self.print_faxes:
-                                self.print_fax(file_path)
+                        # **Print the fax if enabled**
+                        if self.print_faxes:
+                            self.print_fax(pdf_path)
 
-                            # Archive a copy if enabled
-                            if self.archive_enabled:
-                                self.archive_fax(file_path, file_name)
+                        # **Archive a copy if enabled**
+                        if self.archive_enabled:
+                            self.archive_fax(pdf_path, file_name, fax['created_at'])
 
-                            download_results.append((fax_id, 'Downloaded', file_path if self.download_type != 'JPG' else 'Converted to JPG'))
-                            downloaded_faxes_count += 1
-                        else:
-                            download_results.append((fax_id, 'Failed to download'))
-                            if self.main_window.isVisible():
-                                self.main_window.update_status_bar(f"Failed to download fax file for ID {fax_id}", 5000)
-                            self.log_system.log_message('error', f"Failed to download fax file for ID {fax_id}, HTTP {pdf_response.status_code}")
-
-                    # Optionally delete the fax record after processing
-                    if self.delete_fax_option == 'Yes':
-                        self.delete_fax(fax_id)
+                        download_results.append(
+                            (fax_id, 'Downloaded', pdf_path if self.download_type != 'JPG' else 'Converted to JPG'))
+                        downloaded_faxes_count += 1
+                    else:
+                        download_results.append((fax_id, 'Failed to download'))
+                        self.log_system.log_message('error',
+                                                    f"Failed to download fax file for ID {fax_id}, HTTP {pdf_response.status_code}")
 
                 except Exception as e:
                     self.log_system.log_message('error', f"Exception in download_fax_pdfs loop: {str(e)}")
 
             if all_faxes_downloaded:
-                if self.download_type == 'PDF':
-                    if self.main_window.isVisible():
-                        self.main_window.update_status_bar("All faxes have already been downloaded as PDFs", 5000)
-                    self.log_system.log_message('info', "All faxes have already been downloaded as PDFs")
-                elif self.download_type == 'JPG':
-                    if self.main_window.isVisible():
-                        self.main_window.update_status_bar("All faxes have already been converted to JPG", 5000)
-                    self.log_system.log_message('info', "All faxes have already been converted to JPG")
-                elif self.download_type == 'Both':
-                    if self.main_window.isVisible():
-                        self.main_window.update_status_bar("All faxes have already been downloaded and converted", 5000)
-                    self.log_system.log_message('info', "All faxes have already been downloaded and converted")
+                self.log_system.log_message('info', "All faxes have already been downloaded.")
             elif downloaded_faxes_count > 0:
-                if self.main_window.isVisible():
-                    self.main_window.update_status_bar(f"{downloaded_faxes_count} faxes downloaded", 5000)
                 self.log_system.log_message('info', f"{downloaded_faxes_count} faxes downloaded")
                 self.notify_user(downloaded_faxes_count)
 
             self.finished.emit(download_results)
+
         except Exception as e:
             self.log_system.log_message('error', f"Exception in download_fax_pdfs: {str(e)}")
             self.finished.emit([])
 
-    def archive_fax(self, file_path, file_name):
-        """Copy the downloaded fax to the archive folder structured by date and hour."""
+    def archive_fax(self, file_path, file_name, sent_timestamp):
+        """Copy the downloaded fax to the archive folder based on when the fax was originally sent."""
         try:
-            now = datetime.datetime.now()
-            archive_dir = os.path.join(self.archive_path, now.strftime("%Y-%m-%d"), now.strftime("%H"))
+            # Detect the local time zone dynamically
+            local_zone = get_localzone()
 
+            # **Convert UTC timestamp to local time for archive structure**
+            try:
+                utc_zone = pytz.utc
+                if '.' in sent_timestamp:
+                    dt_utc = datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                else:
+                    dt_utc = datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%SZ")
+
+                dt_utc = dt_utc.replace(tzinfo=utc_zone)
+                dt_local = dt_utc.astimezone(local_zone)  # Convert UTC → Local time
+            except Exception as e:
+                self.log_system.log_message('error',
+                                            f"Failed to parse sent timestamp for archiving: {sent_timestamp} - {str(e)}")
+                dt_local = datetime.now()  # Fall back to current time if parsing fails
+
+            # **Organize by sent date & hour instead of retrieval time**
+            archive_dir = os.path.join(self.archive_path, dt_local.strftime("%Y-%m-%d"), dt_local.strftime("%H"))
             os.makedirs(archive_dir, exist_ok=True)  # Ensure archive directory exists
             archive_path = os.path.join(archive_dir, file_name)
 
-            shutil.copy(file_path, archive_path)  # Copy file to archive directory
-            self.log_system.log_message('info', f"Archived fax to {archive_path}")
+            if not os.path.exists(archive_path):  # Prevent duplicate archiving
+                shutil.copy(file_path, archive_path)  # Copy file to archive directory
+                self.log_system.log_message('info', f"Archived fax to {archive_path}")
+            else:
+                self.log_system.log_message('info', f"Skipped archiving: Fax already archived at {archive_path}")
 
         except Exception as e:
             self.log_system.log_message('error', f"Failed to archive fax: {e}")
-
     def print_fax(self, file_path):
         try:
             if os.path.exists(file_path):
