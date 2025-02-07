@@ -1,5 +1,5 @@
 # 🚀 FaxRetriever Update - Version 1.16.01  
-*Released: MM/DD/YYYY*  
+*Released: 02/07/2025*  
 
 ## 🔹 **Fax Status Button is Now Enabled!**  
 - Users can now **access the Fax Status tool** from the toolbar.  
