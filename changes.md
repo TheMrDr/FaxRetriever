@@ -1,3 +1,13 @@
+# 🚀 FaxRetriever Update - Version 1.16.01  
+*Released: MM/DD/YYYY*  
+
+## 🔹 **Fax Status Button is Now Enabled!**  
+- Users can now **access the Fax Status tool** from the toolbar.  
+- View **sent and received fax history** directly from within the app.  
+- 💡 *Heads up: The UI needs some love—it’s functional but overdue for a redesign!* Stay tuned for future improvements!  
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.16.00  
 *Released 02/07/2025*
 

@@ -325,10 +325,10 @@ class MainWindow(QMainWindow):
 
     def populate_tools_menu(self):
         try:
-            # self.fax_status_button = QAction("Fax Status", self)
-            # self.fax_status_button.triggered.connect(self.show_fax_status_dialog)
-            # self.tools_menu.addAction(self.fax_status_button)
-            # self.fax_status_button.setEnabled(True)
+            self.fax_status_button = QAction("Fax Status", self)
+            self.fax_status_button.triggered.connect(self.show_fax_status_dialog)
+            self.tools_menu.addAction(self.fax_status_button)
+            self.fax_status_button.setEnabled(True)
 
             # self.convert_to_pdf = QAction("Convert Image to PDF", self)
             # self.convert_to_pdf.triggered.connect(self.convert_to_pdf_dialog)
