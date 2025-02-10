@@ -1,5 +1,4 @@
 import datetime
-import json
 import os
 import platform
 import re
@@ -228,6 +227,10 @@ class RetrieveFaxes(QThread):
                         if self.archive_enabled:
                             self.archive_fax(pdf_path, file_name, fax['created_at'])
 
+                        # Optionally delete the fax record after processing
+                        if self.delete_fax_option == 'Yes':
+                            self.delete_fax(fax_id)
+
                         download_results.append(
                             (fax_id, 'Downloaded', pdf_path if self.download_type != 'JPG' else 'Converted to JPG'))
                         downloaded_faxes_count += 1
@@ -254,23 +257,29 @@ class RetrieveFaxes(QThread):
     def archive_fax(self, file_path, file_name, sent_timestamp):
         """Copy the downloaded fax to the archive folder based on when the fax was originally sent."""
         try:
-            # Detect the local time zone dynamically
-            local_zone = get_localzone()
+            # **Get a valid local timezone name**
+            local_zone_name = get_localzone_name()  # Fetch system’s timezone as a string
+            try:
+                local_zone = pytz.timezone(local_zone_name)  # Convert to pytz timezone object
+            except pytz.UnknownTimeZoneError:
+                self.log_system.log_message('error',
+                                            f"Invalid timezone detected: {local_zone_name}. Using UTC instead.")
+                local_zone = pytz.utc  # Fallback to UTC
 
-            # **Convert UTC timestamp to local time for archive structure**
+            # **Convert UTC timestamp to local time**
             try:
                 utc_zone = pytz.utc
                 if '.' in sent_timestamp:
-                    dt_utc = datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                    dt_utc = datetime.datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
                 else:
-                    dt_utc = datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%SZ")
+                    dt_utc = datetime.datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%SZ")
 
                 dt_utc = dt_utc.replace(tzinfo=utc_zone)
                 dt_local = dt_utc.astimezone(local_zone)  # Convert UTC → Local time
             except Exception as e:
                 self.log_system.log_message('error',
                                             f"Failed to parse sent timestamp for archiving: {sent_timestamp} - {str(e)}")
-                dt_local = datetime.now()  # Fall back to current time if parsing fails
+                dt_local = datetime.datetime.now()  # Fall back to current time if parsing fails
 
             # **Organize by sent date & hour instead of retrieval time**
             archive_dir = os.path.join(self.archive_path, dt_local.strftime("%Y-%m-%d"), dt_local.strftime("%H"))
@@ -285,6 +294,7 @@ class RetrieveFaxes(QThread):
 
         except Exception as e:
             self.log_system.log_message('error', f"Failed to archive fax: {e}")
+
     def print_fax(self, file_path):
         try:
             if os.path.exists(file_path):

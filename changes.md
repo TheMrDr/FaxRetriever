@@ -1,3 +1,12 @@
+# 🚀 FaxRetriever Update - Version 1.16.02  
+*Released: 02/10/2025*  
+
+## 🛠️ **Bug Fixes & Improvements**  
+- 🕒 **System Time Zone is now properly detected** for fax archival, ensuring accurate retention periods.  
+- ❌ **Faxes now properly delete from the server** after being downloaded (if enabled in settings).  
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.16.01  
 *Released: 02/07/2025*  
 
