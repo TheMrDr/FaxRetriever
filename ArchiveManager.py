@@ -10,16 +10,26 @@ class ArchiveManager:
         self.main_window = main_window
         self.log_system = SystemLog()
         self.save_manager = SaveManager(self.main_window)
+
+        # Load archival settings safely
+        archive_enabled_raw = self.save_manager.get_config_value('Fax Options', 'archive_enabled')
+
+        # If the key is missing or invalid, default to "No"
+        self.archive_enabled = archive_enabled_raw == "Yes" if archive_enabled_raw else False
+
+        # Load and validate archive duration
         raw_duration = self.save_manager.get_config_value('Fax Options', 'archive_duration')
 
-        # Load archival settings
-        self.archive_enabled = self.save_manager.get_config_value('Fax Options', 'archive_enabled') == "Yes"
+        # Ensure the retrieved value is a valid integer
         try:
-            self.archive_duration = int(raw_duration)
+            if raw_duration and raw_duration.isdigit():  # Ensure it contains only digits
+                self.archive_duration = int(raw_duration)
+            else:
+                raise ValueError  # Trigger the exception if it's not a valid number
         except (ValueError, TypeError):
             self.log_system.log_message('warning',
                                         f"Invalid archive duration value: {raw_duration}. Defaulting to 30 days.")
-            self.archive_duration = 30  # Set default value if conversion fails
+            self.archive_duration = 30  # Default to 30 days if invalid
 
         self.archive_path = os.path.join(os.getcwd(), "Archive")
 

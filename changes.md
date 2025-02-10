@@ -1,3 +1,12 @@
+# 🚀 FaxRetriever Update - Version 1.16.03  
+*Released: 02/10/2025*  
+
+## 🛠️ **Minor Bug Fix**  
+- Fixed an issue where **undefined archival settings** could cause the archival module to fail.  
+- This update **prevents unnecessary error popups** when saving faxes.  
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.16.02  
 *Released: 02/10/2025*  
 
