@@ -10,6 +10,8 @@ from RetrieveToken import RetrieveToken
 from SaveManager import SaveManager
 from SystemLog import SystemLog  # Make sure to import the logging class
 
+from integrations.ComputerRx import  CRxIntegration
+
 
 # noinspection PyUnresolvedReferences
 class TokenLifespanProgressBar(QWidget):
@@ -170,9 +172,10 @@ class FaxPollTimerProgressBar(QWidget):
         self.main_window = main_window  # Reference to the main window for status updates
         self.token_progress_bar = token_progress_bar  # Reference to TokenLifespanProgressBar for token checks
         self.log_system = SystemLog()  # Initialize logging
-        self.encryption_manager = SaveManager(self.main_window)
+        self.save_manager = SaveManager(self.main_window)
         self.setupUI()
         self.setupTimer()
+        self.crx_integration = CRxIntegration(self.main_window)
 
     def setupUI(self):
         self.layout = QGridLayout(self)
@@ -207,7 +210,7 @@ class FaxPollTimerProgressBar(QWidget):
         self.updateTimer.start(1000)  # Updates every second
 
     def updateProgressBar(self):
-        auto_retrieve_enabled = self.encryption_manager.get_config_value('Retrieval', 'auto_retrieve')
+        auto_retrieve_enabled = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
 
         if auto_retrieve_enabled == "Enabled":
             self.faxPollTimer_text.setText("Automatically Polling for New Faxes every 15 minutes.")
@@ -255,12 +258,19 @@ class FaxPollTimerProgressBar(QWidget):
             self.log_system.log_message('info', "Token is invalid, cannot retrieve faxes.")
             return  # Do not retrieve faxes if the token is invalid
 
-        if self.main_window.isVisible():
-            self.main_window.update_status_bar("Checking for new faxes...", 5000)
         self.log_system.log_message('info', "Fax retrieval initiated.")
         self.setupTimer()  # Reset and restart the fax poll timer
         self.faxRetrieval = RetrieveFaxes(self.main_window)
         self.faxRetrieval.start()  # Start the thread
+
+        if self.save_manager.get_config_value("Integrations", "integration_enabled") == "Yes":
+            ### We'll use save_manager to read our value for "Integrations", "integration_software" to determine which thread to launch.
+            if self.save_manager.get_config_value("Integrations", "integration_software") == "Computer-Rx":
+                self.crx_integration.start()  ### This might be the wrong way to start this process ###
+            else:
+                self.log_system.log_message('info', "Integration is enabled, but no software is selected.")
+        else:
+            self.log_system.log_message('info', "Integration is disabled, skipping integration check.")
 
     def restart_progress(self):
         self.setupTimer()  # Reset and restart the fax poll timer

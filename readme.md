@@ -46,7 +46,7 @@ It provides an easy-to-use interface for **managing faxes securely**.
 
 ## 📌 **Usage Guide**
 ### 📥 Retrieving Faxes
-- Faxes are **automatically checked every 5 minutes**.
+- Faxes are **automatically checked every 15 minutes**.
 - You can **manually retrieve** faxes by clicking **"Check for New Faxes"**.
 
 ### 📤 Sending Faxes
@@ -63,6 +63,10 @@ It provides an easy-to-use interface for **managing faxes securely**.
 ☎️ **Phone:** **405-300-0122**  
 📧 **Email:** **[info@clinicnetworking.com](mailto:info@clinicnetworking.com)**  
 🌐 **Website:** **[ClinicNetworking.com](https://clinicnetworking.com)**  
+
+---
+
+**Some Artwork provided by Freepik - [www.flaticon.com](https://www.flaticon.com)**
 
 ---
 

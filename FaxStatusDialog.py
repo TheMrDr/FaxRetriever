@@ -190,7 +190,8 @@ class FaxStatusDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Fax Status")
-        self.resize(605, 605)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)  # Remove Help (?) Button
+        self.setFixedSize(800, 600)
         self.layout = QVBoxLayout(self)
         self.fax_result_table = CustomFaxTable()
         self.layout.addWidget(self.fax_result_table.search_box)

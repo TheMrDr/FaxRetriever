@@ -141,49 +141,33 @@ class RetrieveFaxes(QThread):
             all_faxes_downloaded = True
             downloaded_faxes_count = 0
 
-            # Detect the local time zone dynamically
-            local_zone = get_localzone()
+            # Show "Checking for new faxes..." status
+            if self.main_window:
+                self.main_window.update_status_bar("Checking for new faxes...", 5000)
 
             for fax in faxes:
                 try:
-                    destination_number = str(fax['destination'])
-
-                    if destination_number not in self.allowed_caller_ids:
-                        self.log_system.log_message('info',
-                                                    f'Destination number {destination_number} not in allowed caller IDs')
-                        continue
-
                     fax_id = fax['id']
                     caller_id = fax['caller_id']
                     timestamp = fax['created_at']
 
-                    # **Convert UTC timestamp to local time**
+                    # Format timestamp as MMDD-HHMM
                     try:
-                        utc_zone = pytz.utc
-                        if '.' in timestamp:
-                            dt_utc = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-                        else:
-                            dt_utc = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ")
-
-                        dt_utc = dt_utc.replace(tzinfo=utc_zone)
-                        dt_local = dt_utc.astimezone(local_zone)  # Convert UTC → Local time
-                        formatted_timestamp = dt_local.strftime("%m%d-%H%M")
-                    except Exception as e:
+                        dt = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                        formatted_timestamp = dt.strftime("%m%d-%H%M")
+                    except ValueError:
                         self.log_system.log_message('error',
-                                                    f"Failed to parse timestamp for fax ID {fax_id}: {timestamp} - {str(e)}")
+                                                    f"Invalid timestamp format for fax ID {fax_id}: {timestamp}")
                         formatted_timestamp = "unknown"
 
-                    # **Determine possible file names**
+                    # Determine file names
                     standard_file_name = f"{fax_id}.pdf"
                     custom_file_name = f"{caller_id}-{formatted_timestamp}.pdf" if caller_id else standard_file_name
-
-                    # **Determine the file naming based on user settings**
                     file_name = custom_file_name if self.file_naming_option == "cid-mmdd-hhmm" and caller_id else standard_file_name
                     pdf_path = os.path.join(self.save_path, file_name)
-                    jpg_prefix = os.path.join(self.save_path,
-                                              file_name.replace(".pdf", ""))  # Prefix for JPG conversion
+                    jpg_prefix = os.path.join(self.save_path, file_name.replace(".pdf", ""))
 
-                    # **Check for existing files before downloading**
+                    # Check if fax already exists
                     standard_file_path = os.path.join(self.save_path, standard_file_name)
                     custom_file_path = os.path.join(self.save_path, custom_file_name)
                     jpg_files = [f for f in os.listdir(self.save_path) if
@@ -196,6 +180,10 @@ class RetrieveFaxes(QThread):
 
                     all_faxes_downloaded = False
 
+                    # Show "Downloading fax..." status
+                    if self.main_window:
+                        self.main_window.update_status_bar(f"Downloading fax {file_name}...", 5000)
+
                     # **Download the fax PDF**
                     pdf_url = fax['pdf']
                     headers = {"accept": "application/json", "authorization": f"Bearer {self.token}"}
@@ -206,24 +194,27 @@ class RetrieveFaxes(QThread):
                             f.write(pdf_response.content)
                         self.log_system.log_message('info', f"Downloaded fax file for ID {fax_id} to {pdf_path}")
 
-                        # **Convert PDF to JPG if required**
+                        # **Convert to JPG if needed**
                         if self.download_type in ["JPG", "Both"]:
+                            if self.main_window:
+                                self.main_window.update_status_bar(f"Converting {file_name} to JPG...", 5000)
+
                             command = ['pdftoppm', '-jpeg', pdf_path, jpg_prefix]
                             process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
                             process.communicate()
-                            self.log_system.log_message('info', f"Converted fax PDF to JPG for ID {fax_id}")
 
-                            # Remove the original PDF if user only wants JPGs
+                            if self.main_window:
+                                self.main_window.update_status_bar(f"Conversion complete for {file_name}", 5000)
+
+                            # Remove original PDF if JPG is the only format
                             if self.download_type == "JPG":
                                 os.remove(pdf_path)
-                                self.log_system.log_message('info',
-                                                            f"Removed original fax PDF for ID {fax_id} after conversion to JPG")
 
-                        # **Print the fax if enabled**
+                        # **Print fax if enabled**
                         if self.print_faxes:
                             self.print_fax(pdf_path)
 
-                        # **Archive a copy if enabled**
+                        # **Archive fax if enabled**
                         if self.archive_enabled:
                             self.archive_fax(pdf_path, file_name, fax['created_at'])
 
@@ -242,9 +233,14 @@ class RetrieveFaxes(QThread):
                 except Exception as e:
                     self.log_system.log_message('error', f"Exception in download_fax_pdfs loop: {str(e)}")
 
+            # **Show final status message**
             if all_faxes_downloaded:
+                if self.main_window:
+                    self.main_window.update_status_bar("All faxes have already been downloaded.", 5000)
                 self.log_system.log_message('info', "All faxes have already been downloaded.")
             elif downloaded_faxes_count > 0:
+                if self.main_window:
+                    self.main_window.update_status_bar(f"{downloaded_faxes_count} new faxes downloaded.", 5000)
                 self.log_system.log_message('info', f"{downloaded_faxes_count} faxes downloaded")
                 self.notify_user(downloaded_faxes_count)
 
@@ -253,6 +249,7 @@ class RetrieveFaxes(QThread):
         except Exception as e:
             self.log_system.log_message('error', f"Exception in download_fax_pdfs: {str(e)}")
             self.finished.emit([])
+
 
     def archive_fax(self, file_path, file_name, sent_timestamp):
         """Copy the downloaded fax to the archive folder based on when the fax was originally sent."""

@@ -1,9 +1,12 @@
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont
+import os
+
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QTextCursor, QIcon
 from PyQt5.QtWidgets import (QPushButton, QDialog, QListView, QDialogButtonBox, QProgressBar, QMessageBox, QVBoxLayout,
-                             QLabel, QHBoxLayout, QLineEdit)
+                             QLabel, QHBoxLayout, QLineEdit, QTextEdit, QMainWindow, QCheckBox)
 
 from SaveManager import SaveManager
+from SystemLog import SystemLog
 
 
 class CustomPushButton(QPushButton):
@@ -24,7 +27,6 @@ class CustomPushButton(QPushButton):
         """)
 
 
-# noinspection PyUnresolvedReferences
 class SelectInboxDialog(QDialog):
     def __init__(self, inboxes, parent=None):
         super().__init__(parent)
@@ -202,3 +204,135 @@ class PhoneNumberInputDialog(QDialog):
         else:
             QMessageBox.warning(self, "Input Error", "Please enter a valid fax number.")
             return None
+
+
+class LogViewer(QDialog):
+    """Displays real-time log updates in a separate window."""
+
+    def __init__(self, log_file_path):
+        super().__init__()
+        self.setWindowTitle("Log Viewer")
+        self.setGeometry(100, 100, 800, 500)
+        # self.setWindowIcon(QtGui.QIcon(os.path.join(os.getcwd(), "images", "logo.ico")))
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)  # Remove help button
+
+        layout = QVBoxLayout()
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        self.log_text.setWordWrapMode(0)  # Prevent forced wrapping
+        layout.addWidget(self.log_text)
+        self.setLayout(layout)
+
+        self.log_file_path = log_file_path
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_log)
+        self.timer.start(1000)  # Update log every second
+
+        self.last_known_size = 0  # Track last known file size
+        self.update_log()  # Load initial content
+
+    def update_log(self):
+        """Efficiently update the log without resetting scroll position or causing jitter."""
+        if os.path.exists(self.log_file_path):
+            with open(self.log_file_path, 'r') as file:
+                file.seek(self.last_known_size)  # Move to last read position
+                new_content = file.read()
+                self.last_known_size = file.tell()  # Update last read position
+
+                if new_content:
+                    previous_scroll = self.log_text.verticalScrollBar().value()
+                    max_scroll = self.log_text.verticalScrollBar().maximum()
+
+                    self.log_text.moveCursor(QTextCursor.End)  # Move cursor to end before appending
+                    self.log_text.insertPlainText(new_content)  # Append new lines instead of resetting text
+
+                    # Auto-scroll only if the user was already at the bottom
+                    if previous_scroll >= max_scroll - 10:
+                        self.log_text.verticalScrollBar().setValue(self.log_text.verticalScrollBar().maximum())
+
+
+class IntegrationAcknowledgement(QDialog):
+    def __init__(self, save_manager, parent=None):
+        super().__init__(parent)
+        self.save_manager = save_manager
+        self.log_system = SystemLog()  # Initialize logging system
+        self.parent_dialog = parent  # Store reference to OptionsDialog
+
+        self.setWindowTitle("Third-Party Integrations Disclaimer")
+        self.setFixedSize(450, 250)
+        self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+
+        layout = QVBoxLayout()
+
+        # Set icon
+        icon_label = QLabel()
+        icon_label.setPixmap(QIcon(os.path.join("images", "logo.png")).pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(icon_label)
+
+        # Message label
+        self.message_label = QLabel(
+            "Third-party integrations are currently in development. Some features may be incomplete or unstable."
+        )
+        self.message_label.setFont(QFont("Arial", 11))
+        self.message_label.setWordWrap(True)
+        self.message_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.message_label)
+
+        # Checkbox layout
+        checkbox_layout = QHBoxLayout()
+        self.dont_remind_checkbox = QCheckBox("Don't remind me again")
+        self.dont_remind_checkbox.setFont(QFont("Arial", 10))
+        checkbox_layout.addStretch()
+        checkbox_layout.addWidget(self.dont_remind_checkbox)
+        checkbox_layout.addStretch()
+        layout.addLayout(checkbox_layout)
+
+        # Button layout
+        button_layout = QVBoxLayout()
+
+        # Acknowledge button
+        self.acknowledge_button = QPushButton("Acknowledge")
+        self.acknowledge_button.setFont(QFont("Arial", 12, QFont.Bold))
+        self.acknowledge_button.clicked.connect(self.save_acknowledgement)
+        self.acknowledge_button.setStyleSheet(
+            "background-color: #2a81dc; color: white; border-radius: 5px; padding: 8px;")
+        button_layout.addWidget(self.acknowledge_button, alignment=Qt.AlignCenter)
+
+        # Disable third-party integrations
+        self.disable_button = QPushButton("Disable 3rd Party Integrations")
+        self.disable_button.setFont(QFont("Arial", 12, QFont.Bold))
+        self.disable_button.clicked.connect(self.disable_integrations)
+        self.disable_button.setStyleSheet(
+            "background-color: #cc0000; color: white; border-radius: 5px; padding: 8px;")
+        button_layout.addWidget(self.disable_button, alignment=Qt.AlignCenter)
+
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+
+    def save_acknowledgement(self):
+        """Saves the acknowledgment and logs the user's choice."""
+        if self.dont_remind_checkbox.isChecked():
+            self.save_manager.config.set('Integrations', 'acknowledgement', "True")
+            self.save_manager.save_changes()
+            self.log_system.log_message('info', "User acknowledged third-party integrations and opted not to be reminded.")
+
+        else:
+            self.log_system.log_message('info', "User acknowledged third-party integrations but allowed future reminders.")
+
+        self.accept()
+
+    def disable_integrations(self):
+        """Disables third-party integrations, logs the action, resets acknowledgment, and unchecks the master checkbox."""
+        self.save_manager.config.set("Integrations", "enable_third_party", "No")
+        self.save_manager.config.set("Integrations", "acknowledgement", "False")
+        self.save_manager.save_changes()
+
+        # Log the decision
+        self.log_system.log_message('warning', "User disabled third-party integrations and dismissed the prompt.")
+
+        # Check if parent dialog (OptionsDialog) exists and update checkbox
+        if self.parent_dialog and hasattr(self.parent_dialog, 'enable_integrations_checkbox'):
+            self.parent_dialog.enable_integrations_checkbox.setChecked(False)
+
+        self.reject()  # Close the dialog

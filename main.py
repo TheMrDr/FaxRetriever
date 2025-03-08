@@ -22,7 +22,7 @@ else:
 
 from AboutDialog import AboutDialog
 from AutoUpdate import CheckForUpdate, UpgradeApplication
-from Customizations import CustomPushButton, SelectInboxDialog, PhoneNumberInputDialog
+from Customizations import CustomPushButton, SelectInboxDialog, PhoneNumberInputDialog, LogViewer
 from FaxStatusDialog import FaxStatusDialog
 from Options import OptionsDialog
 from ProgressBars import TokenLifespanProgressBar, FaxPollTimerProgressBar
@@ -59,10 +59,6 @@ class MainWindow(QMainWindow):
             self.faxPollButton.setMinimumHeight(50)
             self.send_fax_button.setMinimumHeight(50)
             self.inbox_button.setMinimumHeight(40)
-            # self.options_button.setMinimumHeight(40)
-
-            # layout.setContentsMargins(20, 20, 20, 20)
-            # layout.setSpacing(15)
 
             self.status_bar.setStyleSheet("font-size: 12pt; padding: 5px;")
 
@@ -154,9 +150,23 @@ class MainWindow(QMainWindow):
     def finalize_initialization(self):
         """Final steps to initialize the UI based on loaded data"""
         try:
-            required_height = (self.centralWidget().sizeHint().height() + self.statusBar().sizeHint().height() +
-                               self.menuBar().sizeHint().height() + 10)
-            self.setFixedSize(600, required_height)  # Set width to 600 and height dynamically
+            central_widget = self.centralWidget()
+            menu_bar_height = self.menuBar().sizeHint().height() if self.menuBar() else 0
+            status_bar_height = self.statusBar().sizeHint().height() if self.statusBar() else 0
+            central_widget_height = central_widget.sizeHint().height() if central_widget else 400  # Default if None
+
+            # Determine the banner width dynamically
+            banner_width = 600  # Default width
+            banner_path = os.path.join(bundle_dir, "images", "banner_small.png")
+            if os.path.exists(banner_path):
+                pixmap = QPixmap(banner_path)
+                banner_width = pixmap.width()
+
+            required_height = central_widget_height + status_bar_height + menu_bar_height + 10
+
+            # Set the window size, ensuring it at least fits the banner
+            self.setFixedSize(max(banner_width, 600), required_height)
+
         except Exception as e:
             self.log_system.log_message('error', f"Failed to finalize initialization: {e}")
             print(f"Failed to finalize initialization: {e}")
@@ -411,9 +421,27 @@ class MainWindow(QMainWindow):
             self.about_button.triggered.connect(self.about)
             self.help_menu.addAction(self.about_button)
             self.about_button.setEnabled(True)
+
+            # Add View Log Button
+            self.view_log_button = QAction("View Log", self)
+            self.view_log_button.triggered.connect(self.open_log_viewer)
+            self.help_menu.addAction(self.view_log_button)
+            self.view_log_button.setEnabled(True)
         except Exception as e:
             self.log_system.log_message('error', f"Failed to populate help menu: {e}")
             print(f"Failed to populate help menu: {e}")
+
+    def open_log_viewer(self):
+        """Opens a real-time log viewer window."""
+        try:
+            log_file = './log/ClinicFax.log'  # Path to log file
+            if os.path.exists(log_file):
+                self.log_viewer = LogViewer(log_file)
+                self.log_viewer.show()
+            else:
+                os.system(f'notepad {log_file}')  # Fallback to Notepad if log file is missing
+        except Exception as e:
+            self.log_system.log_message('error', f"Failed to open log viewer: {e}")
 
     def create_status_bar(self):
         try:
@@ -439,14 +467,14 @@ class MainWindow(QMainWindow):
 
     def create_central_widget(self):
         try:
-            self.centralWidget = QWidget()
-            layout = QGridLayout(self.centralWidget)
+            self.main_central_widget = QWidget()  # Rename to avoid conflict
+            layout = QGridLayout(self.main_central_widget)
 
             self.load_data_from_config()
 
             # Placeholder for a logo
             banner = QLabel()
-            pixmap = QPixmap(os.path.join(bundle_dir, "images", "banner_small.png"))  # Update the path as needed
+            pixmap = QPixmap(os.path.join(bundle_dir, "images", "banner_small.png"))
             banner.setPixmap(pixmap)
             banner.setAlignment(Qt.AlignCenter)
             layout.addWidget(banner, 0, 0, 1, 2)
@@ -486,8 +514,8 @@ class MainWindow(QMainWindow):
             if self.isVisible():
                 self.update_status_bar('System Started', 1000)
 
-            self.setCentralWidget(self.centralWidget)
-            self.centralWidget.setLayout(layout)
+            self.setCentralWidget(self.main_central_widget)  # Use new variable name
+            self.main_central_widget.setLayout(layout)
 
             self.create_status_bar()
             self.log_system.log_message('debug', 'Status Bar Initialized')

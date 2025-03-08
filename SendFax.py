@@ -10,7 +10,7 @@ from reportlab.pdfgen import canvas
 import requests
 from PIL import Image, ImageDraw
 from pypdf import PdfReader, PdfWriter
-from PyQt5 import QtGui
+from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import pyqtSignal, Qt, QObject
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QTransform, QMovie
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QInputDialog,
@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButto
                              QGraphicsScene, QGraphicsPixmapItem, QProgressBar)
 from docx import Document
 
+from AddressBook import AddressBookManager, AddressBookDialog, AddContactDialog
 from SaveManager import SaveManager
 from SystemLog import SystemLog
 
@@ -42,6 +43,8 @@ class UIManager(QDialog):
             self.main_window = main_window
             self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
             self.setWindowTitle("Send Fax")
+            self.setMaximumWidth(700)
+            self.address_book_manager = AddressBookManager()
             self.setup_ui()
             self.current_page_index = 0
 
@@ -128,12 +131,29 @@ class UIManager(QDialog):
             self.first_three_input.setMaxLength(3)
             self.last_four_input = QLineEdit()
             self.last_four_input.setMaxLength(4)
+
+            self.add_contact_button = QPushButton()
+            self.add_contact_button.setIcon(QtGui.QIcon(os.path.join("images", "AddContact.png")))
+            self.add_contact_button.setIconSize(QtCore.QSize(30, 30))  # Scale icon inside the button
+            self.add_contact_button.setFixedSize(40, 40)  # Ensures button is square
+            self.add_contact_button.setToolTip("Add Contact")
+            self.add_contact_button.clicked.connect(self.open_add_contact_dialog)
+
+            self.address_book_button = QPushButton()
+            self.address_book_button.setIcon(QtGui.QIcon(os.path.join("images", "AddressBook.png")))
+            self.address_book_button.setIconSize(QtCore.QSize(30, 30))
+            self.address_book_button.setFixedSize(40, 40)
+            self.address_book_button.setToolTip("Address Book")
+            self.address_book_button.clicked.connect(self.open_address_book_dialog)
+
             grid_layout.addWidget(self.phone_label, 0, 0)
             grid_layout.addWidget(self.area_code_input, 0, 1)
             grid_layout.addWidget(QLabel(")"), 0, 2)
             grid_layout.addWidget(self.first_three_input, 0, 3)
             grid_layout.addWidget(QLabel("-"), 0, 4)
             grid_layout.addWidget(self.last_four_input, 0, 5)
+            grid_layout.addWidget(self.add_contact_button, 0, 6)
+            grid_layout.addWidget(self.address_book_button, 0, 7)
 
             # Connect field transitions
             self.area_code_input.textChanged.connect(
@@ -149,6 +169,22 @@ class UIManager(QDialog):
                 next_widget.setFocus()
         except Exception as e:
             print(f"Focus next error: {e}")
+
+    def open_add_contact_dialog(self):
+        dialog = AddContactDialog(self.address_book_manager, self)
+        dialog.exec_()
+
+    def open_address_book_dialog(self):
+        dialog = AddressBookDialog(self.address_book_manager, self)
+        dialog.exec_()
+
+    def populate_phone_fields(self, phone):
+        phone = phone.replace(" ", "").replace("(", "").replace(")", "").replace("-", "")
+        if len(phone) == 10:
+            self.area_code_input.setText(phone[:3])
+            self.first_three_input.setText(phone[3:6])
+            self.last_four_input.setText(phone[6:])
+
 
     def setup_document_section(self, layout):
         try:
@@ -241,11 +277,19 @@ class UIManager(QDialog):
             print(f"Setup action buttons error: {e}")
 
     def closeEvent(self, event):
-        """Override the close event to clear the document list and prevent crashes."""
+        """Override the close event to clear the document list, destination number fields, and prevent crashes."""
         self.clear_document_list()
+
+        # Clear destination number fields
+        self.area_code_input.clear()
+        self.first_three_input.clear()
+        self.last_four_input.clear()
 
         # Explicitly reset the preview image before closing
         self.pixmap_item = None
+
+        # Reset the Area Code on the Fax window
+        self.populate_area_code()
 
         super().closeEvent(event)
 
@@ -817,15 +861,11 @@ class SendFax(UIManager):
     def setup_connections(self):
         try:
             self.caller_id_combo.currentIndexChanged.connect(self.populate_area_code)
-            # self.cover_sheet_button.clicked.connect(self.document_manager.attach_or_change_cover_sheet)
-            # self.scan_cover_sheet_button.clicked.connect(lambda: self.scanner_manager.scan_document(is_cover_sheet=True))
             self.document_button.clicked.connect(self.document_manager.attach_document)
             self.scan_button.clicked.connect(self.scanner_manager.scan_document)
             self.send_button.clicked.connect(self.fax_sender.send_fax)
             self.cancel_button.clicked.connect(self.close)
-            # self.cover_sheet_list.customContextMenuRequested.connect(self.show_cover_sheet_context_menu)
             self.document_list.customContextMenuRequested.connect(self.show_document_context_menu)
-            # self.cover_sheet_list.itemClicked.connect(self.display_cover_sheet_image)
             self.document_list.itemClicked.connect(self.display_document_image)
         except Exception as e:
             print(f"Setup connections error: {e}")

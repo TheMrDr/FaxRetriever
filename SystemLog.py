@@ -16,6 +16,7 @@ class SystemLog(QAction):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = None
+        self.current_logging_level = logging.INFO  # Default logging level
         self.setup_logger()
 
     def setup_logger(self):
@@ -28,19 +29,14 @@ class SystemLog(QAction):
                 os.makedirs(log_directory)  # Create the directory if it does not exist
 
             self.logger = logging.getLogger('ClinicFax')
-            self.logger.setLevel(logging.INFO)  # Set initial logging level
+            self.logger.setLevel(self.current_logging_level)
 
             # Check if handlers already exist to avoid duplicate logging
             if not self.logger.handlers:
-                # Set up rotating file handler
-                fh = RotatingFileHandler(log_file_path, maxBytes=512 * 512, backupCount=3)
+                # Set up rotating file handler (500KB max per file, 3 backups)
+                fh = RotatingFileHandler(log_file_path, maxBytes=500 * 1024, backupCount=3)
                 fh.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
                 self.logger.addHandler(fh)
-
-                # Optional: Set up stream handler to also echo logs to console
-                ch = logging.StreamHandler()
-                ch.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-                self.logger.addHandler(ch)
         except Exception as e:
             print(f"Failed to set up logger: {e}")
 
@@ -53,7 +49,8 @@ class SystemLog(QAction):
                 'ERROR': logging.ERROR,
                 'CRITICAL': logging.CRITICAL
             }
-            new_level = level_mapping.get(level, logging.INFO)
+            new_level = level_mapping.get(level.upper(), logging.INFO)
+            self.current_logging_level = new_level
             self.logger.setLevel(new_level)
             for handler in self.logger.handlers:
                 handler.setLevel(new_level)
@@ -62,6 +59,17 @@ class SystemLog(QAction):
 
     def log_message(self, level, message):
         try:
-            getattr(self.logger, level.lower(), self.logger.info)(message)
+            level_mapping = {
+                'DEBUG': logging.DEBUG,
+                'INFO': logging.INFO,
+                'WARNING': logging.WARNING,
+                'ERROR': logging.ERROR,
+                'CRITICAL': logging.CRITICAL
+            }
+            log_level = level_mapping.get(level.upper(), logging.INFO)
+
+            # Only log messages that meet or exceed the configured logging level
+            if log_level >= self.current_logging_level:
+                getattr(self.logger, level.lower(), self.logger.info)(message)
         except Exception as e:
             print(f"Failed to log message: {e}")

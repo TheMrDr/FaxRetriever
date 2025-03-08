@@ -14,7 +14,8 @@ a = Analysis(
         ('images', 'images'),
         ('readme.md', '.'),
         ('poppler', 'poppler'),
-        ('changes.md', '.')
+        ('changes.md', '.'),
+        ('integrations', 'integrations')
     ],
     hiddenimports=['pdf2image', 'pdf2image.backends', 'pdf2image.backends.poppler', 'plyer', 'plyer.notification',
     'fitz', 'pymupdf', 'pyinsane2', 'docx', 'python-docx'],

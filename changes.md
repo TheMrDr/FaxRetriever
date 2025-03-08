@@ -1,3 +1,56 @@
+# 🚀 FaxRetriever Update - Version 1.17.00  
+*Released: 03/08/2025*  
+
+## 🔄 **Major Architecture Change - Now 32-Bit for Better Compatibility!**  
+- FaxRetriever has been **recompiled from 64-bit to 32-bit** to ensure **better interoperability with third-party integrations**.  
+- This change **improves compatibility** with external software and legacy systems.  
+- **Reduced program size by nearly 25%!** The switch to 32-bit results in a **smaller, more efficient application**.  
+- **No functionality loss** – everything works the same, just with broader support!
+
+---
+
+## 🌟 **New Features & Enhancements**  
+
+### 📇 **Address Book Added!**  
+- Now accessible inside the **Send Fax** window.  
+- Save frequently-used fax numbers for quick selection.  
+- Import and export contacts for easy backup and sharing.  
+
+### 📜 **View System Logs in Real Time**  
+- Added a new **View Log** option under the **Help** menu.  
+- Monitor the system log **live**, making troubleshooting **easier than ever!**  
+
+### 📂 **Improved Archival Process**  
+- **Better error handling, logging, and cleanup functionality**.  
+- Archival storage is now **more efficient**, reducing unnecessary disk usage.  
+
+### 🔌 **Third-Party Integrations - Beta Begins!**  
+- The **first phase of integrations** is here, starting with **Computer-Rx** in **testing mode**.  
+- **How to Enable:**
+  1. Navigate to **System → Options**.  
+  2. Select **Enable 3rd Party Integrations**.  
+- **More vendors coming soon** – Let us know which integrations **you** want to see!  
+
+### 🎨 **Refined Options Menu & UI Enhancements**  
+- **System Options menu redesigned** for a **cleaner, more organized layout**.  
+- **Smaller main window banner** – (previously, branding took up over **60% of the UI** 😬).  
+- **More status messages** to keep users informed of what’s happening **in real-time**.  
+
+### 📥 **Improved Fax Retrieval**  
+- Ensures **only new, undownloaded faxes** are retrieved.  
+- **Deletes faxes from the server** correctly (if "Delete Faxes" is enabled in settings).  
+
+### 💾 **Better Save Management & Access Tokens**  
+- Eliminated **unnecessary calls** to invalid settings.  
+- **More detailed status messages** during token retrieval and error handling.  
+- **Enhanced save file logic** to prevent **null or missing values**.  
+
+## 🛠️ **Behind-the-Scenes Improvements**  
+- **Optimized internal code structure** for better performance.  
+- Cleaned up **tons of old comment blocks** to make the app **smaller and more efficient**. 
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.16.03  
 *Released: 02/10/2025*  
 

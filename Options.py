@@ -2,18 +2,18 @@ import os
 import re
 import sys
 
+from PyQt5.QtCore import Qt, QStandardPaths
 from PyQt5 import QtGui
 from PyQt5.QtPrintSupport import QPrintDialog
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QCheckBox, QMessageBox,
-                             QRadioButton, QGroupBox, QHBoxLayout, QButtonGroup, QComboBox)
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox,
+                             QRadioButton, QGroupBox, QHBoxLayout, QComboBox, QWidget, QFileDialog)
 
+from Customizations import IntegrationAcknowledgement
 from ProgressBars import FaxPollTimerProgressBar
 from RetrieveToken import RetrieveToken
 from SaveManager import SaveManager
 from SystemLog import SystemLog
 from Validation import validate_fax_user
-
-# from ImportConfig import ImportConfig
 
 
 # Determine if running as a bundled executable
@@ -31,15 +31,17 @@ class OptionsDialog(QDialog):
         self.retrieve_token = RetrieveToken(main_window)
         self.main_window = main_window
         self.selected_printer_full_name = None
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)  # Remove help button
 
         try:
             self.save_manager = SaveManager(self.main_window)
             self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
 
             self.setWindowTitle("Options")
-            self.setFixedWidth(500)
+            self.setFixedWidth(700)
+            self.setMinimumHeight(800)
 
-            self.layout = QVBoxLayout()
+            self.layout = QGridLayout()
             self.setup_ui()
             self.populate_settings()
             self.fax_timer_progress_bar = FaxPollTimerProgressBar(self.main_window, token_progress_bar)
@@ -55,46 +57,67 @@ class OptionsDialog(QDialog):
 
     def setup_ui(self):
         try:
-            form_layout = QFormLayout()
+            # Initialize Window Layout
+            self.layout = QGridLayout()
 
+            # Create the section layouts
+            left_layout = QVBoxLayout()
+            right_layout = QVBoxLayout()
+
+            # Fax Retrieval Settings
             self.fax_retrieval_group = QGroupBox("Fax Retrieval Settings")
             fax_retrieval_group_layout = QVBoxLayout()
             self.setup_fax_retrieval_options(fax_retrieval_group_layout)
             self.fax_retrieval_group.setLayout(fax_retrieval_group_layout)
 
+            # Logging Level
+            self.logging_level_group = QGroupBox("Logging Level")
+            self.setup_logging_level_group(self.logging_level_group)
+
+            # Account Settings
             self.account_info_group = QGroupBox("Account Settings")
             account_settings_layout = QVBoxLayout()
             self.setup_account_settings_group(account_settings_layout)
             self.account_info_group.setLayout(account_settings_layout)
 
-            self.logging_level_group = QGroupBox("Logging Level")
-            self.setup_logging_level_group(self.logging_level_group)  # Pass group box itself
-            #
-            # logging_level_layout = QVBoxLayout()
-            # self.setup_logging_level_group(logging_level_group)
-            # self.logging_level_group.setLayout(logging_level_layout)
+            # Integrations (Moved to Right Column Above Account Settings)
+            self.integrations_group = QGroupBox("Integrations")
+            integrations_group_layout = QVBoxLayout()
+            self.setup_integrations_group(integrations_group_layout)
+            self.integrations_group.setLayout(integrations_group_layout)
 
-            # # Import Config Button
-            # self.import_config_button = QPushButton("Import Config String")
-            # self.import_config_button.clicked.connect(self.import_config_string)
-            # self.import_config_button.setEnabled(False)
+            # Add widgets to layouts
+            left_layout.addWidget(self.fax_retrieval_group)
+            left_layout.addWidget(self.logging_level_group)
+            left_layout.addStretch()
 
-            # Save button
+            right_layout.addWidget(self.integrations_group)
+            right_layout.addWidget(self.account_info_group)
+            right_layout.addStretch()
+
+            # Wrap layouts in QWidget objects (fixes missing UI issue)
+            left_widget = QWidget()
+            left_widget.setLayout(left_layout)
+            left_widget.setFixedWidth(350)
+
+            right_widget = QWidget()
+            right_widget.setLayout(right_layout)
+            right_widget.setFixedWidth(350)
+
+            # Add widgets to the grid layout
+            self.layout.addWidget(left_widget, 0, 0)
+            self.layout.addWidget(right_widget, 0, 1)
+
+            # Save & Cancel buttons
+            button_layout = QHBoxLayout()
             self.save_button = QPushButton("Save")
             self.save_button.clicked.connect(self.save_settings)
-
-            # Cancel button
             self.cancel_button = QPushButton("Cancel")
             self.cancel_button.clicked.connect(self.close)
+            button_layout.addWidget(self.save_button)
+            button_layout.addWidget(self.cancel_button)
 
-            # Add widgets to the form
-            form_layout.addRow(self.fax_retrieval_group)
-            form_layout.addRow(self.account_info_group)
-            form_layout.addRow(self.logging_level_group)
-            form_layout.addRow(self.save_button)
-            form_layout.addRow(self.cancel_button)
-
-            self.layout.addLayout(form_layout)
+            self.layout.addLayout(button_layout, 1, 0, 1, 2)
             self.setLayout(self.layout)
             self.toggle_sensitive_settings(False)
 
@@ -111,6 +134,7 @@ class OptionsDialog(QDialog):
 
             # Disable Fax Retrieval Checkbox (This should remain interactive)
             self.disable_fax_retrieval_checkbox = QCheckBox("Disable Fax Retrieval")
+            self.disable_fax_retrieval_checkbox.setChecked(True)
             self.disable_fax_retrieval_checkbox.toggled.connect(self.toggle_retrieval_settings)
             fax_retrieval_layout.addWidget(self.disable_fax_retrieval_checkbox)
 
@@ -119,6 +143,7 @@ class OptionsDialog(QDialog):
             download_options_layout = QVBoxLayout()
             self.download_method_combo = QComboBox()
             self.download_method_combo.addItems(["PDF", "JPG", "Both"])
+            self.download_method_combo.setCurrentText("PDF")
             download_options_layout.addWidget(self.download_method_combo)
             self.download_options_group.setLayout(download_options_layout)
             fax_retrieval_layout.addWidget(self.download_options_group)
@@ -134,15 +159,19 @@ class OptionsDialog(QDialog):
 
             # CID-MMDD-HHMM Option
             self.cid_mmdd_hhmm_radio = QRadioButton("Use CID-MMDD-HHMM")
-            cid_example = QLabel("Example: 1231231234-0206-1645.pdf")  # Example label
-            cid_example.setStyleSheet("font-size: 10px; color: gray;")  # Optional styling
+            cid_example = QLabel("Example: 1231231234-0206-1645.pdf")
+            cid_example.setStyleSheet("font-size: 10px; color: gray;")
 
-            # Add to grid layout
-            fax_name_layout.addWidget(self.fax_id_radio, 0, 0)  # Row 0, Column 0
-            fax_name_layout.addWidget(self.cid_mmdd_hhmm_radio, 0, 1)  # Row 0, Column 1
+            # Adjust row/column positioning with vertical padding
+            fax_name_layout.addWidget(self.fax_id_radio, 0, 0, Qt.AlignLeft)
+            fax_name_layout.addWidget(fax_id_example, 1, 0, Qt.AlignLeft)
 
-            fax_name_layout.addWidget(fax_id_example, 1, 0)  # Example text below Use Fax ID
-            fax_name_layout.addWidget(cid_example, 1, 1)  # Example text below Use CID-MMDD-HHMM
+            fax_name_layout.addWidget(self.cid_mmdd_hhmm_radio, 0, 1, Qt.AlignRight)
+            fax_name_layout.addWidget(cid_example, 1, 1, Qt.AlignRight)
+
+            # Add spacing to prevent squishing
+            fax_name_layout.setRowMinimumHeight(0, 25)
+            fax_name_layout.setRowMinimumHeight(1, 20)
 
             # Set layout before adding to parent
             self.fax_name_group.setLayout(fax_name_layout)
@@ -171,20 +200,21 @@ class OptionsDialog(QDialog):
 
             # Archive Faxes Checkbox
             self.archive_enabled_checkbox = QCheckBox("Archive Incoming Faxes")
+            self.archive_enabled_checkbox.setChecked(False)
             self.archive_enabled_checkbox.toggled.connect(self.toggle_archive_duration)
 
             # Archive Duration Dropdown
             self.archive_duration_label = QLabel("Archive Incoming Faxes For:")
             self.archive_duration_combo = QComboBox()
-            self.archive_duration_combo.addItems(["30 Days", "60 Days", "90 Days", "120 Days", "365 Days"])
-            self.archive_duration_combo.setEnabled(False)  # Initially disabled
+            self.archive_duration_combo.addItems(["30", "60", "90", "120", "365"])
+            self.archive_duration_combo.setCurrentText("30")
+            self.archive_duration_combo.setEnabled(False)
 
             # Add widgets to the layout
             archival_layout.addWidget(self.archive_enabled_checkbox)
-            # archival_layout.addWidget(self.archive_duration_label)
             archival_layout.addWidget(self.archive_duration_combo)
+            archival_layout.addWidget(QLabel("Days"))
             self.archival_group.setLayout(archival_layout)
-
             fax_retrieval_layout.addWidget(self.archival_group)
 
             # Delete Faxes Group
@@ -204,25 +234,180 @@ class OptionsDialog(QDialog):
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
 
-    # def setup_print_options_group(self, parent_layout):
-    #     try:
-    #         # Print Faxes Checkbox
-    #         self.print_faxes_checkbox = QCheckBox("Print Faxes")
-    #         self.print_faxes_checkbox.toggled.connect(self.toggle_print_options)
-    #
-    #         # Select Printer Button (Initially Hidden)
-    #         self.select_printer_button = QPushButton("Select Printer")
-    #         self.select_printer_button.clicked.connect(self.select_printer)
-    #         self.select_printer_button.setVisible(False)  # Start hidden
-    #
-    #         # Add to layout
-    #         parent_layout.addWidget(self.print_faxes_checkbox)
-    #         parent_layout.addWidget(self.select_printer_button)
-    #
-    #     except Exception as e:
-    #         self.log_system.log_message('error', f"Failed to set up print options group: {e}")
-    #         if self.main_window:
-    #             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+    def setup_integrations_group(self, parent_layout):
+        """Sets up the integrations section with software dropdown."""
+
+        # Master Enable Checkbox
+        self.enable_integrations_checkbox = QCheckBox("Enable 3rd Party Integrations")
+        self.enable_integrations_checkbox.toggled.connect(self.toggle_integrations_group)
+        parent_layout.addWidget(self.enable_integrations_checkbox)
+
+        # Software Selection Dropdown (Dynamically Updated)
+        self.software_group = QGroupBox("Select Software Integration")
+        software_layout = QVBoxLayout()
+
+        self.software_selector = QComboBox()
+        self.software_selector.addItems(["None"])  # Placeholder, will update dynamically
+        self.software_selector.currentIndexChanged.connect(self.handle_software_selection)
+
+        software_layout.addWidget(self.software_selector)
+        self.software_group.setLayout(software_layout)
+        parent_layout.addWidget(self.software_group)
+
+        # Locate Program Button (Hidden by default)
+        self.locate_program_button = QPushButton("Locate Program")
+        self.locate_program_button.clicked.connect(self.prompt_for_winrx_path)
+        self.locate_program_button.setVisible(False)
+        parent_layout.addWidget(self.locate_program_button)
+
+        # Initially hide software selectors
+        self.software_group.setVisible(False)
+
+    def toggle_integrations_group(self, checked):
+        """Show/hide integration settings based on master checkbox and display warning message."""
+        self.software_group.setVisible(checked)
+
+        if not checked:
+            self.software_selector.setCurrentIndex(0)
+
+        if checked:
+            acknowledgement_setting = self.save_manager.get_config_value('Integrations', 'acknowledgement')
+            if acknowledgement_setting != "True":
+                dialog = IntegrationAcknowledgement(self.save_manager, parent=self)
+                if dialog.exec_() == QDialog.Accepted:
+                    self.update_integration_visibility()
+            else:
+                self.update_integration_visibility()
+
+        self.resize_window(enforce_minimum=checked)
+
+    def update_integration_visibility(self):
+        enabled = self.enable_integrations_checkbox.isChecked()
+        self.software_selector.setVisible(enabled)
+        self.update_software_options()
+
+    def update_software_options(self):
+        """Populates the software integration dropdown with available options."""
+        self.software_selector.clear()
+
+        available_options = [
+            "None",
+            "Computer-Rx",
+            "PioneerRx",
+            "BestRx",
+            "QS/1",
+            "FrameworkLTC",
+            "Rx30",
+            "SRS Pharmacy Systems",
+            "Other"
+        ]
+
+        # Ensure only "None" and "Computer-Rx" are currently selectable
+        for option in available_options:
+            index = self.software_selector.count()
+            self.software_selector.addItem(option)
+            if option not in ["None", "Computer-Rx"]:
+                self.software_selector.model().item(index).setEnabled(False)  # Grayed-out, non-selectable
+
+        # Set default selection
+        self.software_selector.setCurrentText("None")
+
+    def handle_software_selection(self):
+        """Handles additional actions when a software selection is made."""
+        selected_software = self.software_selector.currentText()
+
+        # If the user selects "Computer-Rx", check for required Pervasive SQL files
+        if selected_software == "Computer-Rx":
+            pervasive_dll_path = r"C:\Program Files (x86)\Actian\PSQL\bin\wbtrv32.dll"
+
+            if not os.path.exists(pervasive_dll_path):
+                # Warn the user and reset selection to "None"
+                QMessageBox.critical(
+                    self, "Integration Unavailable",
+                    "Computer-Rx integration requires Pervasive to be installed.\n"
+                    "This installation is missing the required files.\n"
+                    "Please contact Computer-Rx for assistance."
+                )
+                self.software_selector.setCurrentText("None")
+                return  # Stop further execution
+
+        # Show the locate button only for Computer-Rx
+        self.locate_program_button.setVisible(selected_software == "Computer-Rx")
+        self.update_winrx_integration_button()
+
+    def prompt_for_winrx_path(self):
+        """Prompts the user to select the path to WinRx and validates its directory."""
+
+        # Inform user about what we are looking for
+        message = (
+            "To enable integration with Computer-Rx (WinRx), we need to locate its installation folder.\n\n"
+            "Look for 'WinRx.exe' in the main installation directory. Typically, this can be found in:\n"
+            "- H:\\Pharmacy\n"
+            "- D:\\ComputerRx\\Pharmacy\n"
+            "- E:\\Computer-Rx\\Pharmacy\n"
+            "- A mapped network drive (e.g., P:\\ or similar)\n"
+            "- Check your desktop for a WinRx shortcut\n\n"
+            "Once selected, we will verify that critical database files are present in the same folder."
+        )
+        QMessageBox.information(self, "Locate WinRx", message)
+
+        # Attempt to prefill common paths
+        common_paths = [
+            "H:\\Pharmacy",
+            "C:\\Pharmacy",
+            "I:\\System Setup\\Computer-Rx\\CrxNewNoImages\\Pharmacy"
+        ]
+
+        # Look for a desktop shortcut
+        desktop_path = QStandardPaths.writableLocation(QStandardPaths.DesktopLocation)
+        for file in os.listdir(desktop_path):
+            if file.lower().startswith("winrx") and file.lower().endswith(".lnk"):
+                shortcut_path = os.path.join(desktop_path, file)
+                target_path = shutil.readlink(shortcut_path)  # Extracts real path from shortcut
+                common_paths.insert(0, os.path.dirname(target_path))  # Prioritize the found shortcut
+
+        # Open file dialog with first found location as the default directory
+        initial_directory = common_paths[0] if os.path.exists(common_paths[0]) else ""
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getOpenFileName(self, "Select WinRx.exe", initial_directory, "Executables (*.exe)")
+
+        if not file_path:
+            return  # User canceled selection
+
+        # Extract directory from selected file
+        program_directory = os.path.dirname(file_path)
+
+        # Verify that FaxControl.btr exists in the same directory
+        fax_control_path = os.path.join(program_directory, "FaxControl.btr")
+
+        if os.path.exists(fax_control_path):
+            # **Save the FULL path in the config**
+            self.save_manager.config.set("Integrations", "winrx_path", program_directory)
+            self.save_manager.save_changes()
+
+            # **Set truncated version for display only**
+            self.locate_program_button.setText(self.truncate_path(program_directory))
+
+            QMessageBox.information(self, "Success",
+                                    "WinRx directory has been set successfully, and integration is ready.")
+        else:
+            QMessageBox.critical(self, "Error",
+                                 "Invalid directory: Critical files not found. Please try again or hit cancel to go back.")
+
+    def update_winrx_integration_button(self):
+        """Updates the Locate Program button text based on saved integration status."""
+        saved_path = self.save_manager.get_config_value("Integrations", "winrx_path")
+
+        if saved_path and saved_path != "Locate Program":
+            self.locate_program_button.setText(self.truncate_path(saved_path))  # Display truncated version
+        else:
+            self.locate_program_button.setText("Locate Program")  # Default label
+
+    def truncate_path(self, path, max_length=30):
+        """Truncates the middle of a file path if it exceeds max_length."""
+        if len(path) <= max_length:
+            return path
+        return f"{path[:15]}...{path[-15:]}"
 
     def toggle_print_options(self, checked):
         """
@@ -231,87 +416,12 @@ class OptionsDialog(QDialog):
         try:
             self.select_printer_button.setVisible(checked)  # Show if checked, hide if unchecked
 
+            self.resize_window(enforce_minimum=checked)
+
         except Exception as e:
             self.log_system.log_message('error', f"Failed to toggle print options: {e}")
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
-
-    # def setup_download_options_group(self, parent_layout):
-    #     try:
-    #         self.download_method_group = QGroupBox("Download Method")
-    #         self.download_method_button_group = QButtonGroup(self)
-    #         download_layout = QHBoxLayout()
-    #         self.pdf_radio = QRadioButton("PDF")
-    #         self.jpg_radio = QRadioButton("JPG")
-    #         self.both_radio = QRadioButton("Both")
-    #         self.download_method_button_group.addButton(self.pdf_radio)
-    #         self.download_method_button_group.addButton(self.jpg_radio)
-    #         self.download_method_button_group.addButton(self.both_radio)
-    #         download_layout.addWidget(self.pdf_radio)
-    #         download_layout.addWidget(self.jpg_radio)
-    #         download_layout.addWidget(self.both_radio)
-    #         self.download_method_group.setLayout(download_layout)
-    #         parent_layout.addWidget(self.download_method_group)
-    #     except Exception as e:
-    #         self.log_system.log_message('error', f"Failed to set up download method group: {e}")
-    #         if self.main_window:
-    #             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
-
-    # def setup_fax_naming_group(self, parent_layout):
-    #     try:
-    #         self.fax_naming_group = QGroupBox("Fax Naming")
-    #         self.fax_naming_button_group = QButtonGroup(self)
-    #         naming_layout = QHBoxLayout()
-    #         self.fax_id_radio = QRadioButton("Fax ID")
-    #         self.cid_mmdd_hhmm_radio = QRadioButton("CID-MMDD-HHMM")
-    #         naming_layout.addWidget(self.fax_id_radio)
-    #         naming_layout.addWidget(self.cid_mmdd_hhmm_radio)
-    #     except Exception as e:
-    #         self.log_system.log_message('error', f"Failed to set up fax naming group: {e}")
-    #         if self.main_window:
-    #             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
-
-
-    # def setup_delete_faxes_group(self, parent_layout):
-    #     try:
-    #         self.delete_faxes_group = QGroupBox("Delete Faxes After Download")
-    #         self.delete_faxes_button_group = QButtonGroup(self)
-    #         delete_layout = QHBoxLayout()
-    #         self.delete_yes_radio = QRadioButton("Yes")
-    #         self.delete_no_radio = QRadioButton("No")
-    #         self.delete_faxes_button_group.addButton(self.delete_yes_radio)
-    #         self.delete_faxes_button_group.addButton(self.delete_no_radio)
-    #         delete_layout.addWidget(self.delete_yes_radio)
-    #         delete_layout.addWidget(self.delete_no_radio)
-    #         self.delete_faxes_group.setLayout(delete_layout)
-    #         parent_layout.addWidget(self.delete_faxes_group)
-    #     except Exception as e:
-    #         self.log_system.log_message('error', f"Failed to set up delete faxes group: {e}")
-    #         if self.main_window:
-    #             self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
-
-    # def setup_archival_group(self, parent_layout):
-    #     """Set up the Fax Archival settings inside the Fax Retrieval group."""
-    #     self.archival_group = QGroupBox("Fax Archival Settings")
-    #     archival_layout = QVBoxLayout()
-    #
-    #     # Archive Faxes Checkbox
-    #     self.archive_enabled_checkbox = QCheckBox("Archive Incoming Faxes")
-    #     self.archive_enabled_checkbox.toggled.connect(self.toggle_archive_duration)
-    #
-    #     # Archive Duration Dropdown
-    #     self.archive_duration_label = QLabel("Archive Incoming Faxes For:")
-    #     self.archive_duration_combo = QComboBox()
-    #     self.archive_duration_combo.addItems(["30 Days", "60 Days", "90 Days", "120 Days", "365 Days"])
-    #     self.archive_duration_combo.setEnabled(False)  # Initially disabled
-    #
-    #     # Add widgets to the layout
-    #     archival_layout.addWidget(self.archive_enabled_checkbox)
-    #     archival_layout.addWidget(self.archive_duration_label)
-    #     archival_layout.addWidget(self.archive_duration_combo)
-    #     self.archival_group.setLayout(archival_layout)
-    #
-    #     parent_layout.addWidget(self.archival_group)
 
     def toggle_archive_duration(self, checked):
         """Enable or disable the archive duration dropdown based on checkbox state."""
@@ -417,12 +527,12 @@ class OptionsDialog(QDialog):
             self.fax_user_input.setText(self.save_manager.get_config_value('Account', 'fax_user'))
 
             # Set Retrieval Enabled/Disabled
-            retrieve_faxes = self.save_manager.get_config_value('Retrieval', 'auto_retrieve')
-            self.disable_fax_retrieval_checkbox.setChecked(retrieve_faxes == 'Disabled')
+            self.disable_fax_retrieval_checkbox.setChecked(
+                self.save_manager.get_config_value('Retrieval', 'auto_retrieve') == 'Disabled')
 
             # Set download method
-            download_method = self.save_manager.get_config_value('Fax Options', 'download_method')
-            self.download_method_combo.setCurrentText(download_method)  # Use combo box instead of radio buttons
+            self.download_method_combo.setCurrentText(
+                self.save_manager.get_config_value('Fax Options', 'download_method') or "PDF")
 
             # Set delete faxes option
             delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
@@ -451,18 +561,24 @@ class OptionsDialog(QDialog):
                 self.update_printer_button(printer_name)
 
             # Load Archive Enabled Setting
-            archive_enabled = self.save_manager.get_config_value('Fax Options', 'archive_enabled')
-            self.archive_enabled_checkbox.setChecked(archive_enabled == "Yes")
+            integration_state = self.save_manager.get_config_value('Integrations', 'enabled')
+            self.enable_integrations_checkbox.setChecked(integration_state == "Yes")
 
             # Load Archive Duration Setting
-            archive_duration = self.save_manager.get_config_value('Fax Options', 'archive_duration')
-            if archive_duration in ["30", "60", "90"]:
-                self.archive_duration_combo.setCurrentText(f"{archive_duration} Days")
-            else:
-                self.archive_duration_combo.setCurrentText("30 Days")  # Default if unset
+            self.archive_duration_combo.setCurrentText(
+                self.save_manager.get_config_value('Fax Options', 'archive_duration') or "30")
 
             # Ensure the dropdown state matches the checkbox
             self.archive_duration_combo.setEnabled(self.archive_enabled_checkbox.isChecked())
+
+            # Restore Integration Configuration and Settings
+            self.enable_integrations_checkbox.setChecked(
+                self.save_manager.get_config_value('Integrations', 'integration_enabled') == "Yes")
+
+            # Restore 3rd party Config if Enabled
+            self.software_selector.setCurrentText(self.save_manager.get_config_value('Integrations', 'integration_software')
+                                                  or self.software_selector.itemText(0) or "None")
+
 
             # Set Debug Level
             logging_level = self.save_manager.get_config_value('UserSettings', 'logging_level')
@@ -476,7 +592,7 @@ class OptionsDialog(QDialog):
 
     def toggle_retrieval_settings(self, checked):
         try:
-            # List of group boxes inside the Fax Retrieval section that should be hidden
+            """Show/hide fax retrieval settings while keeping the layout intact."""
             retrieval_groups = [
                 self.download_options_group,
                 self.fax_name_group,
@@ -486,11 +602,9 @@ class OptionsDialog(QDialog):
             ]
 
             for group in retrieval_groups:
-                group.setVisible(not checked)  # Hide or show the entire group box
+                group.setHidden(checked)  # Hide without removing layout space
 
-            self.adjustSize()  # Resize window dynamically
-            self.setMinimumHeight(self.layout.sizeHint().height())  # Force minimum height
-            self.setMaximumHeight(self.layout.sizeHint().height())  # Prevent unnecessary expansion
+            self.resize_window(enforce_minimum=checked)
 
         except Exception as e:
             self.log_system.log_message('error', f"Failed to toggle retrieval options: {e}")
@@ -522,9 +636,7 @@ class OptionsDialog(QDialog):
                     widget.setEnabled(False)
                     widget.setHidden(True)
 
-            self.adjustSize()  # Resize window dynamically
-            self.setMinimumHeight(self.layout.sizeHint().height())  # Force minimum height
-            self.setMaximumHeight(self.layout.sizeHint().height())  # Prevent unnecessary expansion
+            self.resize_window(enforce_minimum=checked)
 
         except Exception as e:
             self.log_system.log_message('error', f"Failed to toggle sensitive settings: {e}")
@@ -574,6 +686,13 @@ class OptionsDialog(QDialog):
 
             delete_faxes = "Yes" if self.delete_faxes_checkbox.isChecked() else "No"
 
+            # 3rd Party Integration Settings
+            integration_status = "Yes" if self.enable_integrations_checkbox.isChecked() else "No"
+            if self.enable_integrations_checkbox.isChecked():
+                integration_software = self.software_selector.currentText()
+            else:
+                integration_software = "None"
+
             # Logging level
             log_level = self.logging_level_combo.currentText() if hasattr(self, 'logging_level_combo') else "Info"
 
@@ -598,7 +717,9 @@ class OptionsDialog(QDialog):
                                 'printer_full_name': printer_full_name, 'archive_enabled': archive_enabled,
                                 'archive_duration': archive_duration, 'file_name_format': file_name_format},
                 'UserSettings': {'logging_level': log_level},
-                'Retrieval': {'auto_retrieve': 'Disabled' if retrieval_disabled else 'Enabled'}
+                'Retrieval': {'auto_retrieve': 'Disabled' if retrieval_disabled else 'Enabled'},
+                'Integrations': {'integration_enabled': integration_status,
+                                 'integration_software': integration_software}
             }
 
             for section, options in settings_to_save.items():
@@ -609,13 +730,15 @@ class OptionsDialog(QDialog):
                         self.save_manager.config.set(section, option, value)
 
             try:
-                self.retrieve_token.retrieve_token()
                 self.save_manager.save_changes()
                 self.save_manager.read_encrypted_ini()  # Reload configuration after saving
                 QMessageBox.information(self, "Settings Updated", "Settings have been updated successfully.")
                 self.edit_sensitive_checkbox.setChecked(False)
                 if self.main_window:
                     self.main_window.update_status_bar("Settings saved successfully.", 5000)
+                self.retrieve_token.retrieve_token()
+                if self.main_window:
+                    self.main_window.update_status_bar("Logging in...", 5000)
                 self.main_window.reload_ui()
                 self.fax_timer_progress_bar.restart_progress()
             except Exception as e:
@@ -632,6 +755,18 @@ class OptionsDialog(QDialog):
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
             QMessageBox.critical(self, "Error", "Failed to save settings: " + str(e))
 
+    def resize_window(self, enforce_minimum=True):
+        """Dynamically adjusts the window size while preventing unexpected collapses or excessive expansion."""
+        self.adjustSize()
+        self.setMinimumWidth(700)  # Ensure proper width for all elements to be visible
+        # self.setMinimumHeight(500)  # Ensure sufficient height for elements like radio buttons
+
+        if enforce_minimum:
+            self.setMinimumHeight(self.layout.sizeHint().height())
+            self.setMaximumHeight(self.layout.sizeHint().height())
+        else:
+            # self.setMinimumHeight(500)
+            self.setMaximumHeight(1000)
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
