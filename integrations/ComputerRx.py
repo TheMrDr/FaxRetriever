@@ -18,11 +18,13 @@ class CRxIntegration(QThread):
         self.save_manager = SaveManager(self.main_window)
         self.log_system = SystemLog()
         self.dll_path = "C:\\Program Files (x86)\\Actian\\PSQL\\bin\\wbtrv32.dll"
+        self.dll_path2 = "C:\\Program Files (x86)\\Pervasive Software\\PSQL\\bin\\wbtrv32.dll"
         self.failed_faxes = {}
 
         # Check if integration is enabled before proceeding
         integration_enabled = self.save_manager.get_config_value('Integrations', 'integration_enabled')
-        if integration_enabled.lower() != "yes":
+        crx_integration_enabled = self.save_manager.get_config_value('Integrations', 'integration_software')
+        if integration_enabled.lower() != "yes" or crx_integration_enabled != "Computer-Rx":
             self.log_system.log_message('info', "Computer-Rx integration is disabled. Skipping initialization.")
             return
 
@@ -50,17 +52,21 @@ class CRxIntegration(QThread):
             return
 
         self.btrieve_file = faxcontrol_path.encode()
-        self.fax_directory = os.path.join(winrx_path, "Fax")
+        self.fax_directory = winrx_path
 
-        if not os.path.exists(self.dll_path):
-            self.log_system.log_message('error', f"Btrieve DLL not found at {self.dll_path}")
+        # Check if either DLL path exists
+        if not os.path.exists(self.dll_path) and not os.path.exists(self.dll_path2):
+            self.log_system.log_message('error', f"Btrieve DLL not found at {self.dll_path} or {self.dll_path2}")
             QMessageBox.critical(self.main_window, "Critical Error",
                                  "Btrieve DLL not found. Ensure Actian PSQL is installed correctly.")
             return
 
+        # Use whichever DLL path is found
+        dll_to_load = self.dll_path if os.path.exists(self.dll_path) else self.dll_path2
+
         try:
-            self.btrieve = ctypes.WinDLL(self.dll_path)
-            self.log_system.log_message('info', "Successfully loaded Btrieve DLL.")
+            self.btrieve = ctypes.WinDLL(dll_to_load)
+            self.log_system.log_message('info', f"Successfully loaded Btrieve DLL from {dll_to_load}.")
         except OSError as e:
             self.log_system.log_message('error', f"Failed to load Btrieve DLL: {e}")
             QMessageBox.critical(self.main_window, "Critical Error", f"Failed to load Btrieve DLL: {e}")
@@ -105,7 +111,7 @@ class CRxIntegration(QThread):
             raw_data = self.DATA_BUFFER.raw[:data_length.value]
             record_id = int.from_bytes(raw_data[0:4], 'little')
             phone_number = raw_data[4:18].decode('ascii', errors='ignore').strip()
-            file_name = raw_data[28:80].decode('ascii', errors='ignore').strip()
+            file_name = raw_data[27:80].decode('ascii', errors='ignore').strip()
             full_file_path = os.path.join(self.fax_directory, file_name)
 
             if not phone_number or not file_name:

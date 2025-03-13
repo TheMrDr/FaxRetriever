@@ -5,6 +5,13 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdi
 from PyQt5.QtGui import QIcon, QFont, QRegExpValidator
 from PyQt5.QtCore import Qt, QRegExp
 
+import sys, os
+
+# Determine if running as a bundled executable
+if hasattr(sys, '_MEIPASS'):
+    bundle_dir = sys._MEIPASS
+else:
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
 class AddressBookManager:
     def __init__(self, filename="address_book.json"):
@@ -101,14 +108,14 @@ class AddressBookDialog(QDialog):
             action_layout.setSpacing(4)
 
             select_button = QPushButton()
-            select_button.setIcon(QIcon(os.path.join("images", "CheckMark.png")))
-            select_button.setFixedSize(35, 35)
+            select_button.setIcon(QIcon(os.path.join(bundle_dir, "images", "CheckMark.png")))
+            # select_button.setFixedSize(35, 35)
             select_button.setToolTip("Select Contact")
             select_button.clicked.connect(lambda _, r=row: self.select_contact(r))
 
             delete_button = QPushButton()
-            delete_button.setIcon(QIcon(os.path.join("images", "TrashCan.png")))
-            delete_button.setFixedSize(35, 35)
+            delete_button.setIcon(QIcon(os.path.join(bundle_dir, "images", "TrashCan.png")))
+            # delete_button.setFixedSize(35, 35)
             delete_button.setToolTip("Delete Contact")
             delete_button.clicked.connect(lambda _, r=row: self.delete_contact(r))
 

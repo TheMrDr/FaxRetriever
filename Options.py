@@ -39,7 +39,7 @@ class OptionsDialog(QDialog):
 
             self.setWindowTitle("Options")
             self.setFixedWidth(700)
-            self.setMinimumHeight(800)
+            # self.setMinimumHeight(800)
 
             self.layout = QGridLayout()
             self.setup_ui()
@@ -293,13 +293,9 @@ class OptionsDialog(QDialog):
         available_options = [
             "None",
             "Computer-Rx",
-            "PioneerRx",
-            "BestRx",
-            "QS/1",
-            "FrameworkLTC",
+            "PharmacyOne",
             "Rx30",
-            "SRS Pharmacy Systems",
-            "Other"
+            "Ask us for more!"
         ]
 
         # Ensure only "None" and "Computer-Rx" are currently selectable
@@ -319,8 +315,9 @@ class OptionsDialog(QDialog):
         # If the user selects "Computer-Rx", check for required Pervasive SQL files
         if selected_software == "Computer-Rx":
             pervasive_dll_path = r"C:\Program Files (x86)\Actian\PSQL\bin\wbtrv32.dll"
+            pervasive10_dll_path = r"C:\Program Files (x86)\Pervasive Software\PSQL\bin\wbtrv32.dll"
 
-            if not os.path.exists(pervasive_dll_path):
+            if not os.path.exists(pervasive_dll_path) and not os.path.exists(pervasive10_dll_path):
                 # Warn the user and reset selection to "None"
                 QMessageBox.critical(
                     self, "Integration Unavailable",
@@ -345,48 +342,73 @@ class OptionsDialog(QDialog):
             "- H:\\Pharmacy\n"
             "- D:\\ComputerRx\\Pharmacy\n"
             "- E:\\Computer-Rx\\Pharmacy\n"
-            "- A mapped network drive (e.g., P:\\ or similar)\n"
+            "- A mapped network drive (e.g., H:\\ or similar)\n"
             "- Check your desktop for a WinRx shortcut\n\n"
             "Once selected, we will verify that critical database files are present in the same folder."
         )
         QMessageBox.information(self, "Locate WinRx", message)
 
-        # Attempt to prefill common paths
+        # Search for WinRx.exe in common paths
         common_paths = [
             "H:\\Pharmacy",
             "C:\\Pharmacy",
-            "I:\\System Setup\\Computer-Rx\\CrxNewNoImages\\Pharmacy"
+            "D:\\Computer-Rx\\Pharmacy",
+            "D:\\ComputerRx\\Pharmacy",
+            "E:\\Computer-Rx\\Pharmacy",
         ]
 
-        # Look for a desktop shortcut
+        valid_paths = []
+
+        for path in common_paths:
+            winrx_exe = os.path.join(path, "WinRx.exe")
+            if os.path.exists(winrx_exe):
+                valid_paths.append(path)
+
+        # Detect desktop shortcuts pointing to WinRx.exe
         desktop_path = QStandardPaths.writableLocation(QStandardPaths.DesktopLocation)
         for file in os.listdir(desktop_path):
             if file.lower().startswith("winrx") and file.lower().endswith(".lnk"):
                 shortcut_path = os.path.join(desktop_path, file)
-                target_path = shutil.readlink(shortcut_path)  # Extracts real path from shortcut
-                common_paths.insert(0, os.path.dirname(target_path))  # Prioritize the found shortcut
+                try:
+                    target_path = shutil.readlink(shortcut_path)  # Extracts real path from shortcut
+                    if os.path.exists(os.path.join(target_path, "WinRx.exe")):
+                        valid_paths.insert(0, target_path)  # Prioritize the found shortcut
+                except Exception as e:
+                    self.log_system.log_message('error', f"Failed to read shortcut: {e}")
 
-        # Open file dialog with first found location as the default directory
-        initial_directory = common_paths[0] if os.path.exists(common_paths[0]) else ""
-        file_dialog = QFileDialog()
-        file_path, _ = file_dialog.getOpenFileName(self, "Select WinRx.exe", initial_directory, "Executables (*.exe)")
+        # If multiple valid paths exist, prompt the user to choose one
+        if len(valid_paths) > 1:
+            selected_path, ok = QInputDialog.getItem(self, "Select WinRx Path",
+                                                     "Multiple valid installations detected. Please select the correct one:",
+                                                     valid_paths, 0, False)
+            if not ok:
+                return  # User canceled selection
+        elif valid_paths:
+            selected_path = valid_paths[0]
+        else:
+            selected_path = ""
 
-        if not file_path:
-            return  # User canceled selection
+        # If no valid paths were found, allow manual selection
+        if not selected_path:
+            file_dialog = QFileDialog()
+            file_path, _ = file_dialog.getOpenFileName(self, "Select WinRx.exe", "", "WinRx Executable (WinRx.exe)")
+            if not file_path or not file_path.lower().endswith("winrx.exe"):
+                QMessageBox.critical(self, "Invalid Selection", "You must select WinRx.exe.")
+                return  # User canceled or selected the wrong file
 
-        # Extract directory from selected file
-        program_directory = os.path.dirname(file_path)
+            # Extract directory from selected file
+            selected_path = os.path.dirname(file_path)
 
         # Verify that FaxControl.btr exists in the same directory
-        fax_control_path = os.path.join(program_directory, "FaxControl.btr")
+        fax_control_path = os.path.join(selected_path, "FaxControl.btr")
 
         if os.path.exists(fax_control_path):
             # **Save the FULL path in the config**
-            self.save_manager.config.set("Integrations", "winrx_path", program_directory)
+            self.save_manager.config.set("Integrations", "winrx_path", selected_path)
             self.save_manager.save_changes()
 
             # **Set truncated version for display only**
-            self.locate_program_button.setText(self.truncate_path(program_directory))
+            self.locate_program_button.setText(self.truncate_path(selected_path))
 
             QMessageBox.information(self, "Success",
                                     "WinRx directory has been set successfully, and integration is ready.")
@@ -534,15 +556,6 @@ class OptionsDialog(QDialog):
             self.download_method_combo.setCurrentText(
                 self.save_manager.get_config_value('Fax Options', 'download_method') or "PDF")
 
-            # Set delete faxes option
-            delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
-            self.delete_faxes_checkbox.setChecked(delete_faxes == 'Yes')
-
-            # Set print faxes option
-            print_faxes = self.save_manager.get_config_value('Fax Options', 'print_faxes') == 'Yes'
-            self.print_faxes_checkbox.setChecked(print_faxes)  # Ensure state is properly restored
-            self.toggle_print_options(print_faxes)  # Apply UI update immediately
-
             # Set File Name Format
             file_name_format = self.save_manager.get_config_value('Fax Options', 'file_name_format')
 
@@ -554,15 +567,23 @@ class OptionsDialog(QDialog):
             self.fax_id_radio.setChecked(file_name_format == 'Fax ID')
             self.cid_mmdd_hhmm_radio.setChecked(file_name_format == 'cid-mmdd-hhmm')
 
+            # Set print faxes option
+            print_faxes = self.save_manager.get_config_value('Fax Options', 'print_faxes')
+            self.print_faxes_checkbox.setChecked(print_faxes == 'Yes')  # Ensure state is properly restored
+            self.toggle_print_options(print_faxes)  # Apply UI update immediately
+
             # Restore selected printer
             if print_faxes:
                 printer_name = self.save_manager.get_config_value('Fax Options', 'printer_name')
                 self.selected_printer_full_name = self.save_manager.get_config_value('Fax Options', 'printer_full_name')
                 self.update_printer_button(printer_name)
+            # Set delete faxes option
+            delete_faxes = self.save_manager.get_config_value('Fax Options', 'delete_faxes')
+            self.delete_faxes_checkbox.setChecked(delete_faxes == 'Yes')
 
             # Load Archive Enabled Setting
-            integration_state = self.save_manager.get_config_value('Integrations', 'enabled')
-            self.enable_integrations_checkbox.setChecked(integration_state == "Yes")
+            archival_status = self.save_manager.get_config_value('Fax Options', 'archive_enabled')
+            self.archive_enabled_checkbox.setChecked(archival_status == "Yes")
 
             # Load Archive Duration Setting
             self.archive_duration_combo.setCurrentText(

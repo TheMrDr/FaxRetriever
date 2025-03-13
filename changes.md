@@ -1,3 +1,28 @@
+# 🚀 FaxRetriever Update - Version 1.17.01  
+*Released: 03/13/2025*  
+
+## 🛠️ **Bug Fixes & Improvements**  
+- **Fixed UI Icon Issues**:  
+  - Address Book button icons now properly load.  
+  - All custom popup windows now correctly display their icons.  
+
+- **Enhanced Computer-Rx Integration**:  
+  - Added support for **Pervasive v10**.  
+  - When multiple pharmacy paths are detected, the user is prompted to select the correct one.  
+  - Validation is performed to ensure all required files exist.  
+
+- **Options Menu Fixes**:  
+  - Resolved an issue where **Print Faxes** was incorrectly enabled when **Archive Faxes** was selected.  
+
+- **Improved Fax Retrieval & Archival**:  
+  - Prevents re-downloading already archived faxes.  
+  - Enhanced logic to check both **Archive** and **Destination folders** before downloading.  
+  - Faxes are now archived under `C:\Clinic Networking, LLC\FaxRetriever\Archive` in a structured **Year → Month → Day → Hour** format.  
+
+- ✅ **Code Cleanup & Stability Enhancements**  
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.17.00  
 *Released: 03/08/2025*  
 

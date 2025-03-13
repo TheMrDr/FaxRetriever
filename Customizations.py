@@ -1,5 +1,7 @@
 import os
+import sys
 
+from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QTextCursor, QIcon
 from PyQt5.QtWidgets import (QPushButton, QDialog, QListView, QDialogButtonBox, QProgressBar, QMessageBox, QVBoxLayout,
@@ -7,6 +9,12 @@ from PyQt5.QtWidgets import (QPushButton, QDialog, QListView, QDialogButtonBox, 
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
+
+# Determine if running as a bundled executable
+if hasattr(sys, '_MEIPASS'):
+    bundle_dir = sys._MEIPASS
+else:
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))  # Default to script directory
 
 
 class CustomPushButton(QPushButton):
@@ -213,7 +221,7 @@ class LogViewer(QDialog):
         super().__init__()
         self.setWindowTitle("Log Viewer")
         self.setGeometry(100, 100, 800, 500)
-        # self.setWindowIcon(QtGui.QIcon(os.path.join(os.getcwd(), "images", "logo.ico")))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(bundle_dir, "images", "logo.ico")))
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)  # Remove help button
 
         layout = QVBoxLayout()
@@ -266,7 +274,7 @@ class IntegrationAcknowledgement(QDialog):
 
         # Set icon
         icon_label = QLabel()
-        icon_label.setPixmap(QIcon(os.path.join("images", "logo.png")).pixmap(48, 48))
+        icon_label.setPixmap(QIcon(os.path.join(bundle_dir, "images", "logo.png")).pixmap(48, 48))
         icon_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(icon_label)
 

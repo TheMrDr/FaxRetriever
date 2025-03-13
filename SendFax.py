@@ -24,7 +24,6 @@ from SystemLog import SystemLog
 
 Image.MAX_IMAGE_PIXELS = None
 
-
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):
     bundle_dir = sys._MEIPASS
@@ -133,14 +132,16 @@ class UIManager(QDialog):
             self.last_four_input.setMaxLength(4)
 
             self.add_contact_button = QPushButton()
-            self.add_contact_button.setIcon(QtGui.QIcon(os.path.join("images", "AddContact.png")))
+            add_contact_icon_path = os.path.join(bundle_dir, "images", "AddContact.png")
+            self.add_contact_button.setIcon(QtGui.QIcon(add_contact_icon_path))
             self.add_contact_button.setIconSize(QtCore.QSize(30, 30))  # Scale icon inside the button
             self.add_contact_button.setFixedSize(40, 40)  # Ensures button is square
             self.add_contact_button.setToolTip("Add Contact")
             self.add_contact_button.clicked.connect(self.open_add_contact_dialog)
 
             self.address_book_button = QPushButton()
-            self.address_book_button.setIcon(QtGui.QIcon(os.path.join("images", "AddressBook.png")))
+            address_book_icon_path = os.path.join(bundle_dir, "images", "AddressBook.png")
+            self.address_book_button.setIcon(QtGui.QIcon(address_book_icon_path))
             self.address_book_button.setIconSize(QtCore.QSize(30, 30))
             self.address_book_button.setFixedSize(40, 40)
             self.address_book_button.setToolTip("Address Book")

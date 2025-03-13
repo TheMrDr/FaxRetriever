@@ -87,14 +87,6 @@ class RetrieveFaxes(QThread):
             if response.status_code == 200:
                 faxes_response = response.json()
 
-                # # Dump JSON response to a file
-                # app_dir = os.path.dirname(os.path.abspath(__file__))
-                # json_dump_path = os.path.join(app_dir, 'fax_dump.json')
-                # with open(json_dump_path, "w", encoding="utf-8") as json_file:
-                #     json.dump(faxes_response, json_file, indent=4)
-                #
-                # self.log_system.log_message('info', f"Fax response saved to {json_dump_path}")
-
                 if 'data' in faxes_response:
                     faxes = faxes_response['data']
                     self.download_fax_pdfs(faxes)
@@ -167,15 +159,38 @@ class RetrieveFaxes(QThread):
                     pdf_path = os.path.join(self.save_path, file_name)
                     jpg_prefix = os.path.join(self.save_path, file_name.replace(".pdf", ""))
 
-                    # Check if fax already exists
+                    # **Determine Archive Path (Year > Month > Day > Hour)**
+                    dt_utc = datetime.strptime(timestamp,
+                                               "%Y-%m-%dT%H:%M:%S.%fZ") if '.' in timestamp else datetime.strptime(
+                        timestamp, "%Y-%m-%dT%H:%M:%SZ")
+                    archive_dir = os.path.join(
+                        self.archive_path,
+                        dt_utc.strftime("%Y"),  # Year (2025)
+                        dt_utc.strftime("%m"),  # Month (03)
+                        dt_utc.strftime("%d"),  # Day (12)
+                        dt_utc.strftime("%H")  # Hour (23)
+                    )
+                    archive_pdf_path = os.path.join(archive_dir, file_name)
+                    archive_jpg_prefix = os.path.join(archive_dir, file_name.replace(".pdf", ""))
+
+                    # **Check if fax already exists in the save directory OR archive**
                     standard_file_path = os.path.join(self.save_path, standard_file_name)
                     custom_file_path = os.path.join(self.save_path, custom_file_name)
                     jpg_files = [f for f in os.listdir(self.save_path) if
                                  f.startswith(jpg_prefix) and f.endswith(".jpg")]
 
-                    if os.path.exists(standard_file_path) or os.path.exists(custom_file_path) or (
-                            self.download_type in ["JPG", "Both"] and jpg_files):
-                        self.log_system.log_message('info', f"Skipping fax ID {fax_id}, already downloaded")
+                    archive_jpg_files = []
+                    if os.path.exists(archive_dir):  # Check archive only if the directory exists
+                        archive_jpg_files = [f for f in os.listdir(archive_dir) if
+                                             f.startswith(archive_jpg_prefix) and f.endswith(".jpg")]
+
+                    if (
+                            os.path.exists(standard_file_path) or
+                            os.path.exists(custom_file_path) or
+                            os.path.exists(archive_pdf_path) or
+                            (self.download_type in ["JPG", "Both"] and (jpg_files or archive_jpg_files))
+                    ):
+                        self.log_system.log_message('info', f"Skipping fax ID {fax_id}, already downloaded or archived")
                         continue
 
                     all_faxes_downloaded = False
@@ -206,6 +221,10 @@ class RetrieveFaxes(QThread):
                             if self.main_window:
                                 self.main_window.update_status_bar(f"Conversion complete for {file_name}", 5000)
 
+                            # **Archive fax if enabled**
+                            if self.archive_enabled:
+                                self.archive_fax(pdf_path, file_name, fax['created_at'])
+
                             # Remove original PDF if JPG is the only format
                             if self.download_type == "JPG":
                                 os.remove(pdf_path)
@@ -213,10 +232,6 @@ class RetrieveFaxes(QThread):
                         # **Print fax if enabled**
                         if self.print_faxes:
                             self.print_fax(pdf_path)
-
-                        # **Archive fax if enabled**
-                        if self.archive_enabled:
-                            self.archive_fax(pdf_path, file_name, fax['created_at'])
 
                         # Optionally delete the fax record after processing
                         if self.delete_fax_option == 'Yes':
@@ -250,36 +265,29 @@ class RetrieveFaxes(QThread):
             self.log_system.log_message('error', f"Exception in download_fax_pdfs: {str(e)}")
             self.finished.emit([])
 
-
     def archive_fax(self, file_path, file_name, sent_timestamp):
         """Copy the downloaded fax to the archive folder based on when the fax was originally sent."""
         try:
-            # **Get a valid local timezone name**
-            local_zone_name = get_localzone_name()  # Fetch system’s timezone as a string
+            # **Extract Year, Month, Day, and Hour from sent_timestamp (Already in UTC)**
             try:
-                local_zone = pytz.timezone(local_zone_name)  # Convert to pytz timezone object
-            except pytz.UnknownTimeZoneError:
-                self.log_system.log_message('error',
-                                            f"Invalid timezone detected: {local_zone_name}. Using UTC instead.")
-                local_zone = pytz.utc  # Fallback to UTC
-
-            # **Convert UTC timestamp to local time**
-            try:
-                utc_zone = pytz.utc
                 if '.' in sent_timestamp:
-                    dt_utc = datetime.datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                    timestamp = datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
                 else:
-                    dt_utc = datetime.datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%SZ")
+                    timestamp = datetime.strptime(sent_timestamp, "%Y-%m-%dT%H:%M:%SZ")
 
-                dt_utc = dt_utc.replace(tzinfo=utc_zone)
-                dt_local = dt_utc.astimezone(local_zone)  # Convert UTC → Local time
-            except Exception as e:
-                self.log_system.log_message('error',
-                                            f"Failed to parse sent timestamp for archiving: {sent_timestamp} - {str(e)}")
-                dt_local = datetime.datetime.now()  # Fall back to current time if parsing fails
+            except ValueError as e:
+                self.log_system.log_message('error', f"Invalid sent timestamp format: {timestamp} - {str(e)}")
+                return  # If timestamp parsing fails, do not archive the fax.
 
-            # **Organize by sent date & hour instead of retrieval time**
-            archive_dir = os.path.join(self.archive_path, dt_local.strftime("%Y-%m-%d"), dt_local.strftime("%H"))
+            # **Organize by sent date & hour in descending order (Year > Month > Day > Hour)**
+            archive_dir = os.path.join(
+                self.archive_path,
+                timestamp.strftime("%Y"),
+                timestamp.strftime("%m"),
+                timestamp.strftime("%d"),
+                timestamp.strftime("%H")
+            )
+
             os.makedirs(archive_dir, exist_ok=True)  # Ensure archive directory exists
             archive_path = os.path.join(archive_dir, file_name)
 
