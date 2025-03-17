@@ -182,7 +182,8 @@ class OptionsDialog(QDialog):
             print_options_layout = QHBoxLayout()
 
             self.print_faxes_checkbox = QCheckBox("Print Faxes")
-            self.print_faxes_checkbox.toggled.connect(self.toggle_print_options)
+            self.print_faxes_checkbox.toggled.connect(
+                lambda checked: self.toggle_print_options('Yes' if checked else 'No'))
 
             self.select_printer_button = QPushButton("Select Printer")
             self.select_printer_button.clicked.connect(self.select_printer)
@@ -436,9 +437,9 @@ class OptionsDialog(QDialog):
         Show or hide the "Select Printer" button based on the checkbox state.
         """
         try:
-            self.select_printer_button.setVisible(checked)  # Show if checked, hide if unchecked
-
-            self.resize_window(enforce_minimum=checked)
+            is_checked = checked == 'Yes'  # Convert string to boolean
+            self.select_printer_button.setVisible(is_checked)  # Show if checked, hide if unchecked
+            self.resize_window(enforce_minimum=is_checked)  # Ensure correct type
 
         except Exception as e:
             self.log_system.log_message('error', f"Failed to toggle print options: {e}")

@@ -1,3 +1,16 @@
+# 🚀 FaxRetriever Update - Version 1.18.00  
+*Released: 03/17/2025*  
+
+## 🎉 **Official Support for Computer-Rx/WinRx Integration!**  
+- When **integration is enabled** from **System Settings**, FaxRetriever will **automatically poll WinRx** for any prescription refills and send them **without user intervention**.  
+- This means **fully automated fax processing** for prescription refills—no manual input needed!  
+
+## 🛠️ **Bug Fixes & Minor Improvements**  
+- **Options Menu Fix**:  
+  - **Print Faxes** setting now properly retains its checked state when the app is restarted.  
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.17.01  
 *Released: 03/13/2025*  
 

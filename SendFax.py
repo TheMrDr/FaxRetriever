@@ -532,18 +532,18 @@ class DocumentPreviewWidget(QGraphicsView):
 
 
 class FaxSender:
-    def __init__(self, ui_manager, document_manager, encryption_manager):
+    def __init__(self, ui_manager, document_manager, save_manager):
         try:
             self.ui_manager = ui_manager
             self.document_manager = document_manager
-            self.encryption_manager = encryption_manager
+            self.save_manager = save_manager
         except Exception as e:
             print(f"Initialization error: {e}")
 
     def send_fax(self):
         try:
-            fax_user = self.encryption_manager.get_config_value('Account', 'fax_user')
-            token = self.encryption_manager.get_config_value('Token', 'access_token')
+            fax_user = self.save_manager.get_config_value('Account', 'fax_user')
+            token = self.save_manager.get_config_value('Token', 'access_token')
             caller_id = self.ui_manager.caller_id_combo.currentText().strip()
             destination = ('1' + self.ui_manager.area_code_input.text() +
                            self.ui_manager.first_three_input.text() +
@@ -848,10 +848,10 @@ class SendFax(UIManager):
     def __init__(self, main_window=None, parent=None):
         try:
             super().__init__(main_window, parent)
-            self.encryption_manager = SaveManager(self.main_window)
+            self.save_manager = SaveManager(self.main_window)
             self.log_system = SystemLog()
             self.document_manager = DocumentManager(self)
-            self.fax_sender = FaxSender(self, self.document_manager, self.encryption_manager)
+            self.fax_sender = FaxSender(self, self.document_manager, self.save_manager)
             self.scanner_manager = ScannerManager(self, self.document_manager)
             self.setup_connections()
             self.populate_caller_id_combo_box()
@@ -895,7 +895,7 @@ class SendFax(UIManager):
     def populate_caller_id_combo_box(self):
         try:
             # Retrieve all fax numbers stored in the configuration
-            all_fax_numbers = self.encryption_manager.get_config_value('Account', 'all_numbers')
+            all_fax_numbers = self.save_manager.get_config_value('Account', 'all_numbers')
 
             if all_fax_numbers:
                 # Split the stored string by commas to get individual numbers
