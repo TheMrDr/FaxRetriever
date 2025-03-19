@@ -3,6 +3,7 @@ import shutil
 import sys
 import tempfile
 import threading
+import time
 
 import pyinsane2
 from reportlab.lib.pagesizes import letter
@@ -46,6 +47,12 @@ class UIManager(QDialog):
             self.address_book_manager = AddressBookManager()
             self.setup_ui()
             self.current_page_index = 0
+
+            self.caller_id_combo = QComboBox()
+
+            self.add_contact_button = QPushButton()
+            self.address_book_button = QPushButton()
+
 
             self.caller_id_label.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
             self.caller_id_combo.setFont(QtGui.QFont("Arial", 12))
@@ -111,7 +118,6 @@ class UIManager(QDialog):
     def setup_caller_id_section(self, layout):
         try:
             self.caller_id_label = QLabel("Faxing From:")
-            self.caller_id_combo = QComboBox()
             layout.addWidget(self.caller_id_label)
             layout.addWidget(self.caller_id_combo)
         except Exception as e:
@@ -131,7 +137,6 @@ class UIManager(QDialog):
             self.last_four_input = QLineEdit()
             self.last_four_input.setMaxLength(4)
 
-            self.add_contact_button = QPushButton()
             add_contact_icon_path = os.path.join(bundle_dir, "images", "AddContact.png")
             self.add_contact_button.setIcon(QtGui.QIcon(add_contact_icon_path))
             self.add_contact_button.setIconSize(QtCore.QSize(30, 30))  # Scale icon inside the button
@@ -139,7 +144,6 @@ class UIManager(QDialog):
             self.add_contact_button.setToolTip("Add Contact")
             self.add_contact_button.clicked.connect(self.open_add_contact_dialog)
 
-            self.address_book_button = QPushButton()
             address_book_icon_path = os.path.join(bundle_dir, "images", "AddressBook.png")
             self.address_book_button.setIcon(QtGui.QIcon(address_book_icon_path))
             self.address_book_button.setIconSize(QtCore.QSize(30, 30))
@@ -346,7 +350,7 @@ class DocumentManager:
                 if self.documents_paths:
                     self.update_document_image(self.documents_paths[0])
                 else:
-                    self.ui_manager.document_image_label.clear()
+                    self.ui_manager.document_preview.clear()
         except Exception as e:
             print(f"Remove document error: {e}")
 
@@ -364,9 +368,12 @@ class DocumentManager:
         try:
             if filepath:
                 # Reload the (possibly converted) PDF for preview.
-                self.update_image_label(filepath, self.ui_manager.document_image_label)
+                self.update_image_label(filepath, self.ui_manager.document_preview)
             else:
-                self.ui_manager.document_image_label.clear()
+                if hasattr(self.ui_manager.document_preview, "scene"):
+                    self.ui_manager.document_preview.scene.clear()
+                else:
+                    self.ui_manager.document_preview.clear()
         except Exception as e:
             print(f"Update document image error: {e}")
 
@@ -511,7 +518,7 @@ class DocumentPreviewWidget(QGraphicsView):
         # When the mouse enters, zoom in by applying a hover zoom factor.
         if self.pixmap_item:
             # Save the fitted transformation before zooming
-            current_transform = self.transform()
+            # current_transform = self.transform()
             # Apply an extra zoom on top of the fitted view.
             self.setTransform(QTransform().scale(self._hover_zoom, self._hover_zoom))
         super().enterEvent(event)
@@ -577,6 +584,15 @@ class FaxSender:
                 response = requests.post(url, files=files, data=data, headers=headers)
                 if response.status_code == 200:
                     QMessageBox.information(self.ui_manager, "Fax Sent", "Your fax has been queued successfully.")
+                    self.ui_manager.clear_document_list()
+
+                    # Clear destination number fields
+                    self.ui_manager.area_code_input.clear()
+                    self.ui_manager.first_three_input.clear()
+                    self.ui_manager.last_four_input.clear()
+
+                    # Explicitly reset the preview image before closing
+                    self.ui_manager.pixmap_item = None
                     self.ui_manager.accept()
                 else:
                     QMessageBox.critical(self.ui_manager, "Sending Failed", f"Failed to send fax: {response.text}")
@@ -675,37 +691,49 @@ class ScannerManager(QObject):
 
     def _init_scanner(self):
         try:
-            pyinsane2.init()  # Try initializing WIA first
+            print("Initializing scanner detection...")
 
+            pyinsane2.init()
             devices = pyinsane2.get_devices()
-            if devices:
-                print(f"Found {len(devices)} WIA scanner(s).")
-                return  # Exit if WIA is working
 
-            # If no WIA scanners are found, reinitialize for TWAIN
-            print("No WIA devices found, switching to TWAIN mode...")
-            pyinsane2.exit()  # Shut down WIA
-            pyinsane2.init(driver="twain")  # Reinitialize for TWAIN
+            if not devices:
+                print("No scanners detected. Checking again after power-on...")
+                self.show_message.emit(
+                    "No Scanner Found",
+                    "No scanners were detected. Ensure your scanner is powered on and properly connected.",
+                    QMessageBox.Warning
+                )
+                return
 
-            devices = pyinsane2.get_devices()
-            if devices:
-                print(f"Found {len(devices)} TWAIN scanner(s).")
-                return  # Exit if TWAIN is working
+            # Step 1: Process scanners to remove duplicate logical devices
+            scanner_dict = {}  # Store scanners by model
 
-            # If no devices are found in either mode, notify user
-            self.show_message.emit(
-                "No Scanner Found",
-                "No scanners were detected. Ensure your scanner is connected and powered on.",
-                QMessageBox.Warning,
+            for device in devices:
+                model = device.model
+                if model not in scanner_dict:
+                    scanner_dict[model] = device  # Keep only one entry per scanner model
+
+            unique_scanners = list(scanner_dict.values())
+
+            if len(unique_scanners) == 1:
+                self.scanner = unique_scanners[0]
+                print(f"Auto-selected scanner: {self.scanner.model}")
+                return
+
+            # Step 2: Let the user pick a scanner if multiple remain
+            scanner_names = [scanner.model for scanner in unique_scanners]
+            selected_scanner, ok = QInputDialog.getItem(
+                self.ui_manager, "Select Scanner", "Available Scanners:", scanner_names, 0, False
             )
+            if ok:
+                self.scanner = next(d for d in unique_scanners if d.model == selected_scanner)
+                print(f"User selected scanner: {self.scanner.model}")
+            else:
+                print("Scanner selection cancelled.")
 
         except Exception as e:
             print(f"Scanner Initialization Error: {e}")
-            self.show_message.emit(
-                "Scanner Error",
-                f"An error occurred while initializing the scanner: {str(e)}",
-                QMessageBox.Critical,
-            )
+            self.show_message.emit("Scanner Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
 
     def _scan_document_thread(self):
         with self.lock:
