@@ -1,3 +1,13 @@
+# 🚀 FaxRetriever Update - Version 1.18.01  
+*Released: 03/19/2025*  
+
+## 🛠️ **Bug Fixes & Minor Improvements**  
+- **Send Fax Window Fixes**:  
+  - The **Send Fax** window now properly clears and resets when a fax is successfully sent or when the window is closed.
+
+---
+
+
 # 🚀 FaxRetriever Update - Version 1.18.00  
 *Released: 03/17/2025*  
 
