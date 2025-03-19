@@ -48,12 +48,6 @@ class UIManager(QDialog):
             self.setup_ui()
             self.current_page_index = 0
 
-            self.caller_id_combo = QComboBox()
-
-            self.add_contact_button = QPushButton()
-            self.address_book_button = QPushButton()
-
-
             self.caller_id_label.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
             self.caller_id_combo.setFont(QtGui.QFont("Arial", 12))
             self.caller_id_combo.setMinimumHeight(35)
@@ -118,6 +112,7 @@ class UIManager(QDialog):
     def setup_caller_id_section(self, layout):
         try:
             self.caller_id_label = QLabel("Faxing From:")
+            self.caller_id_combo = QComboBox()
             layout.addWidget(self.caller_id_label)
             layout.addWidget(self.caller_id_combo)
         except Exception as e:
@@ -137,6 +132,7 @@ class UIManager(QDialog):
             self.last_four_input = QLineEdit()
             self.last_four_input.setMaxLength(4)
 
+            self.add_contact_button = QPushButton()
             add_contact_icon_path = os.path.join(bundle_dir, "images", "AddContact.png")
             self.add_contact_button.setIcon(QtGui.QIcon(add_contact_icon_path))
             self.add_contact_button.setIconSize(QtCore.QSize(30, 30))  # Scale icon inside the button
@@ -144,6 +140,7 @@ class UIManager(QDialog):
             self.add_contact_button.setToolTip("Add Contact")
             self.add_contact_button.clicked.connect(self.open_add_contact_dialog)
 
+            self.address_book_button = QPushButton()
             address_book_icon_path = os.path.join(bundle_dir, "images", "AddressBook.png")
             self.address_book_button.setIcon(QtGui.QIcon(address_book_icon_path))
             self.address_book_button.setIconSize(QtCore.QSize(30, 30))
@@ -518,17 +515,17 @@ class DocumentPreviewWidget(QGraphicsView):
         # When the mouse enters, zoom in by applying a hover zoom factor.
         if self.pixmap_item:
             # Save the fitted transformation before zooming
-            # current_transform = self.transform()
+            current_transform = self.transform()
             # Apply an extra zoom on top of the fitted view.
             self.setTransform(QTransform().scale(self._hover_zoom, self._hover_zoom))
         super().enterEvent(event)
 
-    def leaveEvent(self, event):
-        # When the mouse leaves, revert to the full-fit view only if the item still exists.
-        if hasattr(self, "pixmap_item") and self.pixmap_item and not self.pixmap_item.scene() is None:
-            self.fit_image()
-
-        super().leaveEvent(event)
+    # def leaveEvent(self, event):
+    #     # When the mouse leaves, revert to the full-fit view only if the item still exists.
+    #     if hasattr(self, "pixmap_item") and self.pixmap_item and not self.pixmap_item.scene() is None:
+    #         self.fit_image()
+    #
+    #     super().leaveEvent(event)
 
     def mouseMoveEvent(self, event):
         # Pan the view so that the area under the cursor stays centered.
