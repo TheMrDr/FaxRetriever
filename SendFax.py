@@ -1,4 +1,3 @@
-import fitz
 import os
 import shutil
 import sys
@@ -614,7 +613,7 @@ class FaxSender:
             width = float(page.mediabox.width)
             height = float(page.mediabox.height)
             if width > height:
-                page.rotate_clockwise(90)
+                page.rotate(90)
             writer.add_page(page)
         with open(output_pdf_path, 'wb') as f:
             writer.write(f)
