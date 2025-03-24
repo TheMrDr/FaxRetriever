@@ -1,11 +1,12 @@
+import fitz
 import os
 import shutil
 import sys
 import tempfile
 import threading
 import time
-
 import pyinsane2
+
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import requests
@@ -477,7 +478,7 @@ class DocumentManager:
                 width = float(page.mediabox.width)
                 height = float(page.mediabox.height)
                 if width > height:
-                    page.rotate_clockwise(90)
+                    page.rotate(90)
                 writer.add_page(page)
             with open(output_pdf_path, 'wb') as f:
                 writer.write(f)
@@ -689,7 +690,7 @@ class ScannerManager(QObject):
     def _init_scanner(self):
         try:
             print("Initializing scanner detection...")
-
+            pyinsane2.exit()
             pyinsane2.init()
             devices = pyinsane2.get_devices()
 
@@ -736,24 +737,14 @@ class ScannerManager(QObject):
         with self.lock:
             scanned_files = []
             try:
-                devices = pyinsane2.get_devices()
-                if not devices:
-                    self.show_message.emit("No Scanner Found", "No scanners were found on your system.", QMessageBox.Warning)
+                if not self.scanner:
+                    self.show_message.emit("Scanner Error", "No scanner was selected.", QMessageBox.Warning)
                     self.scanning_dialog_closed.emit()
                     return
 
-                if len(devices) > 1:
-                    device_names = [device.model for device in devices]  # Use model name for display
-                    scanner_model, ok = QInputDialog.getItem(self.ui_manager, "Select Scanner", "Available Scanners:", device_names, 0, False)
-                    if not ok:
-                        self.scanning_dialog_closed.emit()
-                        return
-                    scanner = next(device for device in devices if device.model == scanner_model)
-                else:
-                    scanner = devices[0]
+                scanner = self.scanner  # ✅ Use the selected scanner
 
-                print(f"Selected scanner: {scanner.model}")
-
+                print(f"Using scanner: {scanner.model}")
                 self._set_scanner_options(scanner)
 
                 scan_session = scanner.scan(multiple=True)
@@ -797,6 +788,7 @@ class ScannerManager(QObject):
             finally:
                 self.scan_finished.emit(scanned_files)
                 self.scanning_dialog_closed.emit()
+                self.scanner = None  # 🔁 Reset for next scan cycle
 
     def _set_scanner_options(self, scanner):
         def set_option(option_name, value):
