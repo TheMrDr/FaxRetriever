@@ -1,3 +1,20 @@
+# 🚀 FaxRetriever Update - Version 1.18.03  
+*Released: 03/24/2025*  
+
+## ✅ **Scanner & PDF Processing Fixes**  
+
+### 🖨️ Scanner Improvements  
+- Fixed bug causing **duplicate “Select Scanner” dialogs** when multiple scanners are installed.  
+- Scanner selection is now handled in the **main thread** and passed cleanly to the background scan thread.  
+- Removed deprecated `force_reload=True` parameter from `pyinsane2.get_devices()` to restore **scanner detection on 32-bit builds**.  
+- Properly using `pyinsane2.exit()` and `pyinsane2.init()` to refresh the WIA device list safely.  
+
+### 📄 PDF Compatibility & Stability  
+- Replaced deprecated `rotate_clockwise()` with `rotate()` in `normalize_pdf_to_portrait()` to fix **landscape page rendering**.  
+- Fixes 0-byte PDF creation issues and ensures **full preview support** for all valid PDF files.  
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.18.01  
 *Released: 03/19/2025*  
 
