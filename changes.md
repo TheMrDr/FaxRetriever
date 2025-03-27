@@ -1,3 +1,18 @@
+# 🚀 FaxRetriever Update - Version 1.18.04  
+*Released: 03/27/2025*  
+
+## 🧠 **Memory Fixes & Performance Optimizations**
+
+- 🗑️ **Temp File Cleanup Fix**  
+  - Resolved an issue where **temporary files were not being properly cleaned up** when sending faxes repeatedly.  
+  - This fix **prevents previously sent messages from being resent unintentionally**.
+
+- ⚙️ **Optimized Imports Across the Application**  
+  - Cleaned and streamlined **import statements** throughout the codebase.  
+  - Slightly improves application load times and overall performance.  
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.18.03  
 *Released: 03/24/2025*  
 

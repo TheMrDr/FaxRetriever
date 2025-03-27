@@ -5,7 +5,7 @@ from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QTextCursor, QIcon
 from PyQt5.QtWidgets import (QPushButton, QDialog, QListView, QDialogButtonBox, QProgressBar, QMessageBox, QVBoxLayout,
-                             QLabel, QHBoxLayout, QLineEdit, QTextEdit, QMainWindow, QCheckBox)
+                             QLabel, QHBoxLayout, QLineEdit, QTextEdit, QCheckBox)
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog

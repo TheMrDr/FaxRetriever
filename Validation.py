@@ -14,6 +14,7 @@ uri = f"mongodb://{username}:{password}@{host}:{port}/?tlsAllowInvalidHostnames=
 client = MongoClient(uri)
 db = client[database]
 accounts_collection = db["accounts"]
+integrator_credentials = db["integrations"]
 
 
 def check_org_identifier_status(org_identifier):

@@ -42,7 +42,7 @@ class RetrieveNumbers(QThread):
             self.log_system.log_message('error', "Essential credentials are not set properly for number retrieval.")
             return
 
-        url = f"https://api.skyswitch.com/users/{self.user_id}/faxes/numberlist"
+        url = f"https://telco-api.skyswitch.com/users/{self.user_id}/faxes/numberlist"
         headers = {
             "accept": "application/json",
             "authorization": f"Bearer {self.access_token}"

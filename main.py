@@ -4,10 +4,10 @@ This application was developed by Clinic Networking, LLC and is the property of 
 The purpose of this application is to retrieve faxes on the SkySwitch platform's Instant Fax API.
 """
 
-import fitz
 import os
 import sys
 
+import fitz
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage

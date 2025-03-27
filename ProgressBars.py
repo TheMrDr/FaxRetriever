@@ -10,7 +10,6 @@ from RetrieveToken import RetrieveToken
 from SaveManager import SaveManager
 from SystemLog import SystemLog  # Make sure to import the logging class
 
-from integrations.ComputerRx import  CRxIntegration
 
 # noinspection PyUnresolvedReferences
 class TokenLifespanProgressBar(QWidget):
@@ -174,7 +173,6 @@ class FaxPollTimerProgressBar(QWidget):
         self.save_manager = SaveManager(self.main_window)
         self.setupUI()
         self.setupTimer()
-        self.crx_integration = CRxIntegration(self.main_window)
 
     def setupUI(self):
         self.layout = QGridLayout(self)
@@ -182,12 +180,10 @@ class FaxPollTimerProgressBar(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
 
         self.faxPollTimer_text = QLabel()
-        # self.faxPollTimer_text = QLabel("")
         self.layout.addWidget(self.faxPollTimer_text, 0, 0, 1, 2)  # Span across all columns for alignment
 
         self.faxPollTimer_bar = HomescreenProgressBar()
         self.faxPollTimer_bar.setTextVisible(False)  # Hide the percentage text
-        # self.faxPollTimer_bar.setMaximum(900)  # 300 seconds equals 5 minutes
         self.layout.addWidget(self.faxPollTimer_bar, 1, 0, 1, 1)  # Progress bar takes the majority of the space
 
         self.time_remaining_label = QLabel("00:00")  # Label to display time
@@ -274,23 +270,25 @@ class FaxPollTimerProgressBar(QWidget):
         if self.save_manager.get_config_value("Integrations", "integration_enabled") == "Yes":
             integration_software = self.save_manager.get_config_value("Integrations", "integration_software")
 
+            # Only load and start integration if CRx is selected
             if integration_software == "Computer-Rx":
-                # Ensure CRxIntegration is reinitialized if needed
-                if not hasattr(self, "crx_integration") or self.crx_integration is None:
-                    self.log_system.log_message('info', "Reinitializing CRxIntegration thread...")
+                try:
+                    from integrations.ComputerRx import CRxIntegration
+
+                    self.log_system.log_message('info', "Initializing Computer-Rx integration thread...")
                     self.crx_integration = CRxIntegration(self.main_window)
                     self.crx_integration.finished.connect(self.cleanup_crx_thread)
 
-                # Ensure we start a fresh CRxIntegration thread each time `retrieveFaxes` is called
-                if not self.crx_integration.isRunning():
-                    self.crx_integration.start()
-                    self.log_system.log_message('info', "Started new Computer-Rx integration thread.")
-                else:
-                    self.log_system.log_message('warning',
-                                                "Computer-Rx integration is already running. Skipping duplicate start.")
-
+                    if not self.crx_integration.isRunning():
+                        self.crx_integration.start()
+                        self.log_system.log_message('info', "Started new Computer-Rx integration thread.")
+                    else:
+                        self.log_system.log_message('warning', "Computer-Rx integration is already running.")
+                except Exception as e:
+                    self.log_system.log_message('error', f"Failed to load Computer-Rx integration: {e}")
             else:
                 self.log_system.log_message('info', "Integration is enabled, but no software is selected.")
+
         else:
             self.log_system.log_message('info', "Integration is disabled, skipping integration check.")
 

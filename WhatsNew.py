@@ -1,11 +1,12 @@
-import markdown
 import os
 import sys
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextBrowser, QPushButton, QLabel
-from PyQt5.QtGui import QFont, QPixmap, QIcon
-from PyQt5.QtCore import Qt
-from Version import __version__
 
+import markdown
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont, QPixmap, QIcon
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextBrowser, QPushButton, QLabel
+
+from Version import __version__
 
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):

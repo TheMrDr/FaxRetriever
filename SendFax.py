@@ -3,21 +3,20 @@ import shutil
 import sys
 import tempfile
 import threading
-import time
-import pyinsane2
 
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+import pyinsane2
 import requests
-from PIL import Image, ImageDraw
-from pypdf import PdfReader, PdfWriter
+from PIL import Image
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import pyqtSignal, Qt, QObject
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QTransform, QMovie
+from PyQt5.QtGui import QPixmap, QImage, QTransform, QMovie
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QInputDialog,
-                             QComboBox, QListWidget, QGridLayout, QMessageBox, QMenu, QAction, QHBoxLayout, QGraphicsView,
+                             QComboBox, QListWidget, QGridLayout, QMessageBox, QMenu, QAction, QHBoxLayout,
+                             QGraphicsView,
                              QGraphicsScene, QGraphicsPixmapItem, QProgressBar)
-from docx import Document
+from pypdf import PdfReader, PdfWriter
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 from AddressBook import AddressBookManager, AddressBookDialog, AddContactDialog
 from SaveManager import SaveManager
@@ -35,7 +34,6 @@ else:
 # noinspection PyUnresolvedReferences
 class UIManager(QDialog):
     finished = pyqtSignal(str, str)  # Signal to indicate the fax send result
-
 
     def __init__(self, main_window=None, parent=None):
         super().__init__(parent)
@@ -296,9 +294,10 @@ class UIManager(QDialog):
         super().closeEvent(event)
 
     def clear_document_list(self):
-        """Clear the document list and reset the document preview widget"""
+        """Clear the document list, reset preview, and delegate document cleanup."""
         self.document_list.clear()
         self.document_preview.scene.clear()
+        self.document_manager.clear_documents()
 
 
 class DocumentManager:
@@ -484,6 +483,20 @@ class DocumentManager:
         except Exception as e:
             print(f"Error normalizing PDF: {e}")
 
+    def clear_documents(self):
+        """Removes all documents from memory and deletes temp files if needed."""
+        try:
+            for file in self.documents_paths:
+                if os.path.exists(file) and file.endswith('.pdf'):
+                    try:
+                        os.remove(file)
+                    except Exception as e:
+                        print(f"Failed to remove temp file: {file} | {e}")
+            self.documents_paths.clear()
+            self.cover_sheet_path = None
+        except Exception as e:
+            print(f"Error during document cleanup: {e}")
+
 
 class DocumentPreviewWidget(QGraphicsView):
     def __init__(self, parent=None):
@@ -598,9 +611,13 @@ class FaxSender:
             finally:
                 for _, file_tuple in files.items():
                     file_tuple[1].close()
-                # Clean up temporary files
                 for temp_file in temp_files:
-                    os.remove(temp_file)
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+
+                # Final document cleanup (to clear memory paths too)
+                self.document_manager.clear_documents()
+
         except Exception as e:
             print(f"Send fax error: {e}")
             QMessageBox.critical(self.ui_manager, "Error",

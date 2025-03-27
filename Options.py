@@ -1,9 +1,10 @@
 import os
 import re
+import socket
 import sys
 
-from PyQt5.QtCore import Qt, QStandardPaths
 from PyQt5 import QtGui
+from PyQt5.QtCore import Qt, QStandardPaths
 from PyQt5.QtPrintSupport import QPrintDialog
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox,
                              QRadioButton, QGroupBox, QHBoxLayout, QComboBox, QWidget, QFileDialog)
@@ -14,7 +15,6 @@ from RetrieveToken import RetrieveToken
 from SaveManager import SaveManager
 from SystemLog import SystemLog
 from Validation import validate_fax_user
-
 
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):
@@ -255,11 +255,22 @@ class OptionsDialog(QDialog):
         self.software_group.setLayout(software_layout)
         parent_layout.addWidget(self.software_group)
 
-        # Locate Program Button (Hidden by default)
-        self.locate_program_button = QPushButton("Locate Program")
-        self.locate_program_button.clicked.connect(self.prompt_for_winrx_path)
-        self.locate_program_button.setVisible(False)
-        parent_layout.addWidget(self.locate_program_button)
+        # Locate WinRx Button (Hidden by default)
+        self.locate_winrx_button = QPushButton("Locate Program")
+        self.locate_winrx_button.clicked.connect(self.prompt_for_winrx_path)
+        self.locate_winrx_button.setVisible(False)
+        parent_layout.addWidget(self.locate_winrx_button)
+
+        # Liberty Rx NPI Field (Hidden by default)
+        self.liberty_npi_label = QLabel("Pharmacy NPI:")
+        self.liberty_npi_input = QLineEdit()
+        self.liberty_npi_input.setPlaceholderText("e.g. 1234567890")
+        self.liberty_npi_label.setVisible(False)
+        self.liberty_npi_input.setVisible(False)
+        self.liberty_npi_input.editingFinished.connect(self.validate_liberty_npi)
+
+        parent_layout.addWidget(self.liberty_npi_label)
+        parent_layout.addWidget(self.liberty_npi_input)
 
         # Initially hide software selectors
         self.software_group.setVisible(False)
@@ -294,7 +305,7 @@ class OptionsDialog(QDialog):
         available_options = [
             "None",
             "Computer-Rx",
-            "PharmacyOne",
+            "Liberty Rx",
             "Rx30",
             "Ask us for more!"
         ]
@@ -313,6 +324,12 @@ class OptionsDialog(QDialog):
         """Handles additional actions when a software selection is made."""
         selected_software = self.software_selector.currentText()
 
+        # If the user selects "None", all sub menus are hidden.
+        if selected_software == "None":
+            self.locate_winrx_button.setVisible(False)
+            self.liberty_npi_label.setVisible(False)
+            self.liberty_npi_input.setVisible(False)
+
         # If the user selects "Computer-Rx", check for required Pervasive SQL files
         if selected_software == "Computer-Rx":
             pervasive_dll_path = r"C:\Program Files (x86)\Actian\PSQL\bin\wbtrv32.dll"
@@ -330,8 +347,45 @@ class OptionsDialog(QDialog):
                 return  # Stop further execution
 
         # Show the locate button only for Computer-Rx
-        self.locate_program_button.setVisible(selected_software == "Computer-Rx")
+        self.locate_winrx_button.setVisible(selected_software == "Computer-Rx")
         self.update_winrx_integration_button()
+
+        if selected_software == "Liberty Rx":
+            self.liberty_npi_label.setVisible(True)
+            self.liberty_npi_input.setVisible(True)
+
+            saved_npi = self.save_manager.get_config_value("Liberty", "pharmacy_npi")
+            if saved_npi:
+                self.liberty_npi_input.setText(saved_npi)
+            else:
+                QMessageBox.information(
+                    self,
+                    "Liberty Rx Setup",
+                    "Please enter the pharmacy’s 10-digit NPI number below to enable Liberty Rx integration."
+                )
+
+    def validate_liberty_npi(self):
+        """Validates and saves the pharmacy NPI for Liberty Rx."""
+        npi = self.liberty_npi_input.text().strip()
+
+        if not re.fullmatch(r"\d{10}", npi):
+            QMessageBox.critical(
+                self,
+                "Invalid NPI",
+                f"'{npi}' is not a valid 10-digit NPI number.\n"
+                "Please check and try again."
+            )
+            return
+
+        self.save_manager.config.set("Liberty", "pharmacy_npi", npi)
+        self.save_manager.save_changes()
+        self.log_system.log_message("info", f"Liberty Rx pharmacy NPI set to: {npi}")
+
+        QMessageBox.information(
+            self,
+            "NPI Saved",
+            f"The pharmacy’s NPI has been saved as:\n{npi}"
+        )
 
     def prompt_for_winrx_path(self):
         """Prompts the user to select the path to WinRx and validates its directory."""
@@ -409,7 +463,7 @@ class OptionsDialog(QDialog):
             self.save_manager.save_changes()
 
             # **Set truncated version for display only**
-            self.locate_program_button.setText(self.truncate_path(selected_path))
+            self.locate_winrx_button.setText(self.truncate_path(selected_path))
 
             QMessageBox.information(self, "Success",
                                     "WinRx directory has been set successfully, and integration is ready.")
@@ -422,9 +476,9 @@ class OptionsDialog(QDialog):
         saved_path = self.save_manager.get_config_value("Integrations", "winrx_path")
 
         if saved_path and saved_path != "Locate Program":
-            self.locate_program_button.setText(self.truncate_path(saved_path))  # Display truncated version
+            self.locate_winrx_button.setText(self.truncate_path(saved_path))  # Display truncated version
         else:
-            self.locate_program_button.setText("Locate Program")  # Default label
+            self.locate_winrx_button.setText("Locate Program")  # Default label
 
     def truncate_path(self, path, max_length=30):
         """Truncates the middle of a file path if it exceeds max_length."""
@@ -789,6 +843,7 @@ class OptionsDialog(QDialog):
         else:
             # self.setMinimumHeight(500)
             self.setMaximumHeight(1000)
+
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

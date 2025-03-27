@@ -5,16 +5,14 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 
 import fitz
 import requests
-from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal, QRect
 from PyQt5.QtGui import QImage, QPainter
 from PyQt5.QtPrintSupport import QPrinter, QPrinterInfo
 from plyer import notification
-import pytz
-from tzlocal import get_localzone
 
 from SaveManager import SaveManager
 from SystemLog import SystemLog
@@ -209,6 +207,26 @@ class RetrieveFaxes(QThread):
                             f.write(pdf_response.content)
                         self.log_system.log_message('info', f"Downloaded fax file for ID {fax_id} to {pdf_path}")
 
+                        # === Liberty Rx Integration Trigger ===
+                        integration_enabled = self.save_manager.get_config_value("Integrations", "integration_enabled",
+                                                                                 fallback="no").lower() == "yes"
+                        selected_software = self.save_manager.get_config_value("Integrations", "integration_software")
+
+                        if integration_enabled and selected_software == "Liberty Rx":
+                            try:
+                                from LibertyRx import LibertyRxIntegration
+
+                                liberty_thread = LibertyRxIntegration(caller_id, pdf_path, self.main_window)
+                                liberty_thread.finished.connect(lambda status, msg: self.handle_liberty_result(
+                                    status, msg, fax_id, pdf_path
+                                ))
+                                liberty_thread.start()
+                                liberty_thread.wait()  # Make this blocking so we wait before converting/printing/etc.
+
+                            except Exception as e:
+                                self.log_system.log_message('error', f"Failed to launch Liberty Rx thread: {str(e)}")
+                                continue  # Skip the rest of the loop to avoid processing this fax further
+
                         # **Convert to JPG if needed**
                         if self.download_type in ["JPG", "Both"]:
                             if self.main_window:
@@ -380,3 +398,10 @@ class RetrieveFaxes(QThread):
         # Log the platform-specific backend used by plyer
         from plyer.utils import platform
         self.log_system.log_message('debug', f"Plyer platform: {platform}")
+
+    def handle_liberty_result(self, status, message, fax_id, pdf_path):
+        if status == "Success":
+            self.log_system.log_message('info', f"Liberty Rx received fax {fax_id}: {message}")
+        else:
+            self.log_system.log_message('error', f"Liberty Rx failed for fax {fax_id}: {message}")
+            raise Exception(f"Failed to deliver fax {fax_id} to Liberty Rx: {message}")
