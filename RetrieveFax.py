@@ -207,34 +207,16 @@ class RetrieveFaxes(QThread):
                             f.write(pdf_response.content)
                         self.log_system.log_message('info', f"Downloaded fax file for ID {fax_id} to {pdf_path}")
 
-                        # === Liberty Rx Integration Trigger ===
-                        integration_enabled = self.save_manager.get_config_value("Integrations", "integration_enabled",
-                                                                                 fallback="no").lower() == "yes"
-                        selected_software = self.save_manager.get_config_value("Integrations", "integration_software")
-
-                        if integration_enabled and selected_software == "Liberty Rx":
-                            try:
-                                from LibertyRx import LibertyRxIntegration
-
-                                liberty_thread = LibertyRxIntegration(caller_id, pdf_path, self.main_window)
-                                liberty_thread.finished.connect(lambda status, msg: self.handle_liberty_result(
-                                    status, msg, fax_id, pdf_path
-                                ))
-                                liberty_thread.start()
-                                liberty_thread.wait()  # Make this blocking so we wait before converting/printing/etc.
-
-                            except Exception as e:
-                                self.log_system.log_message('error', f"Failed to launch Liberty Rx thread: {str(e)}")
-                                continue  # Skip the rest of the loop to avoid processing this fax further
-
                         # **Convert to JPG if needed**
                         if self.download_type in ["JPG", "Both"]:
                             if self.main_window:
                                 self.main_window.update_status_bar(f"Converting {file_name} to JPG...", 5000)
 
-                            command = ['pdftoppm', '-jpeg', pdf_path, jpg_prefix]
-                            process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
-                            process.communicate()
+                            success = self.convert_pdf_to_jpg(pdf_path, jpg_prefix)
+                            if not success:
+                                self.log_system.log_message('error',
+                                                            f"Skipping fax ID {fax_id} due to failed JPG conversion.")
+                                continue
 
                             if self.main_window:
                                 self.main_window.update_status_bar(f"Conversion complete for {file_name}", 5000)
@@ -282,6 +264,38 @@ class RetrieveFaxes(QThread):
         except Exception as e:
             self.log_system.log_message('error', f"Exception in download_fax_pdfs: {str(e)}")
             self.finished.emit([])
+
+    def convert_pdf_to_jpg(self, pdf_path, jpg_prefix):
+        """Converts a PDF to JPG using pdftoppm and returns success status."""
+        try:
+            command = ['pdftoppm', '-jpeg', pdf_path, jpg_prefix]
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            stdout, stderr = process.communicate()
+
+            if process.returncode != 0:
+                self.log_system.log_message('error', f"pdftoppm failed for {pdf_path}: {stderr.decode().strip()}")
+                return False
+
+            # Verify JPGs were actually created
+            parent_dir = os.path.dirname(jpg_prefix)
+            base_prefix = os.path.basename(jpg_prefix)
+            jpg_files = [f for f in os.listdir(parent_dir) if f.startswith(base_prefix) and f.endswith('.jpg')]
+
+            if not jpg_files:
+                self.log_system.log_message('error', f"No JPGs created from {pdf_path}. Check conversion.")
+                return False
+
+            self.log_system.log_message('info', f"Successfully converted {pdf_path} to {len(jpg_files)} JPG(s)")
+            return True
+
+        except Exception as e:
+            self.log_system.log_message('error', f"Exception during PDF to JPG conversion: {str(e)}")
+            return False
 
     def archive_fax(self, file_path, file_name, sent_timestamp):
         """Copy the downloaded fax to the archive folder based on when the fax was originally sent."""
