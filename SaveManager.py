@@ -184,6 +184,11 @@ class SaveManager:
             ("Fax Options", "archive_enabled"): "No",
             ("Fax Options", "archive_duration"): "30",  # Always store raw number, UI can append 'Days'
             ("Fax Options", "file_name_format"): "Fax ID",
+            ("Fax Options", "include_cover_sheet"): "No",
+            ("Fax Options", "cover_sheet_business_name"): "None",
+            ("Fax Options", "cover_sheet_business_address"): "None",
+            ("Fax Options", "cover_sheet_business_phone"): "None",
+            ("Fax Options", "cover_sheet_business_email"): "None",
 
             # User Settings
             ("UserSettings", "logging_level"): "Info",

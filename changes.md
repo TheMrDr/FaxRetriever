@@ -1,3 +1,20 @@
+# 🚀 FaxRetriever Update - Version 1.19.00  
+*Released: 04/22/2025*  
+
+## 🧾 **Cover Sheet Support is Here!**  
+- You can now add a **default or custom cover sheet** in the **Send Fax** window.  
+- Cover sheets are attached automatically before sending—no more manual prep!  
+
+## 🛠️ **Send Fax Module Overhaul**  
+- Major code cleanup and restructuring inside Send Fax logic.  
+- Improved **scanner functionality**:
+  - Supports scanning **multiple times** into a single outbound fax.  
+  - Better threading, device handling, and scan flow.  
+- More reliable **temp file cleanup** after each fax is sent.  
+- Additional internal optimizations for a smoother faxing experience.  
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.18.04  
 *Released: 03/27/2025*  
 
