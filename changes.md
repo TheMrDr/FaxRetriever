@@ -1,3 +1,19 @@
+# 🚀 FaxRetriever Update - Version 1.19.01  
+*Released: 04/24/2025*  
+
+## ✏️ **Cover Sheet UI Enhancements**  
+- Added new **"Attention:"** and **"Memo:"** fields when using the in-app generated cover sheet.  
+- These fields are optional but provide additional detail when sending faxes.
+
+## 🎨 **New Logo!**  
+- Updated the application’s main logo for a **cleaner, more modern look**.
+
+## 🛠️ **UI Logic Improvements**  
+- Resolved an issue with **redundant main window resizing** during initialization.  
+- Minor cleanup in backend layout handling.
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.19.00  
 *Released: 04/22/2025*  
 

@@ -12,7 +12,7 @@ from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QAction, QLabel, QLineEdit, QPushButton, QFileDialog,
-                             QGridLayout, QSystemTrayIcon, QMenu, QMessageBox, QDialog)
+                             QGridLayout, QSystemTrayIcon, QMenu, QMessageBox, QDialog, QSizePolicy, QHBoxLayout)
 
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):
@@ -147,25 +147,35 @@ class MainWindow(QMainWindow):
             self.log_system.log_message('error', f"Failed to disable functionality: {e}")
             print(f"Failed to disable functionality: {e}")
 
+    # def finalize_initialization(self):
+    #     """Final steps to initialize the UI based on loaded data"""
+    #     try:
+    #         central_widget = self.centralWidget()
+    #         menu_bar_height = self.menuBar().sizeHint().height() if self.menuBar() else 0
+    #         status_bar_height = self.statusBar().sizeHint().height() if self.statusBar() else 0
+    #         central_widget_height = central_widget.sizeHint().height() if central_widget else 400  # Default if None
+    #
+    #         # Determine the banner width dynamically
+    #         banner_path = os.path.join(bundle_dir, "images", "banner_small_new.png")
+    #         if os.path.exists(banner_path):
+    #             pixmap = QPixmap(banner_path)
+    #             banner_width = pixmap.width()
+    #             self.setMinimumWidth(max(banner_width, 600))  # No height lock
+    #
+    #         required_height = central_widget_height + status_bar_height + menu_bar_height + 10
+    #
+    #         # Set the window size, ensuring it at least fits the banner
+    #         self.setFixedSize(max(banner_width, 600), required_height)
+    #
+    #     except Exception as e:
+    #         self.log_system.log_message('error', f"Failed to finalize initialization: {e}")
+    #         print(f"Failed to finalize initialization: {e}")
+
     def finalize_initialization(self):
         """Final steps to initialize the UI based on loaded data"""
         try:
-            central_widget = self.centralWidget()
-            menu_bar_height = self.menuBar().sizeHint().height() if self.menuBar() else 0
-            status_bar_height = self.statusBar().sizeHint().height() if self.statusBar() else 0
-            central_widget_height = central_widget.sizeHint().height() if central_widget else 400  # Default if None
-
-            # Determine the banner width dynamically
-            banner_width = 600  # Default width
-            banner_path = os.path.join(bundle_dir, "images", "banner_small.png")
-            if os.path.exists(banner_path):
-                pixmap = QPixmap(banner_path)
-                banner_width = pixmap.width()
-
-            required_height = central_widget_height + status_bar_height + menu_bar_height + 10
-
-            # Set the window size, ensuring it at least fits the banner
-            self.setFixedSize(max(banner_width, 600), required_height)
+            # Set fixed window size directly — skip dynamic measurements
+            self.setFixedSize(800, 600)  # Adjust these to match your ideal layout
 
         except Exception as e:
             self.log_system.log_message('error', f"Failed to finalize initialization: {e}")
@@ -472,12 +482,32 @@ class MainWindow(QMainWindow):
 
             self.load_data_from_config()
 
-            # Placeholder for a logo
-            banner = QLabel()
-            pixmap = QPixmap(os.path.join(bundle_dir, "images", "banner_small.png"))
-            banner.setPixmap(pixmap)
-            banner.setAlignment(Qt.AlignCenter)
-            layout.addWidget(banner, 0, 0, 1, 2)
+            # Banner setup with balanced scale
+            self.banner = QLabel()
+            self.banner.setAlignment(Qt.AlignCenter)
+            self.banner.setStyleSheet("background-color: transparent;")
+            self.banner.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+            banner_path = os.path.join(bundle_dir, "images", "banner_small_new.png")
+            pixmap = QPixmap(banner_path)
+
+            # Target width based on your fixed app size
+            target_width = 600  # Adjust to match your window's usable width
+            scaled_pixmap = pixmap.scaledToWidth(target_width, Qt.SmoothTransformation)
+
+            # Apply scaled image
+            self.banner.setPixmap(scaled_pixmap)
+            self.banner.setFixedHeight(min(scaled_pixmap.height(), 250))  # Max cap for height
+
+            # Container for alignment
+            banner_container = QWidget()
+            banner_layout = QHBoxLayout()
+            banner_layout.setContentsMargins(0, 0, 0, 0)
+            banner_layout.setAlignment(Qt.AlignCenter)
+            banner_layout.addWidget(self.banner)
+            banner_container.setLayout(banner_layout)
+
+            layout.addWidget(banner_container, 0, 0, 1, 2)
 
             # Save Location
             saveLocationLayout = QGridLayout()

@@ -130,6 +130,26 @@ class UIManager(QDialog):
             self.view_cover_button = QPushButton("View Cover Sheet")
             self.view_cover_button.clicked.connect(self.view_cover_sheet)
 
+            attn_layout = QHBoxLayout()
+            self.attn_label = QLabel("Attention:")
+            self.attn_label.setFont(QtGui.QFont("Arial", 12))
+            self.attn_line_edit = QLineEdit()
+            self.attn_line_edit.setPlaceholderText("Enter recipient's name")
+            self.attn_line_edit.setFont(QtGui.QFont("Arial", 12))
+            self.attn_line_edit.editingFinished.connect(self.on_cover_field_edited)
+            attn_layout.addWidget(self.attn_label)
+            attn_layout.addWidget(self.attn_line_edit)
+
+            memo_layout = QHBoxLayout()
+            self.memo_label = QLabel("Memo:")
+            self.memo_label.setFont(QtGui.QFont("Arial", 12))
+            self.memo_line_edit = QLineEdit()
+            self.memo_line_edit.setPlaceholderText("Enter memo")
+            self.memo_line_edit.setFont(QtGui.QFont("Arial", 12))
+            self.memo_line_edit.editingFinished.connect(self.on_cover_field_edited)
+            memo_layout.addWidget(self.memo_label)
+            memo_layout.addWidget(self.memo_line_edit)
+
             for btn in [self.create_cover_button, self.upload_cover_button, self.view_cover_button]:
                 btn.setMinimumHeight(35)
                 btn.setFont(QtGui.QFont("Arial", 11))
@@ -140,6 +160,8 @@ class UIManager(QDialog):
 
             cover_sheet_layout.addWidget(self.include_cover_checkbox)
             cover_sheet_layout.addLayout(buttons_layout)
+            cover_sheet_layout.addLayout(attn_layout)
+            cover_sheet_layout.addLayout(memo_layout)
 
             layout.addLayout(cover_sheet_layout)
 
@@ -149,6 +171,8 @@ class UIManager(QDialog):
             self.include_cover_checkbox.setChecked(is_enabled)
             self.create_cover_button.setEnabled(is_enabled)
             self.upload_cover_button.setEnabled(is_enabled)
+            self.attn_line_edit.setEnabled(is_enabled)
+            self.memo_line_edit.setEnabled(is_enabled)
             self.view_cover_button.setEnabled(
                 is_enabled and os.path.exists(os.path.join(os.getcwd(), "cover_sheet.pdf")))
             self.update_cover_sheet_button_states()
@@ -262,9 +286,14 @@ class UIManager(QDialog):
 
     def closeEvent(self, event):
         self.clear_document_list()
-        self.area_code_input.clear()
+        # self.area_code_input.clear()
         self.first_three_input.clear()
         self.last_four_input.clear()
+        self.attn_line_edit.clear()
+        self.memo_line_edit.clear()
+
+        self.generate_cover_sheet_pdf()
+
         self.pixmap_item = None
         self.populate_area_code()
         super().closeEvent(event)
@@ -330,6 +359,8 @@ class UIManager(QDialog):
             self.create_cover_button.setEnabled(checked)
             self.upload_cover_button.setEnabled(checked)
             self.view_cover_button.setEnabled(checked and os.path.exists(os.path.join(os.getcwd(), "cover_sheet.pdf")))
+            self.attn_line_edit.setEnabled(checked)
+            self.memo_line_edit.setEnabled(checked)
 
             if self.main_window:
                 self.main_window.update_status_bar(f"Cover sheet setting saved: {value}", 5000)
@@ -414,6 +445,8 @@ class UIManager(QDialog):
             business_address = self.save_manager.get_config_value("Fax Options", "cover_sheet_business_address") or ""
             business_phone = self.save_manager.get_config_value("Fax Options", "cover_sheet_business_phone") or ""
             business_email = self.save_manager.get_config_value("Fax Options", "cover_sheet_business_email") or ""
+            attn_text = self.attn_line_edit.text().strip()
+            memo_text = self.memo_line_edit.text().strip()
 
             output_path = os.path.join(os.getcwd(), "cover_sheet.pdf")
             c = canvas.Canvas(output_path, pagesize=letter)
@@ -430,6 +463,11 @@ class UIManager(QDialog):
             c.setFont("Helvetica-Bold", 36)
             c.drawCentredString(width / 2.0, height / 2.0, "COVER SHEET")
 
+            # ATTN and Memo Section
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(1 * inch, height / 2.0 - 0.75 * inch, f"Attention: {attn_text}")
+            c.drawString(1 * inch, height / 2.0 - 1.1 * inch, f"Memo: {memo_text}")
+
             # Footer (optional)
             c.setFont("Helvetica-Oblique", 10)
             c.drawCentredString(width / 2.0, 0.75 * inch, "This page intentionally left blank")
@@ -442,6 +480,9 @@ class UIManager(QDialog):
 
             self.view_cover_button.setEnabled(self.include_cover_checkbox.isChecked() and os.path.exists(
                 os.path.join(os.getcwd(), "cover_sheet.pdf")))
+
+            self.save_manager.config.set("Fax Options", "cover_sheet_type", "Generated")
+            self.save_manager.save_changes()
 
             self.update_cover_sheet_button_states()
 
@@ -458,7 +499,7 @@ class UIManager(QDialog):
             if not file_path:
                 return  # User cancelled
 
-            dest_path = os.path.join(os.getcwd(), "cover_sheet.pdf")
+            dest_path = os.path.join(os.getcwd(), "custom_cover_sheet.pdf")
 
             # Handle image conversion
             if file_path.lower().endswith((".jpg", ".jpeg", ".png")):
@@ -471,7 +512,10 @@ class UIManager(QDialog):
                 self.main_window.update_status_bar("Cover sheet uploaded successfully.", 5000)
 
             self.view_cover_button.setEnabled(self.include_cover_checkbox.isChecked() and os.path.exists(
-                os.path.join(os.getcwd(), "cover_sheet.pdf")))
+                os.path.join(os.getcwd(), "custom_cover_sheet.pdf")))
+
+            self.save_manager.config.set("Fax Options", "cover_sheet_type", "Uploaded")
+            self.save_manager.save_changes()
 
             self.update_cover_sheet_button_states()
 
@@ -529,6 +573,23 @@ class UIManager(QDialog):
             print(f"Error removing cover sheet: {e}")
             if self.main_window:
                 self.main_window.update_status_bar(f"Error: {str(e)}", 10000)
+
+    def on_cover_field_edited(self):
+        cover_type = self.save_manager.get_config_value("Fax Options", "cover_sheet_type")
+
+        if cover_type == "Uploaded":
+            reply = QMessageBox.question(
+                self,
+                "Overwrite Uploaded Cover Sheet?",
+                "You're currently using a custom uploaded cover sheet.\n"
+                "Editing these fields will generate a new one and overwrite the selection.\n\n"
+                "Do you want to continue?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
+
+        self.generate_cover_sheet_pdf()
 
 
 class DocumentManager:
@@ -814,15 +875,13 @@ class FaxSender:
 
             # Validate cover sheet inclusion (if enabled)
             include_cover = self.save_manager.get_config_value("Fax Options", "include_cover_sheet") == "Yes"
-            cover_path = os.path.join(os.getcwd(), "cover_sheet.pdf")
+            cover_type = self.save_manager.get_config_value("Fax Options", "cover_sheet_type")
+            cover_path = os.path.join(os.getcwd(),
+                                      "custom_cover_sheet.pdf" if cover_type == "Uploaded" else "cover_sheet.pdf")
 
             if include_cover and not os.path.exists(cover_path):
-                QMessageBox.warning(
-                    self.ui_manager,
-                    "Missing Cover Sheet",
-                    "You selected to include a cover sheet, but 'cover_sheet.pdf' was not found.\n\n"
-                    "Please create or upload a cover sheet before sending."
-                )
+                QMessageBox.warning(self.ui_manager, "Missing Cover Sheet",
+                                    "Cover sheet selected, but file not found. Please re-upload or re-generate.")
                 return
 
             fax_user = self.save_manager.get_config_value('Account', 'fax_user')
@@ -839,6 +898,10 @@ class FaxSender:
                     QMessageBox.information(self.ui_manager, "Fax Sent", "Your fax has been queued successfully.")
                     self.ui_manager.clear_document_list()
                     self._clear_inputs()
+                    self.ui_manager.attn_line_edit.blockSignals(True)
+                    self.ui_manager.attn_line_edit.clear()
+                    self.ui_manager.attn_line_edit.blockSignals(False)
+                    self.ui_manager.memo_line_edit.clear()
                     self.ui_manager.accept()
                 else:
                     QMessageBox.critical(self.ui_manager, "Sending Failed", f"Failed to send fax: {response.text}")

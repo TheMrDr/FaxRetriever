@@ -1,11 +1,11 @@
 import ctypes
 import os
 import re
-import time
-import tempfile
+
 import requests
-from PyQt5.QtCore import QThread, pyqtSignal, QMetaObject, Qt
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox
+
 from SaveManager import SaveManager
 from SystemLog import SystemLog
 
@@ -16,10 +16,6 @@ class CRxIntegration(QThread):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
-
-        print("DEBUG: Entering CRxIntegration.__init__()")  # Print to console
-        if self.main_window:
-            self.main_window.log_system.log_message('debug', "DEBUG: Entering CRxIntegration.__init__()")
 
         self.save_manager = SaveManager(self.main_window)
         self.log_system = SystemLog()
