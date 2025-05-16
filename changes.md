@@ -1,3 +1,16 @@
+# 🚀 FaxRetriever Update - Version 1.19.02  
+*Released: 05/14/2025*  
+
+## 🔒 **New Caller ID Validation Before Sending Faxes**  
+
+- We've implemented a **backend API check** to **validate the caller ID** before any fax is sent.  
+- This ensures that FaxRetriever is **fully configured and properly authenticated** before transmitting documents.  
+- It also acts as an **additional security layer** to help protect user accounts and prevent misconfigured sending.  
+
+💡 *If your account is not fully configured or lacks an assigned Caller ID, fax sending will now be blocked until corrected.*
+
+---
+
 # 🚀 FaxRetriever Update - Version 1.19.01  
 *Released: 04/24/2025*  
 

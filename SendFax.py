@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -841,12 +842,23 @@ class FaxSender:
     def send_fax(self):
         try:
             # Validate caller ID
-            caller_id = self.ui_manager.caller_id_combo.currentText().strip()
-            if not caller_id:
+            raw_caller_id = self.ui_manager.caller_id_combo.currentText().strip()
+            if not raw_caller_id:
                 QMessageBox.warning(
                     self.ui_manager,
                     "Missing Caller ID",
                     "Please select a Caller ID (source fax number) before sending."
+                )
+                return
+
+            # Strip all non-digit characters
+            caller_id = re.sub(r'\D', '', raw_caller_id)
+
+            if not caller_id or len(caller_id) < 10:
+                QMessageBox.critical(
+                    self.ui_manager,
+                    "Invalid Caller ID",
+                    f"The caller ID '{raw_caller_id}' is invalid. Please enter a valid phone number with at least 10 digits."
                 )
                 return
 
