@@ -15,36 +15,45 @@ from PyQt5.QtCore import QThread, pyqtSignal, Qt, QRect
 from PyQt5.QtGui import QImage, QPainter
 from PyQt5.QtPrintSupport import QPrinter
 
+import fitz  # PyMuPDF for in-app PDF rasterization (no external tools)
 from utils.history_index import is_downloaded
 
 from core.app_state import app_state
 from utils.logging_utils import get_logger
 
 
-def _poppler_pdftoppm_path(base_dir: str) -> str:
-    exe = os.path.join(base_dir, "poppler", "bin", "pdftoppm.exe")
-    return exe if os.path.exists(exe) else "pdftoppm"
-
-
 def convert_pdf_to_jpg(pdf_path: str, output_prefix: str, base_dir: str, dpi: int = 200) -> list:
     """
-    Convert a PDF into JPG image(s) using poppler's pdftoppm.
+    Convert a PDF into JPG image(s) using PyMuPDF (fitz), avoiding external tools.
+    - pdf_path: source PDF file
+    - output_prefix: destination prefix; images will be saved as f"{output_prefix}-<page>.jpg"
+    - dpi: target rendering DPI (default 200)
     Returns a list of generated JPG file paths.
     """
     try:
-        exe = _poppler_pdftoppm_path(base_dir)
-        cmd = [exe, "-jpeg", f"-r", str(dpi), pdf_path, output_prefix]
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-        if proc.returncode != 0:
-            return []
-        # Gather generated files: output_prefix-1.jpg, output_prefix-2.jpg, ...
-        parent = os.path.dirname(output_prefix)
+        # Ensure output directory exists
+        parent = os.path.dirname(output_prefix) or os.path.dirname(pdf_path)
+        os.makedirs(parent, exist_ok=True)
         base = os.path.basename(output_prefix)
-        jpgs = []
-        for name in os.listdir(parent):
-            if name.startswith(base + "-") and name.lower().endswith(".jpg"):
-                jpgs.append(os.path.join(parent, name))
-        return sorted(jpgs)
+
+        # Compute zoom from requested DPI (72 DPI is the PDF default)
+        try:
+            zoom = float(dpi) / 72.0 if dpi else 200.0 / 72.0
+        except Exception:
+            zoom = 200.0 / 72.0
+        if zoom <= 0:
+            zoom = 200.0 / 72.0
+        mat = fitz.Matrix(zoom, zoom)
+
+        jpgs: list[str] = []
+        with fitz.open(pdf_path) as doc:
+            for i, page in enumerate(doc, start=1):
+                pix = page.get_pixmap(matrix=mat, alpha=False)
+                out_path = os.path.join(parent, f"{base}-{i}.jpg")
+                # Save as JPEG; extension controls format
+                pix.save(out_path)
+                jpgs.append(out_path)
+        return jpgs
     except Exception:
         return []
 
