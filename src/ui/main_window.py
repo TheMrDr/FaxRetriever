@@ -132,7 +132,7 @@ class MainWindow(QMainWindow):
         # Run What's New check early (before update checker may overwrite stored version)
         QTimer.singleShot(500, self._maybe_show_whats_new)
         # Defer update check slightly to ensure UI is responsive
-        QTimer.singleShot(1500, self._maybe_check_for_updates)
+        QTimer.singleShot(1500, lambda: self._maybe_check_for_updates(force=True))
 
     def _show_overlay(self, dialog: QWidget):
         """Show a child dialog as an in-app modal overlay with dimmed scrim and solid content background."""

@@ -13,6 +13,10 @@ from core.config_loader import device_config
 
 API_URL = "https://api.github.com/repos/TheMrDr/FaxRetriever/releases/latest"
 REQUEST_TIMEOUT = 10  # seconds
+GITHUB_HEADERS = {
+    "Accept": "application/vnd.github+json",
+    "User-Agent": "ClinicFax-FaxRetriever/2.x (AutoUpdate)"
+}
 
 log = get_logger("auto_update")
 
@@ -90,7 +94,7 @@ class UpdateChecker(QThread):
 
             current_version = get_current_version()
             log.info(f"Checking for updates (current={current_version})")
-            resp = requests.get(API_URL, timeout=REQUEST_TIMEOUT)
+            resp = requests.get(API_URL, headers=GITHUB_HEADERS, timeout=REQUEST_TIMEOUT)
             if resp.status_code != 200:
                 msg = f"GitHub API error: {resp.status_code}"
                 log.warning(msg)
@@ -156,12 +160,32 @@ class UpdateInstaller(QThread):
             current_exe = sys.executable
             self.progress.emit("Downloading update...")
             tmp_path = os.path.join(self.exe_dir, f"update_{self.version}.exe")
-            r = requests.get(self.download_url, timeout=REQUEST_TIMEOUT)
-            if r.status_code != 200:
-                self.failed.emit(f"Failed to download update: HTTP {r.status_code}")
-                return
-            with open(tmp_path, 'wb') as f:
-                f.write(r.content)
+            tmp_part = tmp_path + ".part"
+            try:
+                with requests.get(self.download_url, timeout=REQUEST_TIMEOUT, stream=True) as r:
+                    if r.status_code != 200:
+                        self.failed.emit(f"Failed to download update: HTTP {r.status_code}")
+                        return
+                    total = int(r.headers.get("Content-Length", 0))
+                    if total:
+                        mb = max(1, total // (1024 * 1024))
+                        self.progress.emit(f"Downloading update ({mb} MB)...")
+                    with open(tmp_part, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=1024 * 128):
+                            if chunk:
+                                f.write(chunk)
+                # Atomic replace
+                try:
+                    os.replace(tmp_part, tmp_path)
+                except Exception:
+                    shutil.move(tmp_part, tmp_path)
+            finally:
+                # Clean up partial file on failure paths
+                try:
+                    if os.path.exists(tmp_part):
+                        os.remove(tmp_part)
+                except Exception:
+                    pass
 
             # Create timestamped backup directory
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
