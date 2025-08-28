@@ -3,9 +3,26 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/.venv/Scripts" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv32" />
+      <excludeFolder url="file://$MODULE_DIR$/cache" />
+      <excludeFolder url="file://$MODULE_DIR$/log" />
+      <excludeFolder url="file://$MODULE_DIR$/shared/config" />
+      <excludeFolder url="file://$MODULE_DIR$/.junie" />
+      <excludeFolder url="file://$MODULE_DIR$/Admin/licensing_server/build" />
+      <excludeFolder url="file://$MODULE_DIR$/Admin/licensing_server/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/Admin/licensing_server/tests" />
+      <excludeFolder url="file://$MODULE_DIR$/Admin/schemas" />
+      <excludeFolder url="file://$MODULE_DIR$/Code Archive" />
+      <excludeFolder url="file://$MODULE_DIR$/Testing Apps" />
+      <excludeFolder url="file://$MODULE_DIR$/Testing Data" />
+      <excludeFolder url="file://$MODULE_DIR$/shared" />
+      <excludeFolder url="file://$MODULE_DIR$/Admin" />
+      <excludeFolder url="file://$MODULE_DIR$/build" />
+      <excludeFolder url="file://$MODULE_DIR$/dist" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.11 (FaxRetriever)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.11 (FaxRetriever) - 32bit" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
