@@ -1,0 +1,13 @@
+/dist/
+/build/
+/log/
+/Testing/
+/bin/
+/.venv/
+/Cover Sheets/
+/Scanned Docs/
+/server_app/
+/Testing Data/
+/Testing Apps/
+/poppler/
+/Source Files/

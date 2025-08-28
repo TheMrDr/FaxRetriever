@@ -11,3 +11,14 @@
 /Testing Apps/
 /poppler/
 /Source Files/
+/cache/
+/.junie/
+/.venv32/
+/Code Archive/
+/Admin/licensing_server/build/
+/Admin/licensing_server/dist/
+/Admin/licensing_server/tests/
+/Admin/licensing_server/fraapi_host.py
+/Admin/schemas/
+/Admin/licensing_server/DEPRECATION_AUDIT.md
+/Admin/licensing_server/fraapi_host_settings.json

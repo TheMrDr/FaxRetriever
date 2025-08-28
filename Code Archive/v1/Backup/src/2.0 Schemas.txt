@@ -1,0 +1,67 @@
+# FaxRetriever 2.0 Schema and Data Design Suggestions
+
+# 1. Identity Token (client identity)
+# Used to bootstrap application config from server
+IdentityToken = str  # Format: user@domain.23613.service
+
+# 2. Retrieved Configuration Bundle (from licensing server)
+# Encrypted and stored locally after first pull
+RetrievedConfig = dict(
+    voice_api_user=str,
+    voice_api_password=str,
+    msg_api_user=str,
+    msg_api_password=str,
+    domain_uuid=str,
+    licensed=True,
+    client_identity=IdentityToken
+)
+
+# 3. Local Encrypted Config Format
+# Stored at shared/config/config.json.enc
+EncryptedConfig = {
+    "version": "2.0",
+    "identity": IdentityToken,
+    "uuid": str,  # Server-issued domain UUID
+    "api": {
+        "voice": {"user": str, "password": str},
+        "message": {"user": str, "password": str},
+    },
+    "paths": {
+        "inbox": str,
+        "outbox": str,
+        "temp": str,
+    },
+    "retriever_lockfile": str,
+    "settings": {
+        "auto_ocr": bool,
+        "pdf_output": bool,
+        "keep_jpg": bool,
+        "cover_pages_enabled": bool
+    }
+}
+
+# 4. Lockfile Format
+# Ensures single active retriever
+LockfileSchema = {
+    "pid": int,
+    "hostname": str,
+    "domain_uuid": str,
+    "created": str,  # ISO timestamp
+    "last_heartbeat": str  # Updated every 30s
+}
+
+# 5. Fax Metadata
+# For each received or sent fax
+FaxRecord = {
+    "direction": "inbound" | "outbound",
+    "status": "pending" | "success" | "failed",
+    "timestamp": str,
+    "pages": int,
+    "remote_id": str,
+    "local_file": str,
+    "ocr_text": str | None
+}
+
+# 6. Recommended JSON Settings File Names (unencrypted, optional)
+# shared/config/display_settings.json → for UI preferences
+# shared/config/cover_templates.json → for managing static templates

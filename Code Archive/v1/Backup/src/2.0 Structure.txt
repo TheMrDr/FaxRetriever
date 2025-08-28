@@ -1,0 +1,59 @@
+# FaxRetriever 2.0 Project Structure and Guide Notes
+
+project_root/
+├── src/
+│   ├── core/                         # System core logic: config, logging, encryption, license validation
+│   │   ├── config_loader.py          # Load/decrypt/upgrade config bundles
+│   │   ├── encryption.py             # Key handling, secure load/save
+│   │   ├── license_client.py         # Server bootstrap, licensing handshake
+│   │   └── app_state.py              # Shared runtime state and global flags
+│   │
+│   ├── fax_io/                       # Send/receive engine and job queue
+│   │   ├── receiver.py               # Inbound fax polling/retrieval engine
+│   │   ├── sender.py                 # Outbound fax sender logic
+│   │   ├── processor.py              # Image/PDF conversion, file cleanup
+│   │   └── watcher.py                # Folder monitor for triggers (e.g., outgoing queue)
+│   │
+│   ├── scanner/                      # WIA/TWAIN support and validation
+│   │   ├── scanner_manager.py        # Device detection and selection logic
+│   │   └── acquire.py                # Document capture pipeline
+│   │
+│   ├── integration/                 # External system bridges
+│   │   ├── winrx.py                  # WinRx/Computer-Rx integration
+│   │   ├── skyswitch_api.py         # SkySwitch voice/fax API client
+│   │   └── cloudmessage_api.py      # CloudMessage API client
+│   │
+│   ├── netcontrol/                  # Shared folder safety and lock coordination
+│   │   ├── lockfile.py              # Ensure single retriever instance per domain
+│   │   └── net_paths.py             # Determine shared data/config paths dynamically
+│   │
+│   ├── ui/                          # PyQt GUI modules
+│   │   ├── main_window.py           # Primary window structure
+│   │   ├── setup_wizard.py          # First-run bootstrap and identity entry
+│   │   ├── status_panel.py          # Visual status/log area
+│   │   └── dialogs.py               # Reusable modal dialogs
+│   │
+│   ├── utils/                       # Reusable utilities
+│   │   ├── logging_utils.py         # Structured logging
+│   │   ├── file_utils.py            # Safe file IO and temp handling
+│   │   └── constants.py             # App-wide constants
+│   │
+│   └── tests/                       # Targeted test harnesses per module
+│       ├── test_config_loader.py
+│       ├── test_lockfile.py
+│       └── ...
+│
+├── shared/
+│   ├── config/                      # Central config file and key store
+│   ├── data/                        # Fax inbox, outbox, logs
+│   └── lock/                        # Lockfile to prevent concurrent retrieval
+│
+├── docs/
+│   ├── changelog.md
+│   ├── architecture.md
+│   └── users_guide.md
+│
+├── LICENSE
+├── requirements.txt
+├── pyproject.toml
+└── main.py                         # Entrypoint for the application
