@@ -196,13 +196,17 @@ class UpdateInstaller(QThread):
             # Write updater batch
             self.progress.emit("Preparing installer...")
             bat_path = os.path.join(self.exe_dir, f"update_{ts}.bat")
+            exe_name = os.path.basename(current_exe)
             bat_lines = [
                 "@echo off",
                 "setlocal enableextensions",
-                f"set CURRENT=\"{current_exe}\"",
-                f"set TMPFILE=\"{tmp_path}\"",
-                f"set BACKUPDIR=\"{backup_dir}\"",
-                f"set BACKUPEXE=\"{backup_exe}\"",
+                "rem Use robust quoting for all path variables",
+                f"set \"CURRENT={current_exe}\"",
+                f"set \"TMPFILE={tmp_path}\"",
+                f"set \"BACKUPDIR={backup_dir}\"",
+                f"set \"BACKUPEXE={backup_exe}\"",
+                "rem Script directory (installation directory)",
+                "set \"SCRIPT_DIR=%~dp0\"",
                 "echo Stopping FaxRetriever...",
                 f"taskkill /f /im {os.path.basename(current_exe)} >nul 2>&1",
                 ":waitloop",
@@ -212,19 +216,21 @@ class UpdateInstaller(QThread):
                 "goto waitloop",
                 ":do_update",
                 "echo Backing up current version...",
-                "if not exist %BACKUPDIR% mkdir %BACKUPDIR%",
-                "copy /y %CURRENT% %BACKUPEXE% >nul",
+                "if not exist \"%BACKUPDIR%\" mkdir \"%BACKUPDIR%\"",
+                "copy /y \"%CURRENT%\" \"%BACKUPEXE%\" >nul",
                 "echo Installing update...",
-                "move /y %TMPFILE% %CURRENT% >nul",
+                "move /y \"%TMPFILE%\" \"%CURRENT%\" >nul",
                 "if errorlevel 1 goto restore",
                 "echo Update successful. Restarting...",
-                "start \"\" %CURRENT%",
+                "pushd \"%SCRIPT_DIR%\"",
+                "start \"\" \"%CURRENT%\"",
+                "popd",
                 "goto end",
                 ":restore",
                 "echo Update failed. Restoring backup...",
-                "copy /y %BACKUPEXE% %CURRENT% >nul",
+                "copy /y \"%BACKUPEXE%\" \"%CURRENT%\" >nul",
                 ":end",
-                f"del \"{bat_path}\"",
+                "del \"%~f0\"",
             ]
             with open(bat_path, 'w', encoding='utf-8') as bf:
                 bf.write("\r\n".join(bat_lines) + "\r\n")

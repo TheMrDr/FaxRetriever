@@ -157,67 +157,163 @@ class ScanWorker(QObject):
 
             img_path = None
 
+            outputs = []
+
             if device is not None:
                 # Headless transfer using current device settings; set DPI if possible
                 try:
                     # Try to set resolution on the device's first item
                     item = device.Items.Item(1) if hasattr(device.Items, "Item") else device.Items[1]
-                    desired_dpi = 300
-                    try:
-                        desired_dpi = int(device_config.get("Scanner", "resolution_dpi", "300") or 300)
-                    except Exception:
-                        desired_dpi = 300
-                    # Set horizontal/vertical resolution if present
-                    for target in [getattr(item, "Properties", None), getattr(device, "Properties", None)]:
-                        if target is None:
-                            continue
+
+
+                    # Use scanner's default settings; do not override WIA properties
+
+                    # Transfer pages in a loop until feeder is empty or an unrecoverable error occurs
+                    temp_dir = tempfile.gettempdir()
+                    base = f"scan_{self.session_number}_{os.getpid()}_{random.randint(1000, 9999)}"
+                    page_index = 1
+                    while True:
                         try:
-                            target.Item("Horizontal Resolution").Value = desired_dpi
-                        except Exception:
-                            pass
+                            image = cdlg.ShowTransfer(item, JPEG_GUID)
+                        except Exception as he:
+                            # If no pages left in feeder, break gracefully
+                            msg = str(he) or ""
+                            # Detect by HRESULT when available (WIA_ERROR_PAPER_EMPTY = 0x80210003)
+                            try:
+                                hresult = getattr(he, "hresult", None)
+                            except Exception:
+                                hresult = None
+                            lowercase = msg.lower()
+                            if (
+                                hresult in (-2145320957, 0x80210003)
+                                or "wia_error_paper_empty" in lowercase
+                                or "there are no pages to scan" in lowercase
+                                or ("feeder" in lowercase and "empty" in lowercase)
+                                or "no documents left in the document feeder" in lowercase
+                                or ("user requested a scan" in lowercase and "no documents" in lowercase and "feeder" in lowercase)
+                                or "no documents" in lowercase
+                            ):
+                                break
+                            # Otherwise, stop without opening any settings UI
+                            raise Exception(msg or "Scan failed.")
+
+                        if image is None:
+                            # No more images
+                            break
+
+                        # Save this page
+                        img_path = os.path.join(temp_dir, f"{base}_p{page_index:03d}.jpg")
                         try:
-                            target.Item("Vertical Resolution").Value = desired_dpi
+                            image.SaveFile(img_path)
+                        except Exception as e:
+                            # If saving fails mid-batch, stop and report what we have
+                            if not outputs:
+                                raise Exception(f"Failed to save scanned image: {e}")
+                            break
+
+                        # Auto-crop margins to remove scanner platen/gray borders before conversion
+                        try:
+                            cropped_path = self._auto_crop_margins(img_path)
+                            use_img_path = cropped_path or img_path
                         except Exception:
-                            pass
-                    # Transfer to image file without UI
-                    image = cdlg.ShowTransfer(item, JPEG_GUID)
+                            use_img_path = img_path
+
+                        # Convert to PDF for consistency with previews and sending pipeline
+                        pdf_path = self._image_to_pdf(use_img_path)
+                        out_path = pdf_path if pdf_path else use_img_path
+                        outputs.append(out_path)
+
+                        page_index += 1
+
+                    if not outputs:
+                        self.error.emit("No pages scanned.")
+                        return
+
                 except Exception as he:
-                    # Fall back to CommonDialog UI acquisition
-                    try:
-                        image = cdlg.ShowAcquireImage(1, 0, 0, JPEG_GUID, False, True, False)
-                    except Exception as e2:
-                        raise Exception(str(he) or str(e2))
+                    # Do not show settings UI; report error
+                    self.error.emit(str(he))
+                    return
             else:
-                # No device found via manager; try UI acquisition (will prompt selection)
+                # No device found via manager; prompt once to select a device, then scan with defaults
                 try:
-                    image = cdlg.ShowAcquireImage(1, 0, 0, JPEG_GUID, True, True, False)
+                    sel = cdlg.ShowSelectDevice(1, True, False)
+                except Exception as e:
+                    raise Exception(str(e))
+                if sel is None:
+                    self.error.emit("No scanner selected.")
+                    return
+                # Attempt to persist selection for next time
+                try:
+                    did = ""
+                    try:
+                        did = sel.Properties.Item("DeviceID").Value
+                    except Exception:
+                        did = getattr(sel, "DeviceID", "")
+                    name = ""
+                    try:
+                        name = sel.Properties.Item("Name").Value
+                    except Exception:
+                        name = getattr(sel, "Name", "")
+                    device_config.set("Scanner", "selected_device_id", did or "")
+                    device_config.set("Scanner", "selected_device_name", name or "")
+                    device_config.save()
+                except Exception:
+                    pass
+                # Perform transfer loop with defaults
+                try:
+                    item = sel.Items.Item(1) if hasattr(sel.Items, "Item") else sel.Items[1]
+                    temp_dir = tempfile.gettempdir()
+                    base = f"scan_{self.session_number}_{os.getpid()}_{random.randint(1000, 9999)}"
+                    page_index = 1
+                    while True:
+                        try:
+                            image = cdlg.ShowTransfer(item, JPEG_GUID)
+                        except Exception as he:
+                            msg = str(he) or ""
+                            # Detect by HRESULT when available (WIA_ERROR_PAPER_EMPTY = 0x80210003)
+                            try:
+                                hresult = getattr(he, "hresult", None)
+                            except Exception:
+                                hresult = None
+                            lowercase = msg.lower()
+                            if (
+                                hresult in (-2145320957, 0x80210003)
+                                or "wia_error_paper_empty" in lowercase
+                                or "there are no pages to scan" in lowercase
+                                or ("feeder" in lowercase and "empty" in lowercase)
+                                or "no documents left in the document feeder" in lowercase
+                                or ("user requested a scan" in lowercase and "no documents" in lowercase and "feeder" in lowercase)
+                                or "no documents" in lowercase
+                            ):
+                                break
+                            else:
+                                raise
+                        if image is None:
+                            break
+                        img_path = os.path.join(temp_dir, f"{base}_p{page_index:03d}.jpg")
+                        try:
+                            image.SaveFile(img_path)
+                        except Exception as e:
+                            if page_index == 1:
+                                raise Exception(f"Failed to save scanned image: {e}")
+                            break
+                        try:
+                            cropped_path = self._auto_crop_margins(img_path)
+                            use_img_path = cropped_path or img_path
+                        except Exception:
+                            use_img_path = img_path
+                        pdf_path = self._image_to_pdf(use_img_path)
+                        out_path = pdf_path if pdf_path else use_img_path
+                        outputs.append(out_path)
+                        page_index += 1
                 except Exception as e:
                     raise Exception(str(e))
 
-            if image is None:
+            # Emit all collected outputs
+            if not outputs:
                 self.error.emit("Scan canceled or no image acquired.")
                 return
-
-            temp_dir = tempfile.gettempdir()
-            base = f"scan_{self.session_number}_{os.getpid()}_{random.randint(1000, 9999)}"
-            img_path = os.path.join(temp_dir, base + ".jpg")
-            try:
-                image.SaveFile(img_path)
-            except Exception as e:
-                raise Exception(f"Failed to save scanned image: {e}")
-
-            # Auto-crop margins to remove scanner platen/gray borders before conversion
-            try:
-                cropped_path = self._auto_crop_margins(img_path)
-                use_img_path = cropped_path or img_path
-            except Exception:
-                use_img_path = img_path
-
-            # Convert to PDF for consistency with previews and sending pipeline
-            pdf_path = self._image_to_pdf(use_img_path)
-            out_path = pdf_path if pdf_path else use_img_path
-
-            self.success.emit([out_path])
+            self.success.emit(outputs)
         except Exception as e:
             self.error.emit(str(e))
         finally:

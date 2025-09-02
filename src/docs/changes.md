@@ -1,3 +1,35 @@
+# What's new in FaxRetriever 2.0.4
+
+The fax history indexer was refactored to ensure that it saves the history to ./log instead of MEIPASS. This ensures that 
+already-downloaded faxes are not redownloaded, even after being deleted from the fax inbox. Manual download is not impacted.
+
+The scanner operations were enhanced to auto-select the system scanner if only 1 is present or to allow the user to select 
+from any installed scanner if multiple scanners are present. This reduces user input when scanning documents. 
+
+---
+
+# What's new in FaxRetriever 2.0.3
+The `scan_worker` was updated to allow scanning multiple pages in a single operation by replacing the single-page acquisition
+with a multi-page loop using WIA. This change eliminates the need for users to click "Scan Document" for each page, and the 
+output now aggregates all scanned paths into a list. The previous functionality for flatbed devices is preserved as a fallback.
+
+Updates to the Auto Upgrade processes are intended to ensure that the application relaunches after successfully updating.
+
+---
+
+# What's new in FaxRetriever 2.0.2
+The Auto Update process was improved by forcing a startup check for new versions, enhancing the GitHub API call with headers 
+for reliability, and implementing a streaming download with atomic replace for updates. As a result, the system now performs u
+pdates more effectively while retaining a 24-hour check gating for non-startup instances.
+
+---
+
+# What's New in FaxRetriever 2.0.1
+Version 2.0.1 replaces PDFtoPPM with Fitz to reduce dependencies on 3rd party applications.
+No additional changes have been made.
+
+---
+
 # What’s New in FaxRetriever 2.0
 
 Welcome to FaxRetriever 2.0 — a major update focused on reliability, ease of use, and a cleaner interface. Here’s what’s changed and why it matters to you.

@@ -309,6 +309,7 @@ class SendFaxPanel(QWidget):
         # Keep controls row at natural height (non-stretch) to avoid overlap
         main_layout.addLayout(controls_row, 0)
 
+
     def refresh_caller_id_numbers(self):
         """Refresh the Caller ID dropdown from current app_state.global_cfg.all_numbers.
         Preserves selection when possible and falls back to device selection or first available.
@@ -522,6 +523,7 @@ class SendFaxPanel(QWidget):
                 self._preview_document(self.file_list.currentRow())
 
     def _on_scan(self):
+        # Start scanning immediately using scanner defaults; only device selection UI may appear
         self.scan_button.setEnabled(False)
         # Show scanning GIF
         try:
