@@ -1,3 +1,10 @@
+# What's new in FaxRetriever 2.0.5
+
+The scanner operations were adjusted to remove hard-coded file formatting and will now dynamically query the scanner for 
+file format options. Images are scanned in as .JPG if available, otherwise .PDF will be used.
+
+---
+
 # What's new in FaxRetriever 2.0.4
 
 The fax history indexer was refactored to ensure that it saves the history to ./log instead of MEIPASS. This ensures that 
