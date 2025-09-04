@@ -77,7 +77,36 @@ class ScanWorker(QObject):
                 raise Exception("Scanning not available: pywin32 (win32com) is not installed.")
 
             cdlg = Dispatch("WIA.CommonDialog")
-            JPEG_GUID = "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}"
+            # WIA image format GUIDs and preference
+            FORMAT_GUIDS = {
+                "JPEG": "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}",
+                "PNG":  "{B96B3CAF-0728-11D3-9D7B-0000F81EF32E}",
+                "BMP":  "{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}",
+                "TIFF": "{B96B3CB1-0728-11D3-9D7B-0000F81EF32E}",
+            }
+            PREFERRED_FORMATS = [
+                FORMAT_GUIDS["JPEG"],
+                FORMAT_GUIDS["PNG"],
+                FORMAT_GUIDS["BMP"],
+                FORMAT_GUIDS["TIFF"],
+            ]
+
+            def _get_supported_format_guids(wia_item):
+                guids = []
+                try:
+                    fmts = getattr(wia_item, "Formats", None)
+                    if fmts is not None:
+                        count = int(getattr(fmts, "Count", 0) or 0)
+                        for i in range(1, count + 1):
+                            try:
+                                guid = fmts.Item(i)
+                                if isinstance(guid, str):
+                                    guids.append(guid.upper())
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+                return guids
 
             device = None
             # Try to locate/persist device selection
@@ -174,7 +203,29 @@ class ScanWorker(QObject):
                     page_index = 1
                     while True:
                         try:
-                            image = cdlg.ShowTransfer(item, JPEG_GUID)
+                            # Try multiple transfer formats in order of preference; fall back on parameter errors
+                            supported = [g for g in _get_supported_format_guids(item)]
+                            candidates = [g for g in PREFERRED_FORMATS if g.upper() in supported] or PREFERRED_FORMATS
+                            image = None
+                            last_param_exc = None
+                            for fmt in candidates:
+                                try:
+                                    image = cdlg.ShowTransfer(item, fmt)
+                                    last_param_exc = None
+                                    break
+                                except Exception as fe:
+                                    msgf = str(fe) or ""
+                                    hrf = getattr(fe, "hresult", None)
+                                    if hrf in (-2147024809, 0x80070057) or "parameter is incorrect" in msgf.lower():
+                                        # Unsupported format or bad parameter for this device; try next format
+                                        last_param_exc = fe
+                                        continue
+                                    else:
+                                        # Other errors bubble to outer handler
+                                        raise
+                            if image is None and last_param_exc is not None:
+                                # Exhausted candidates; raise last param error for outer handling
+                                raise last_param_exc
                         except Exception as he:
                             # If no pages left in feeder, break gracefully
                             msg = str(he) or ""
@@ -267,7 +318,29 @@ class ScanWorker(QObject):
                     page_index = 1
                     while True:
                         try:
-                            image = cdlg.ShowTransfer(item, JPEG_GUID)
+                            # Try multiple transfer formats in order of preference; fall back on parameter errors
+                            supported = [g for g in _get_supported_format_guids(item)]
+                            candidates = [g for g in PREFERRED_FORMATS if g.upper() in supported] or PREFERRED_FORMATS
+                            image = None
+                            last_param_exc = None
+                            for fmt in candidates:
+                                try:
+                                    image = cdlg.ShowTransfer(item, fmt)
+                                    last_param_exc = None
+                                    break
+                                except Exception as fe:
+                                    msgf = str(fe) or ""
+                                    hrf = getattr(fe, "hresult", None)
+                                    if hrf in (-2147024809, 0x80070057) or "parameter is incorrect" in msgf.lower():
+                                        # Unsupported format or bad parameter for this device; try next format
+                                        last_param_exc = fe
+                                        continue
+                                    else:
+                                        # Other errors bubble to outer handler
+                                        raise
+                            if image is None and last_param_exc is not None:
+                                # Exhausted candidates; raise last param error for outer handling
+                                raise last_param_exc
                         except Exception as he:
                             msg = str(he) or ""
                             # Detect by HRESULT when available (WIA_ERROR_PAPER_EMPTY = 0x80210003)
