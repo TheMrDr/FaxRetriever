@@ -145,8 +145,15 @@ class OptionsDialog(QDialog):
         download_format_row.addWidget(self.download_both_radio)
         layout.addLayout(download_format_row)
 
-        method = (device_config.get("Fax Options", "download_method", "PDF") or "PDF").lower()
-        getattr(self, f"download_{method}_radio").setChecked(True)
+        raw_method = device_config.get("Fax Options", "download_method", "PDF")
+        # Some legacy configs may store "None" or unexpected values; default to PDF safely
+        method = (str(raw_method).strip().lower() if raw_method is not None else "pdf")
+        method_map = {
+            "pdf": self.download_pdf_radio,
+            "jpg": self.download_jpg_radio,
+            "both": self.download_both_radio,
+        }
+        (method_map.get(method) or self.download_pdf_radio).setChecked(True)
 
         format_group = QButtonGroup()
         for rb in [self.download_pdf_radio, self.download_jpg_radio, self.download_both_radio]:
