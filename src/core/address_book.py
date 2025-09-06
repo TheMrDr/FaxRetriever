@@ -1,9 +1,87 @@
 import json
 import os
+import sys
+from typing import Optional
+
+
+def _resolve_address_book_path(exe_dir: str, filename: str = "address_book.json") -> str:
+    """
+    Resolve a shared path for the address book so all clients launching from a
+    network share use the same file. Priority:
+      1) FR_ADDRESS_BOOK_FILE (file or dir) and FR_ADDRESS_BOOK_DIR
+      2) FR_ORIGINAL_ROOT (set by SMB bootstrap) at <root>/address_book.json
+      3) origin.path stored in LOCALAPPDATA\\...\\bin\\origin.path
+      4) Process-dir relative (exe_dir)
+      5) Project root (..\\.. from this file)
+      6) Current working directory
+    If none exist, prefer creating under FR_ORIGINAL_ROOT when available.
+    """
+    cands: list[str] = []
+
+    # 1) Environment overrides
+    env_file = os.environ.get('FR_ADDRESS_BOOK_FILE')
+    if env_file:
+        if os.path.isdir(env_file):
+            cands.append(os.path.join(env_file, filename))
+        else:
+            cands.append(env_file)
+    env_dir = os.environ.get('FR_ADDRESS_BOOK_DIR')
+    if env_dir:
+        cands.append(os.path.join(env_dir, filename))
+
+    # 2) Original network launch root provided by bootstrap
+    orig_root = os.environ.get('FR_ORIGINAL_ROOT')
+    if orig_root:
+        cands.append(os.path.join(orig_root, filename))
+
+    # 3) Origin path file written by bootstrap in local cache bin
+    try:
+        local_appdata = os.environ.get('LOCALAPPDATA') or ''
+        origin_file = os.path.join(local_appdata, 'Clinic Networking, LLC', 'FaxRetriever', '2.0', 'bin', 'origin.path')
+        if os.path.exists(origin_file):
+            with open(origin_file, 'r', encoding='utf-8') as f:
+                origin_root = f.read().strip()
+                if origin_root:
+                    cands.append(os.path.join(origin_root, filename))
+    except Exception:
+        pass
+
+    # 4) Process directory provided to manager (exe_dir)
+    if exe_dir:
+        cands.append(os.path.join(exe_dir, filename))
+
+    # 5) Project root when running from source
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        proj_root = os.path.abspath(os.path.join(here, '..', '..'))
+        cands.append(os.path.join(proj_root, filename))
+    except Exception:
+        pass
+
+    # 6) Current working directory
+    cands.append(os.path.join(os.getcwd(), filename))
+
+    for p in cands:
+        try:
+            if p and os.path.exists(p):
+                return p
+        except Exception:
+            continue
+
+    # Prefer creating under original root if available
+    if orig_root:
+        return os.path.join(orig_root, filename)
+    # Else, create in exe_dir if possible
+    if exe_dir:
+        return os.path.join(exe_dir, filename)
+    # Fallback to CWD
+    return os.path.join(os.getcwd(), filename)
+
 
 class AddressBookManager:
     def __init__(self, exe_dir, filename="address_book.json"):
-        self.filename = os.path.join(exe_dir, filename)
+        # Resolve to a shared location when launched via SMB; fall back as needed
+        self.filename = _resolve_address_book_path(exe_dir, filename)
         self.contacts = self.load_contacts()
 
     @staticmethod
@@ -72,7 +150,7 @@ class AddressBookManager:
             self._initialize_with_placeholder()
 
         try:
-            with open(self.filename, "r") as file:
+            with open(self.filename, "r", encoding="utf-8") as file:
                 data = json.load(file)
                 if not isinstance(data, list):
                     return []
@@ -90,8 +168,11 @@ class AddressBookManager:
         Initialize an empty address book on first run. UI will render non-persistent
         placeholder cards (at least 4) so we avoid storing sample data permanently.
         """
-        with open(self.filename, "w") as file:
+        os.makedirs(os.path.dirname(self.filename) or '.', exist_ok=True)
+        tmp_path = self.filename + '.tmp'
+        with open(tmp_path, "w", encoding="utf-8") as file:
             json.dump([], file, indent=4)
+        os.replace(tmp_path, self.filename)
 
     def save_contacts(self):
         # Normalize, drop placeholders, dedupe, and persist in a canonical order
@@ -100,8 +181,11 @@ class AddressBookManager:
         normalized = self._dedupe_contacts(normalized)
         normalized.sort(key=lambda x: (x.get('name', '') or '').lower())
         self.contacts = normalized
-        with open(self.filename, "w") as file:
+        os.makedirs(os.path.dirname(self.filename) or '.', exist_ok=True)
+        tmp_path = self.filename + '.tmp'
+        with open(tmp_path, "w", encoding="utf-8") as file:
             json.dump(self.contacts, file, indent=4)
+        os.replace(tmp_path, self.filename)
 
     def refresh_contacts(self):
         self.contacts = self.load_contacts()
@@ -181,12 +265,12 @@ class AddressBookManager:
                 self.save_contacts()
 
     def export_contacts(self, filepath):
-        with open(filepath, "w") as file:
+        with open(filepath, "w", encoding="utf-8") as file:
             json.dump(self.contacts, file, indent=4)
 
     def import_contacts(self, filepath):
         try:
-            with open(filepath, "r") as file:
+            with open(filepath, "r", encoding="utf-8") as file:
                 imported = json.load(file)
                 if isinstance(imported, list):
                     normalized = [self._normalize_contact(c) for c in imported]
