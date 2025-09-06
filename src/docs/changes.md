@@ -1,3 +1,17 @@
+# What's new in FaxRetriever 2.0.7
+
+- Added a startup bootstrap that transparently copies the executable to a trusted local cache when launched from a network path (UNC or mapped drive) and relaunches from there. This allows launching FaxRetriever.exe directly from SMB shares without ordinal/DLL loader errors on some systems. No behavior change when the app is started from a local disk or during development.
+- The app now continues to use a shared global configuration (shared/config/config.json) located on the original network share even after relocating the EXE to the local cache. At bootstrap, the original launch root is persisted and passed to the relaunched process; the configuration loader resolves the shared config via that origin, environment overrides (FR_GLOBAL_CONFIG_FILE/FR_GLOBAL_CONFIG_DIR), or falls back to process/repo-relative locations. This ensures all clients read the same global_config and any changes are reflected across devices on next reload/startup.
+
+---
+
+# What's new in FaxRetriever 2.0.6
+
+A typo in the download_methods would crash the application during new deployments when no download method was pre-specified. 
+The change now defaults the system to PDF in the event that no download method is specified.
+
+---
+
 # What's new in FaxRetriever 2.0.5
 
 The scanner operations were adjusted to remove hard-coded file formatting and will now dynamically query the scanner for 
