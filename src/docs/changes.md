@@ -1,3 +1,11 @@
+# What's new in FaxRetriever 2.0.8
+
+- Scanner refactored to use pyinsane2 instead of direct WIA calls. This should resolve issues with scanners failing to scan on some systems.
+- Scanned pages are now optimized for size and quality using a combination of color-limiting and compression.
+- Added delayed cleanup to remove temporary fax files after 5 minutes, preventing disk bloat and improving stability.
+
+---
+
 # What's new in FaxRetriever 2.0.7
 
 - Added a startup bootstrap that transparently copies the executable to a trusted local cache when launched from a network path (UNC or mapped drive) and relaunches from there. This allows launching FaxRetriever.exe directly from SMB shares without ordinal/DLL loader errors on some systems. No behavior change when the app is started from a local disk or during development.

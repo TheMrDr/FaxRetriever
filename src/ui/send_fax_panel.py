@@ -1,7 +1,7 @@
 import io
 import os
 
-from PyQt5.QtCore import Qt, QRectF, QSize, QThread
+from PyQt5.QtCore import Qt, QRectF, QSize, QThread, QTimer
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QMovie
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QLineEdit, \
     QGroupBox, QMessageBox, QListWidget, QGridLayout, QFileDialog, \
@@ -12,6 +12,7 @@ from fax_io.sender import FaxSender
 from utils.document_utils import normalize_document
 from tempfile import mkstemp
 import random
+import tempfile
 try:
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
@@ -523,19 +524,20 @@ class SendFaxPanel(QWidget):
                 self._preview_document(self.file_list.currentRow())
 
     def _on_scan(self):
-        # Start scanning immediately using scanner defaults; only device selection UI may appear
         self.scan_button.setEnabled(False)
-        # Show scanning GIF
+
         try:
             if hasattr(self, 'scan_movie') and self.scan_movie:
                 self.scan_gif_label.setVisible(True)
                 self.scan_movie.start()
         except Exception:
             pass
-        self.thread = QThread()
+
+        self.thread = QThread(self)
         self.worker = ScanWorker(session_number=self.scan_session_count)
         self.worker.moveToThread(self.thread)
 
+        # Signals
         self.worker.success.connect(self._on_scan_success)
         self.worker.error.connect(self._on_scan_error)
         self.worker.finished.connect(self.thread.quit)
@@ -546,33 +548,32 @@ class SendFaxPanel(QWidget):
         self.thread.start()
 
     def _on_scan_success(self, paths):
-        # Hide scanning GIF
+        self.scan_session_count += 1
+
         try:
-            if hasattr(self, 'scan_movie') and self.scan_movie:
+            if self.scan_movie:
                 self.scan_movie.stop()
                 self.scan_gif_label.setVisible(False)
         except Exception:
             pass
-        self.scan_session_count += 1
-        # Normalize scanned outputs before attaching
+
         added_any = False
-        for p in paths or []:
-            try:
-                norm = normalize_document(p)
-            except Exception as e:
-                norm = None
-            if norm:
-                self.attachments.append(norm)
-                self.file_list.addItem(os.path.basename(norm))
+        for p in paths:
+            if os.path.exists(p):
+                self.attachments.append(p)
+                self.file_list.addItem(os.path.basename(p))
+
                 added_any = True
+
         if not added_any:
             QMessageBox.warning(self, "Scanner", "No usable document produced by scan.")
-        # If cover is selected, keep it pinned to index 0
+
         if self.cover_checkbox.isChecked():
             self._pin_cover_to_front()
-        # Update preview to the last item
+
         if self.file_list.count() > 0:
             self._preview_document(self.file_list.count() - 1)
+
         self.scan_button.setEnabled(True)
 
     def _on_scan_error(self, message):
@@ -717,11 +718,27 @@ class SendFaxPanel(QWidget):
             device_config.save()
         except Exception:
             pass
+
+        # Capture the current attachment paths (and cover path if any) to schedule temp cleanup after send
+        to_delete = list(self.attachments)
+        try:
+            if getattr(self, '_cover_temp_path', None):
+                to_delete.append(self._cover_temp_path)
+        except Exception:
+            pass
+
         with BusyDialog(self, "Sending fax..."):
             success = FaxSender.send_fax(self.base_dir, fax, self.attachments, include_cover)
+
+        # Always schedule cleanup after attempt (both success and failure) with a 5-minute delay
+        try:
+            self._schedule_temp_cleanup(to_delete, delay_ms=300000)
+        except Exception:
+            pass
+
         if success:
             QMessageBox.information(self, "Success", "Fax sent successfully.")
-            # Clear the panel first per UX requirement
+            # Clear the panel per UX requirement
             self._on_clear()
             try:
                 # Refresh History and trigger polling via MainWindow if available
@@ -753,18 +770,23 @@ class SendFaxPanel(QWidget):
             QMessageBox.critical(self, "Failed", "Fax failed to send.")
 
     def _on_clear(self):
-        # Clean up any temp cover sheet and Recipient Info
+        # Schedule deletion of any temp files from current attachments (including cover) after 5 minutes
+        try:
+            to_delete = list(self.attachments)
+            if getattr(self, '_cover_temp_path', None):
+                to_delete.append(self._cover_temp_path)
+            self._schedule_temp_cleanup(to_delete, delay_ms=300000)
+        except Exception:
+            pass
+
+        # Clean up any Recipient Info and UI state
         self.fax_area.clear()
         self.fax_prefix.clear()
         self.fax_suffix.clear()
         self.cover_to_input.clear()
         self.cover_memo_input.clear()
         self.cover_checkbox.setChecked(False)
-        try:
-            if hasattr(self, '_cover_temp_path') and self._cover_temp_path and os.path.exists(self._cover_temp_path):
-                os.remove(self._cover_temp_path)
-        except Exception:
-            pass
+        # Do not delete cover immediately; scheduled above. Just forget its path.
         self._cover_temp_path = None
         self.page_images = []
         self.original_pixmap = None
@@ -973,7 +995,7 @@ class SendFaxPanel(QWidget):
             pass
 
     def _remove_cover_if_present(self):
-        # Remove list item labeled as cover and delete temp file
+        # Remove list item labeled as cover and schedule deletion of its temp file
         try:
             for i in range(self.file_list.count()):
                 item = self.file_list.item(i)
@@ -983,7 +1005,54 @@ class SendFaxPanel(QWidget):
                         self.attachments.pop(i)
                     break
             if self._cover_temp_path and os.path.exists(self._cover_temp_path):
-                os.remove(self._cover_temp_path)
+                # Schedule deletion with default delay (5 minutes)
+                self._schedule_temp_cleanup([self._cover_temp_path], delay_ms=300000)
         except Exception:
             pass
         self._cover_temp_path = None
+
+    def _schedule_temp_cleanup(self, paths, delay_ms: int = 300000):
+        """Schedule deletion of temp files after a delay (default 5 minutes).
+        Only deletes files under the system temp directory or app cache, and the generated cover file.
+        """
+        try:
+            # Normalize and filter to safe temp locations
+            tempdir = os.path.abspath(tempfile.gettempdir())
+            app_cache = os.path.abspath(os.path.join(self.base_dir, "cache"))
+            safe_paths = []
+            for p in (paths or []):
+                try:
+                    if not p:
+                        continue
+                    ap = os.path.abspath(p)
+                    if ap.startswith(tempdir) or ap.startswith(app_cache):
+                        safe_paths.append(ap)
+                    elif getattr(self, '_cover_temp_path', None) and ap == os.path.abspath(self._cover_temp_path):
+                        safe_paths.append(ap)
+                except Exception:
+                    continue
+            if not safe_paths:
+                return
+            try:
+                self.log.info(f"Scheduling deletion of {len(safe_paths)} temp file(s) in {max(0, delay_ms // 1000)}s")
+            except Exception:
+                pass
+
+            def _do_delete():
+                for p in safe_paths:
+                    try:
+                        if os.path.exists(p):
+                            os.remove(p)
+                            try:
+                                self.log.info(f"Deleted temp file: {p}")
+                            except Exception:
+                                pass
+                    except Exception:
+                        try:
+                            self.log.exception(f"Failed to delete temp file: {p}")
+                        except Exception:
+                            pass
+            # Use a single-shot QTimer on the UI thread
+            QTimer.singleShot(int(max(0, delay_ms)), _do_delete)
+        except Exception:
+            pass
