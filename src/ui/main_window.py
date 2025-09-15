@@ -7,30 +7,30 @@ Heavy logic is offloaded to core modules and app state accessors.
 """
 
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QGridLayout, QLabel, QPushButton, QLineEdit,
-    QMenuBar, QMenu, QAction, QStatusBar, QFileDialog, QMessageBox, QHBoxLayout, QSizePolicy, QSystemTrayIcon,
-    QVBoxLayout, QSplitter, QListWidget, QListWidgetItem
-)
+from PyQt5.QtWidgets import (QAction, QApplication, QFileDialog, QGridLayout,
+                             QHBoxLayout, QLabel, QLineEdit, QListWidget,
+                             QListWidgetItem, QMainWindow, QMenu, QMenuBar,
+                             QMessageBox, QPushButton, QSizePolicy, QSplitter,
+                             QStatusBar, QSystemTrayIcon, QVBoxLayout, QWidget)
 
 from core.address_book import AddressBookManager
 from core.app_state import app_state
 from core.auto_update import UpdateChecker, UpdateInstaller, is_time_to_check
-from core.config_loader import global_config, device_config
+from core.config_loader import device_config, global_config
 from core.license_client import retrieve_skyswitch_token
 from fax_io.receiver import FaxReceiver
 from integrations.computer_rx import CRxIntegration2
 from ui.about_dialog import AboutDialog
 from ui.address_book_dialog import AddressBookDialog
-from ui.dialogs import LogViewer, WhatsNewDialog, MarkdownViewer
+from ui.dialogs import LogViewer, MarkdownViewer, WhatsNewDialog
 from ui.fax_history_panel import FaxHistoryPanel
 from ui.options_dialog import OptionsDialog
 from ui.send_fax_panel import SendFaxPanel
-from ui.status_panel import TokenLifespanProgressBar, FaxPollTimerProgressBar
+from ui.status_panel import FaxPollTimerProgressBar, TokenLifespanProgressBar
 from utils.logging_utils import get_logger
 from version import __version__
 
@@ -67,7 +67,7 @@ class MainWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.central_widget = QWidget()
         self.main_layout = QGridLayout(self.central_widget)
-        
+
         # Limited-mode full-screen logo placeholder
         self.limited_logo_label = QLabel()
         self.limited_logo_label.setAlignment(Qt.AlignCenter)
@@ -84,12 +84,16 @@ class MainWindow(QMainWindow):
 
         # Cache banner pixmap once to avoid repeated disk reads and rescaling
         try:
-            self._banner_pixmap_orig = QPixmap(os.path.join(self.base_dir, "images", "corner_logo.png"))
+            self._banner_pixmap_orig = QPixmap(
+                os.path.join(self.base_dir, "images", "corner_logo.png")
+            )
         except Exception:
             self._banner_pixmap_orig = QPixmap()
         # Preload splash image for inactive state
         try:
-            self._splash_pixmap_orig = QPixmap(os.path.join(self.base_dir, "images", "splash.png"))
+            self._splash_pixmap_orig = QPixmap(
+                os.path.join(self.base_dir, "images", "splash.png")
+            )
         except Exception:
             self._splash_pixmap_orig = QPixmap()
 
@@ -153,7 +157,9 @@ class MainWindow(QMainWindow):
             dialog.setAttribute(Qt.WA_TranslucentBackground, True)
             # Ensure the dialog and its children have an opaque background and visible border
             dialog.setAutoFillBackground(True)
-            dialog.setStyleSheet("QDialog { background: #ffffff; border: 1px solid rgba(0,0,0,90); border-radius: 10px; } * { background-color: #ffffff; }")
+            dialog.setStyleSheet(
+                "QDialog { background: #ffffff; border: 1px solid rgba(0,0,0,90); border-radius: 10px; } * { background-color: #ffffff; }"
+            )
         except Exception:
             # Fallback to normal modal if anything fails
             pass
@@ -201,18 +207,22 @@ class MainWindow(QMainWindow):
         # Help Menu
         # User Guide (Read Me)
         user_guide_action = QAction("Read Me (User Guide)", self)
-        user_guide_action.triggered.connect(lambda: self._open_markdown_viewer(
-            "FaxRetriever 2.0 — User Guide",
-            os.path.join(self.base_dir, "src", "docs", "readme.md")
-        ))
+        user_guide_action.triggered.connect(
+            lambda: self._open_markdown_viewer(
+                "FaxRetriever 2.0 — User Guide",
+                os.path.join(self.base_dir, "src", "docs", "readme.md"),
+            )
+        )
         self.help_menu.addAction(user_guide_action)
 
         # What's New
         whats_new_action = QAction("What's New (2.0)", self)
-        whats_new_action.triggered.connect(lambda: self._open_markdown_viewer(
-            "What's New in FaxRetriever 2.0",
-            os.path.join(self.base_dir, "src", "docs", "changes.md")
-        ))
+        whats_new_action.triggered.connect(
+            lambda: self._open_markdown_viewer(
+                "What's New in FaxRetriever 2.0",
+                os.path.join(self.base_dir, "src", "docs", "changes.md"),
+            )
+        )
         self.help_menu.addAction(whats_new_action)
 
         # About
@@ -249,22 +259,33 @@ class MainWindow(QMainWindow):
             self._doc_windows[key] = dlg
         except Exception as e:
             try:
-                QMessageBox.information(self, "Document", f"Unable to open document:\n{e}")
+                QMessageBox.information(
+                    self, "Document", f"Unable to open document:\n{e}"
+                )
             except Exception:
                 pass
 
     def _show_options_dialog(self):
-        dialog = OptionsDialog(base_dir=self.base_dir, app_state=self.app_state, main_window=self)
+        dialog = OptionsDialog(
+            base_dir=self.base_dir, app_state=self.app_state, main_window=self
+        )
         dialog.load_state_into_form()
         self._show_overlay(dialog)
 
     def _build_banner(self):
         """Prepare a small logo pixmap; it will be embedded in the left pane header instead of a full-width row."""
         try:
-            if hasattr(self, "_banner_pixmap_orig") and not self._banner_pixmap_orig.isNull():
-                pixmap = self._banner_pixmap_orig.scaledToWidth(160, Qt.SmoothTransformation)
+            if (
+                hasattr(self, "_banner_pixmap_orig")
+                and not self._banner_pixmap_orig.isNull()
+            ):
+                pixmap = self._banner_pixmap_orig.scaledToWidth(
+                    160, Qt.SmoothTransformation
+                )
             else:
-                pixmap = QPixmap(os.path.join(self.base_dir, "images", "corner_logo.png")).scaledToWidth(160, Qt.SmoothTransformation)
+                pixmap = QPixmap(
+                    os.path.join(self.base_dir, "images", "corner_logo.png")
+                ).scaledToWidth(160, Qt.SmoothTransformation)
             self.banner.setPixmap(pixmap)
         except Exception:
             pass
@@ -291,12 +312,16 @@ class MainWindow(QMainWindow):
         # (Save location moved to right Retrieval section)
 
         # Embedded send fax panel
-        self.send_fax_panel = SendFaxPanel(self.base_dir, self.exe_dir, self.app_state, self.address_book_model, self)
+        self.send_fax_panel = SendFaxPanel(
+            self.base_dir, self.exe_dir, self.app_state, self.address_book_model, self
+        )
         self.send_fax_panel.setMinimumHeight(560)
         left_v.addWidget(self.send_fax_panel, 1)
 
         # Right side: Fax History (bottom area). Retrieval controls move to a full-width top header.
-        self.fax_history_panel = FaxHistoryPanel(self.base_dir, self.app_state, self.exe_dir)
+        self.fax_history_panel = FaxHistoryPanel(
+            self.base_dir, self.app_state, self.exe_dir
+        )
         self.fax_history_panel.setMinimumWidth(300)
 
         # Build a full-width top header with logo (left) and retrieval controls (right)
@@ -321,7 +346,9 @@ class MainWindow(QMainWindow):
         top_row.addWidget(self.save_location_input)
         top_row.addWidget(self.select_folder_button)
         self.setup_retrieval_button = QPushButton("Configure Fax Retrieval")
-        self.setup_retrieval_button.setToolTip("Select fax number(s) for retrieval on this device")
+        self.setup_retrieval_button.setToolTip(
+            "Select fax number(s) for retrieval on this device"
+        )
         self.setup_retrieval_button.clicked.connect(self._setup_fax_retrieval)
         top_row.addWidget(self.setup_retrieval_button)
         top_row.addWidget(self.poll_button)
@@ -427,7 +454,7 @@ class MainWindow(QMainWindow):
         try:
             self._force_exit = True
             try:
-                if hasattr(self, 'tray_icon') and self.tray_icon:
+                if hasattr(self, "tray_icon") and self.tray_icon:
                     self.tray_icon.hide()
             except Exception:
                 pass
@@ -437,6 +464,20 @@ class MainWindow(QMainWindow):
 
     def _manual_poll(self):
         """Trigger manual fax check (delegated)."""
+        # Enforce authorization before allowing any retrieval
+        mode_ok = ((self.app_state.device_cfg.retriever_mode or "").lower() == "sender_receiver")
+        status_ok = ((self.app_state.device_cfg.retriever_status or "").lower() == "allowed")
+        if not (mode_ok and status_ok):
+            try:
+                self.log.warning("Manual poll blocked: device is not authorized as retriever.")
+            except Exception:
+                pass
+            self.status_bar.showMessage("This device is not authorized to retrieve faxes.", 4000)
+            try:
+                self.poll_bar.timer.stop()
+            except Exception:
+                pass
+            return
         self.status_bar.showMessage("Manual fax poll requested")
         self.poll_bar.retrieveFaxes()
 
@@ -448,12 +489,12 @@ class MainWindow(QMainWindow):
             "Stop Retrieving Faxes",
             "Are you sure you want to stop retrieving faxes from this device?\n\nYou may re-enroll at any time so long as there isn't already another retriever device.",
             QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.No,
         )
         if resp != QMessageBox.Yes:
             return
         try:
-            from core.admin_client import unregister_assignments, get_device_id
+            from core.admin_client import get_device_id, unregister_assignments
         except Exception:
             unregister_assignments = None
             get_device_id = lambda: "UNKNOWN"
@@ -465,11 +506,17 @@ class MainWindow(QMainWindow):
                 payload_numbers = numbers if numbers else None
                 res = unregister_assignments(jwt, payload_numbers, get_device_id())
                 if res.get("error"):
-                    QMessageBox.warning(self, "Unregister", f"Failed to unregister: {res['error']}")
+                    QMessageBox.warning(
+                        self, "Unregister", f"Failed to unregister: {res['error']}"
+                    )
                 else:
-                    self.status_bar.showMessage("Retriever assignments rescinded.", 4000)
+                    self.status_bar.showMessage(
+                        "Retriever assignments rescinded.", 4000
+                    )
             except Exception as e:
-                QMessageBox.warning(self, "Unregister", f"Unregister request failed: {e}")
+                QMessageBox.warning(
+                    self, "Unregister", f"Unregister request failed: {e}"
+                )
         # Update local config regardless to reflect stop state
         try:
             device_config.set("Account", "selected_fax_numbers", [])
@@ -495,13 +542,18 @@ class MainWindow(QMainWindow):
 
     def _setup_fax_retrieval(self):
         """Open in-app modal to select fax numbers; consult assignments routes and apply on confirm."""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
-        from core.admin_client import list_assignments, request_assignments, get_device_id
+        from PyQt5.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout
+
+        from core.admin_client import (get_device_id, list_assignments,
+                                       request_assignments)
+
         dlg = QDialog(self)
         dlg.setWindowTitle("Setup Fax Retrieval")
         v = QVBoxLayout(dlg)
 
-        instructions = QLabel("Select fax number(s) to retrieve on this device. Only one retriever per number is allowed.")
+        instructions = QLabel(
+            "Select fax number(s) to retrieve on this device. Only one retriever per number is allowed."
+        )
         instructions.setWordWrap(True)
         v.addWidget(instructions)
 
@@ -515,6 +567,7 @@ class MainWindow(QMainWindow):
         jwt = self.app_state.global_cfg.jwt_token or ""
         if jwt:
             from ui.busy import BusyDialog
+
             with BusyDialog(self, "Loading assignments…"):
                 data = list_assignments(jwt)
             owners = (data.get("results") or {}) if isinstance(data, dict) else {}
@@ -545,13 +598,20 @@ class MainWindow(QMainWindow):
         def on_ok():
             selected = [i.text().split()[0] for i in lst.selectedItems()]
             if not selected:
-                QMessageBox.warning(dlg, "Select Numbers", "Please select at least one fax number.")
+                QMessageBox.warning(
+                    dlg, "Select Numbers", "Please select at least one fax number."
+                )
                 return
             jwt_token = self.app_state.global_cfg.jwt_token or ""
             if not jwt_token:
-                QMessageBox.warning(dlg, "Missing JWT", "Initialize in Options before requesting assignments.")
+                QMessageBox.warning(
+                    dlg,
+                    "Missing JWT",
+                    "Initialize in Options before requesting assignments.",
+                )
                 return
             from ui.busy import BusyDialog
+
             with BusyDialog(self, "Applying selection…"):
                 res = request_assignments(jwt_token, selected)
             if res.get("error"):
@@ -567,13 +627,19 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
             results = res.get("results", {})
-            allowed = [n for n, r in results.items() if (r or {}).get("status") == "allowed"]
-            denied = [n for n, r in results.items() if (r or {}).get("status") != "allowed"]
+            allowed = [
+                n for n, r in results.items() if (r or {}).get("status") == "allowed"
+            ]
+            denied = [
+                n for n, r in results.items() if (r or {}).get("status") != "allowed"
+            ]
             if allowed:
                 device_config.set("Account", "selected_fax_numbers", allowed)
                 device_config.set("Account", "selected_fax_number", allowed[0])
                 device_config.set("Account", "retriever_mode", "sender_receiver")
-                device_config.set("Account", "requested_retriever_mode", "sender_receiver")
+                device_config.set(
+                    "Account", "requested_retriever_mode", "sender_receiver"
+                )
                 device_config.set("Token", "retriever_status", "allowed")
                 device_config.save()
                 self.app_state.sync_from_config()
@@ -593,15 +659,15 @@ class MainWindow(QMainWindow):
     def _on_receiver_finished(self):
         # Close any active busy indicator for receiver processing
         try:
-            if getattr(self, '_receiver_busy', None):
+            if getattr(self, "_receiver_busy", None):
                 self._receiver_busy.close()
                 self._receiver_busy = None
         except Exception:
             pass
         # After any receiver pass completes, refresh the history panel
         try:
-            if hasattr(self, 'fax_history_panel'):
-                if hasattr(self.fax_history_panel, 'request_refresh'):
+            if hasattr(self, "fax_history_panel"):
+                if hasattr(self.fax_history_panel, "request_refresh"):
                     self.fax_history_panel.request_refresh()
                 else:
                     self.fax_history_panel.refresh()
@@ -618,12 +684,29 @@ class MainWindow(QMainWindow):
         """
         Bound to FaxPollTimerProgressBar.retrieveFaxes.
         Policy:
+          - If not authorized as retriever, do nothing.
           - If bearer missing or <60 min remaining, attempt refresh.
           - Always run the receiver pass afterward.
         """
+        # Authorization check
+        mode_ok = ((self.app_state.device_cfg.retriever_mode or "").lower() == "sender_receiver")
+        status_ok = ((self.app_state.device_cfg.retriever_status or "").lower() == "allowed")
+        if not (mode_ok and status_ok):
+            try:
+                self.log.info("Poll timer tick ignored: device is not authorized as retriever.")
+            except Exception:
+                pass
+            try:
+                self.poll_bar.timer.stop()
+            except Exception:
+                pass
+            return
+
         try:
             if not self._has_valid_bearer_token(min_minutes=60):
-                self.log.info("Bearer missing/stale (<60m). Attempting refresh before poll.")
+                self.log.info(
+                    "Bearer missing/stale (<60m). Attempting refresh before poll."
+                )
                 self._retrieve_token()
         except Exception as e:
             self.log.warning(f"Bearer check failed: {e}")
@@ -633,9 +716,10 @@ class MainWindow(QMainWindow):
             # Show a non-blocking busy indicator while the receiver processes faxes
             try:
                 from ui.busy import BusyDialog
+
                 # Close any prior busy indicator just in case
                 try:
-                    if getattr(self, '_receiver_busy', None):
+                    if getattr(self, "_receiver_busy", None):
                         self._receiver_busy.close()
                 except Exception:
                     pass
@@ -650,7 +734,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             # Ensure busy indicator is closed on failure
             try:
-                if getattr(self, '_receiver_busy', None):
+                if getattr(self, "_receiver_busy", None):
                     self._receiver_busy.close()
                     self._receiver_busy = None
             except Exception:
@@ -685,13 +769,20 @@ class MainWindow(QMainWindow):
         self.app_state.sync_from_config()
 
         if not self.app_state.global_cfg.fax_user:
-            QMessageBox.warning(self, "Missing User", "Please configure your Fax User in System > Options.")
+            QMessageBox.warning(
+                self,
+                "Missing User",
+                "Please configure your Fax User in System > Options.",
+            )
             self._apply_operational_mode()
             return
 
         if not self.app_state.global_cfg.validation_status:
-            QMessageBox.critical(self, "Not Licensed",
-                                 "This account is not licensed or authenticated. Open Options to configure.")
+            QMessageBox.critical(
+                self,
+                "Not Licensed",
+                "This account is not licensed or authenticated. Open Options to configure.",
+            )
             self._apply_operational_mode()
             return
 
@@ -702,33 +793,42 @@ class MainWindow(QMainWindow):
 
     def _retrieve_token(self):
         from ui.busy import BusyDialog
+
         with BusyDialog(self, "Refreshing token..."):
             result = retrieve_skyswitch_token(self.app_state)
 
         if result.get("error"):
-            QMessageBox.critical(self, "Token Error",
-                                 f"Failed to retrieve SkySwitch bearer token:\n\n{result['error']}")
+            QMessageBox.critical(
+                self,
+                "Token Error",
+                f"Failed to retrieve SkySwitch bearer token:\n\n{result['error']}",
+            )
             self._apply_operational_mode()
             return
 
         self.app_state.global_cfg.bearer_token = result["bearer_token"]
         self.app_state.global_cfg.bearer_token_expiration = result["expires_at"]
-        self.app_state.global_cfg.bearer_token_retrieved = datetime.now(timezone.utc).isoformat()
+        self.app_state.global_cfg.bearer_token_retrieved = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         self.token_bar.restart_progress()
         self.poll_bar.restart_progress()
         self.status_bar.showMessage("Bearer refreshed.", 2000)
 
-        numbers = result.get("all_fax_numbers", self.app_state.global_cfg.all_numbers or [])
+        numbers = result.get(
+            "all_fax_numbers", self.app_state.global_cfg.all_numbers or []
+        )
         self.app_state.update_token_state(
             bearer_token=result["bearer_token"],
             expires_at=result["expires_at"],
-            fax_numbers=numbers
+            fax_numbers=numbers,
         )
 
         # After refreshing bearer, update retriever assignments cache (global)
         try:
             from core.admin_client import list_assignments
+
             jwt = self.app_state.global_cfg.jwt_token or ""
             if jwt:
                 data = list_assignments(jwt)
@@ -774,6 +874,20 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Token Error", msg)
 
     def _start_services(self):
+        # Authorization check: never start receiver unless explicitly authorized
+        mode_ok = ((self.app_state.device_cfg.retriever_mode or "").lower() == "sender_receiver")
+        status_ok = ((self.app_state.device_cfg.retriever_status or "").lower() == "allowed")
+        if not (mode_ok and status_ok):
+            try:
+                self.log.info("Start services skipped: device not authorized as retriever.")
+            except Exception:
+                pass
+            try:
+                self.poll_bar.timer.stop()
+            except Exception:
+                pass
+            return
+
         self.status_bar.showMessage("Initializing fax engine...")
         # Kick a one-time preflight token attempt if we’re already inside the 60m window
         try:
@@ -786,8 +900,9 @@ class MainWindow(QMainWindow):
         # Show a non-blocking busy indicator during initial receiver run
         try:
             from ui.busy import BusyDialog
+
             try:
-                if getattr(self, '_receiver_busy', None):
+                if getattr(self, "_receiver_busy", None):
                     self._receiver_busy.close()
             except Exception:
                 pass
@@ -812,9 +927,9 @@ class MainWindow(QMainWindow):
         # Open Address Book dialog modelessly; keep single instance and reuse
         try:
             # Prefer SendFaxPanel as parent so selections populate fax fields
-            parent_widget = getattr(self, 'send_fax_panel', self)
+            parent_widget = getattr(self, "send_fax_panel", self)
             # Reuse existing dialog if open
-            existing = getattr(self, '_address_book_dialog', None)
+            existing = getattr(self, "_address_book_dialog", None)
             if existing is not None:
                 try:
                     existing.show()
@@ -826,14 +941,18 @@ class MainWindow(QMainWindow):
                         existing.close()
                     except Exception:
                         pass
-            dlg = AddressBookDialog(self.base_dir, self.address_book_model, parent_widget)
+            dlg = AddressBookDialog(
+                self.base_dir, self.address_book_model, parent_widget
+            )
             dlg.setModal(False)
             dlg.setAttribute(Qt.WA_DeleteOnClose, True)
+
             def _on_destroyed(_obj=None):
                 try:
                     self._address_book_dialog = None
                 except Exception:
                     pass
+
             try:
                 dlg.destroyed.connect(_on_destroyed)
             except Exception:
@@ -843,7 +962,11 @@ class MainWindow(QMainWindow):
         except Exception:
             # Fallback to modal open to preserve functionality if modeless fails
             try:
-                dlg = AddressBookDialog(self.base_dir, self.address_book_model, getattr(self, 'send_fax_panel', self))
+                dlg = AddressBookDialog(
+                    self.base_dir,
+                    self.address_book_model,
+                    getattr(self, "send_fax_panel", self),
+                )
                 dlg.exec_()
             except Exception:
                 pass
@@ -852,9 +975,12 @@ class MainWindow(QMainWindow):
         # Attempt one-time migration of v1 settings before loading state
         try:
             from core.v1_migration import migrate_v1_if_present
+
             if migrate_v1_if_present():
                 try:
-                    self.status_bar.showMessage("Imported settings from FaxRetriever v1.", 5000)
+                    self.status_bar.showMessage(
+                        "Imported settings from FaxRetriever v1.", 5000
+                    )
                 except Exception:
                     pass
         except Exception:
@@ -866,9 +992,9 @@ class MainWindow(QMainWindow):
 
     def _focus_fax_history(self):
         try:
-            if hasattr(self, 'fax_history_panel'):
+            if hasattr(self, "fax_history_panel"):
                 self.fax_history_panel.setVisible(True)
-                if hasattr(self.fax_history_panel, 'request_refresh'):
+                if hasattr(self.fax_history_panel, "request_refresh"):
                     self.fax_history_panel.request_refresh()
                 else:
                     self.fax_history_panel.refresh()
@@ -889,9 +1015,15 @@ class MainWindow(QMainWindow):
         global_config.save()
         device_config.save()
         validation = self.app_state.global_cfg.validation_status
-        auto_retrieve = ((self.app_state.device_cfg.retriever_mode or "").lower() == "sender_receiver")
+        auto_retrieve = (
+            self.app_state.device_cfg.retriever_mode or ""
+        ).lower() == "sender_receiver"
+        status_allowed = (self.app_state.device_cfg.retriever_status or "").lower() == "allowed"
+        allowed_to_retrieve = auto_retrieve and status_allowed
         numbers_approved = bool(self.app_state.device_cfg.selected_fax_numbers)
-        save_path = self.app_state.device_cfg.save_path or device_config.get("Fax Options", "save_path", "")
+        save_path = self.app_state.device_cfg.save_path or device_config.get(
+            "Fax Options", "save_path", ""
+        )
         self.save_location_input.setText(save_path)
         # If save_path exists in persisted config but not hydrated into runtime yet, hydrate now
         if not self.app_state.device_cfg.save_path and save_path:
@@ -906,7 +1038,9 @@ class MainWindow(QMainWindow):
             if pix.isNull():
                 pix = QPixmap(os.path.join(self.base_dir, "images", "splash.png"))
             if not pix.isNull():
-                self.limited_logo_label.setPixmap(pix.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                self.limited_logo_label.setPixmap(
+                    pix.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                )
         except Exception:
             pass
 
@@ -920,13 +1054,13 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             # Hide all panels/controls
-            if hasattr(self, 'header_widget'):
+            if hasattr(self, "header_widget"):
                 self.header_widget.setVisible(False)
-            if hasattr(self, 'splitter'):
+            if hasattr(self, "splitter"):
                 self.splitter.setVisible(False)
-            if hasattr(self, 'fax_history_panel'):
+            if hasattr(self, "fax_history_panel"):
                 self.fax_history_panel.setVisible(False)
-            if hasattr(self, 'send_fax_panel'):
+            if hasattr(self, "send_fax_panel"):
                 self.send_fax_panel.setVisible(False)
             self.token_bar.setValue(0)
             try:
@@ -944,17 +1078,17 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self.status_bar.setVisible(True)
-        if hasattr(self, 'header_widget'):
+        if hasattr(self, "header_widget"):
             self.header_widget.setVisible(True)
-        if hasattr(self, 'splitter'):
+        if hasattr(self, "splitter"):
             self.splitter.setVisible(True)
         self.limited_logo_label.setVisible(False)
 
         self.tools_menu.menuAction().setVisible(True)
         self.token_bar.setVisible(True)
-        if hasattr(self, 'fax_history_panel'):
+        if hasattr(self, "fax_history_panel"):
             self.fax_history_panel.setVisible(True)
-        if hasattr(self, 'send_fax_panel'):
+        if hasattr(self, "send_fax_panel"):
             self.send_fax_panel.setVisible(True)
         self.token_bar.restart_progress()
 
@@ -965,7 +1099,20 @@ class MainWindow(QMainWindow):
         show_bars = True
         show_stop = False
 
-        if auto_retrieve and self._requirements_met_for_retrieval():
+        # Startup confirmation: log whether we are authorized as a retriever
+        try:
+            if allowed_to_retrieve:
+                self.log.info(
+                    f"Startup: device authorized as retriever (mode=sender_receiver, status=allowed)."
+                )
+            else:
+                self.log.info(
+                    f"Startup: device is NOT authorized as retriever (mode={'sender_receiver' if auto_retrieve else (self.app_state.device_cfg.retriever_mode or '').lower()}, status={'allowed' if status_allowed else (self.app_state.device_cfg.retriever_status or '').lower()}). Running as sender-only."
+                )
+        except Exception:
+            pass
+
+        if allowed_to_retrieve and self._requirements_met_for_retrieval():
             # ── Full Mode (Send + Polling) ─────────────────────────
             self.log.info("System in full service mode (Send + Polling).")
             show_configure = False
@@ -974,7 +1121,7 @@ class MainWindow(QMainWindow):
             show_stop = True
             self._start_services()
             self.status_bar.showMessage("Ready (All Services Mode)")
-        elif numbers_approved:
+        elif allowed_to_retrieve and numbers_approved:
             # ── Post-Approval / Partial Config ─────────────────────
             self.log.info("Numbers approved; awaiting full configuration.")
             show_configure = False
@@ -983,7 +1130,9 @@ class MainWindow(QMainWindow):
             show_stop = True
             # Enablement handled below: poll disabled until save_path exists
             if not save_path:
-                self.status_bar.showMessage("Select a Save Location to enable retrieving faxes.")
+                self.status_bar.showMessage(
+                    "Select a Save Location to enable retrieving faxes."
+                )
             else:
                 self.status_bar.showMessage("Ready to retrieve faxes.")
         else:
@@ -993,16 +1142,23 @@ class MainWindow(QMainWindow):
             show_save = False
             show_poll = False
             show_stop = False
-            self.status_bar.showMessage("Ready (Send Only) — Configure Fax Retrieval to begin.")
+            # Ensure polling timer is stopped when not authorized
+            try:
+                self.poll_bar.timer.stop()
+            except Exception:
+                pass
+            self.status_bar.showMessage(
+                "Ready (Send Only) — Configure Fax Retrieval to begin."
+            )
 
         # Apply visibility
-        if hasattr(self, 'setup_retrieval_button'):
+        if hasattr(self, "setup_retrieval_button"):
             self.setup_retrieval_button.setVisible(show_configure)
         self.save_location_input.setVisible(show_save)
         self.select_folder_button.setVisible(show_save)
         self.poll_button.setVisible(show_poll)
         self.poll_bar.setVisible(show_bars)
-        if hasattr(self, 'stop_retrieval_button'):
+        if hasattr(self, "stop_retrieval_button"):
             self.stop_retrieval_button.setVisible(show_stop)
 
         # Enablement: disable poll until minimum requirements met for this stage
@@ -1021,13 +1177,26 @@ class MainWindow(QMainWindow):
         path = cfg.save_path or device_config.get("Fax Options", "save_path", "")
         have_numbers = bool(cfg.selected_fax_numbers)
         have_path = bool(path)
+        # Authorization: must be explicitly configured as sender_receiver and allowed
+        mode_ok = ((cfg.retriever_mode or "").lower() == "sender_receiver")
+        status_ok = ((cfg.retriever_status or "").lower() == "allowed")
+        allowed = mode_ok and status_ok
         # Use sensible defaults if fields are unset (legacy configs)
         try:
-            pf = cfg.polling_frequency if cfg.polling_frequency is not None else device_config.get("Fax Options", "polling_frequency", 15)
+            pf = (
+                cfg.polling_frequency
+                if cfg.polling_frequency is not None
+                else device_config.get("Fax Options", "polling_frequency", 15)
+            )
             have_poll = bool(int(pf or 15))
         except Exception:
             have_poll = True
-        have_method = bool((cfg.download_method or device_config.get("Fax Options", "download_method", "PDF")))
+        have_method = bool(
+            (
+                cfg.download_method
+                or device_config.get("Fax Options", "download_method", "PDF")
+            )
+        )
         # file_name_format defaults to 'faxid' if missing; do not block readiness on it
         have_format = True
         # If we discovered a persisted save path but app_state lacks it, hydrate runtime state
@@ -1036,10 +1205,14 @@ class MainWindow(QMainWindow):
                 self.app_state.update_save_path(path)
             except Exception:
                 pass
-        return all([have_numbers, have_path, have_poll, have_method, have_format])
+        return all([allowed, have_numbers, have_path, have_poll, have_method, have_format])
 
     def _update_retrieval_interactables(self):
         cfg = self.app_state.device_cfg
+        # Authorization: must be explicitly configured as sender_receiver and allowed
+        mode_ok = ((cfg.retriever_mode or "").lower() == "sender_receiver")
+        status_ok = ((cfg.retriever_status or "").lower() == "allowed")
+        allowed = mode_ok and status_ok
         # If numbers are approved and a save path is set, allow manual polling,
         # otherwise fall back to the stricter full-requirements check.
         path = cfg.save_path or device_config.get("Fax Options", "save_path", "")
@@ -1050,12 +1223,18 @@ class MainWindow(QMainWindow):
                 self.app_state.update_save_path(path)
             except Exception:
                 pass
-        enabled = enabled_min or self._requirements_met_for_retrieval()
+        enabled = allowed and (enabled_min or self._requirements_met_for_retrieval())
         self.poll_button.setEnabled(enabled)
         self.poll_bar.setEnabled(enabled)
         if enabled:
             try:
                 self.poll_bar.restart_progress()
+            except Exception:
+                pass
+        else:
+            try:
+                self.poll_bar.timer.stop()
+                self.poll_bar.setValue(0)
             except Exception:
                 pass
         self._apply_retrieval_section_state()
@@ -1064,21 +1243,36 @@ class MainWindow(QMainWindow):
         """Gray-out Retrieval section when client retrieval is disabled; leave Configure button enabled if permitted."""
         try:
             status = (self.app_state.device_cfg.retriever_status or "").lower()
-            is_allowed = status == "allowed"
+            mode = (self.app_state.device_cfg.retriever_mode or "").lower()
+            is_allowed = (status == "allowed" and mode == "sender_receiver")
             # Configure is allowed when validated (JWT present)
             can_configure = bool(self.app_state.global_cfg.jwt_token)
-            if hasattr(self, 'setup_retrieval_button'):
+            if hasattr(self, "setup_retrieval_button"):
                 self.setup_retrieval_button.setEnabled(can_configure)
             # Disable other controls if not allowed
-            for w in [self.save_location_input, self.select_folder_button, self.poll_button, self.token_bar, self.poll_bar]:
+            for w in [
+                self.save_location_input,
+                self.select_folder_button,
+                self.poll_button,
+                self.token_bar,
+                self.poll_bar,
+            ]:
                 try:
-                    w.setEnabled(is_allowed and (w not in [self.poll_button, self.poll_bar] or self._requirements_met_for_retrieval()))
+                    w.setEnabled(
+                        is_allowed
+                        and (
+                            w not in [self.poll_button, self.poll_bar]
+                            or self._requirements_met_for_retrieval()
+                        )
+                    )
                 except Exception:
                     pass
             # Visual gray-out
-            if hasattr(self, 'retrieval_section') and self.retrieval_section:
+            if hasattr(self, "retrieval_section") and self.retrieval_section:
                 if not is_allowed:
-                    self.retrieval_section.setStyleSheet("#retrievalSection{background-color:#f5f5f5;} QWidget{color:#888;}")
+                    self.retrieval_section.setStyleSheet(
+                        "#retrievalSection{background-color:#f5f5f5;} QWidget{color:#888;}"
+                    )
                 else:
                     self.retrieval_section.setStyleSheet("")
         except Exception:
@@ -1088,22 +1282,34 @@ class MainWindow(QMainWindow):
         """Start Computer-Rx integration once if enabled/selected and not already running."""
         try:
             # Prefer device-level settings
-            settings = device_config.get("Integrations", "integration_settings", {}) or (self.app_state.device_cfg.integration_settings or {})
-            enabled = ((settings.get("enable_third_party") or "").strip().lower() == "yes")
+            settings = device_config.get(
+                "Integrations", "integration_settings", {}
+            ) or (self.app_state.device_cfg.integration_settings or {})
+            enabled = (
+                settings.get("enable_third_party") or ""
+            ).strip().lower() == "yes"
             software = (settings.get("integration_software") or "None").strip()
             if not (enabled and software == "Computer-Rx"):
                 return
-            winrx_path = device_config.get("Integrations", "winrx_path", "") or (self.app_state.device_cfg.winrx_path or "")
+            winrx_path = device_config.get("Integrations", "winrx_path", "") or (
+                self.app_state.device_cfg.winrx_path or ""
+            )
             if not (winrx_path and os.path.isdir(winrx_path)):
                 return
-            if self.crx_thread is not None and hasattr(self.crx_thread, 'isRunning') and self.crx_thread.isRunning():
+            if (
+                self.crx_thread is not None
+                and hasattr(self.crx_thread, "isRunning")
+                and self.crx_thread.isRunning()
+            ):
                 return
             self.crx_thread = CRxIntegration2(self.base_dir)
+
             def _on_done():
                 try:
                     self.crx_thread = None
                 except Exception:
                     pass
+
             try:
                 self.crx_thread.finished.connect(_on_done)
             except Exception:
@@ -1117,15 +1323,31 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         try:
-            if getattr(self, '_force_exit', False):
+            if getattr(self, "_force_exit", False):
                 event.accept()
                 return
-            close_to_tray = str(getattr(self.app_state.device_cfg, 'close_to_tray', 'No') or 'No').strip().lower() == 'yes'
-            is_receiver = str(getattr(self.app_state.device_cfg, 'retriever_mode', '') or '').strip().lower() == 'sender_receiver'
+            close_to_tray = (
+                str(getattr(self.app_state.device_cfg, "close_to_tray", "No") or "No")
+                .strip()
+                .lower()
+                == "yes"
+            )
+            is_receiver = (
+                str(getattr(self.app_state.device_cfg, "retriever_mode", "") or "")
+                .strip()
+                .lower()
+                == "sender_receiver"
+            )
             if close_to_tray:
                 try:
-                    if hasattr(self, 'tray_icon') and self.tray_icon:
-                        self.tray_icon.showMessage('FaxRetriever', 'Running in background.' + (' Receiver mode active.' if is_receiver else ''), QSystemTrayIcon.Information, 3000)
+                    if hasattr(self, "tray_icon") and self.tray_icon:
+                        self.tray_icon.showMessage(
+                            "FaxRetriever",
+                            "Running in background."
+                            + (" Receiver mode active." if is_receiver else ""),
+                            QSystemTrayIcon.Information,
+                            3000,
+                        )
                 except Exception:
                     pass
                 self.hide()
@@ -1133,12 +1355,14 @@ class MainWindow(QMainWindow):
                 return
             if is_receiver:
                 box = QMessageBox(self)
-                box.setWindowTitle('Close FaxRetriever')
+                box.setWindowTitle("Close FaxRetriever")
                 box.setIcon(QMessageBox.Warning)
-                box.setText('FaxRetriever is in Receiver mode. Closing the application will prevent faxes from being downloaded.\nWhat would you like to do?')
-                minimize_btn = box.addButton('Minimize to Tray', QMessageBox.AcceptRole)
-                close_btn = box.addButton('Close Anyway', QMessageBox.DestructiveRole)
-                cancel_btn = box.addButton('Cancel', QMessageBox.RejectRole)
+                box.setText(
+                    "FaxRetriever is in Receiver mode. Closing the application will prevent faxes from being downloaded.\nWhat would you like to do?"
+                )
+                minimize_btn = box.addButton("Minimize to Tray", QMessageBox.AcceptRole)
+                close_btn = box.addButton("Close Anyway", QMessageBox.DestructiveRole)
+                cancel_btn = box.addButton("Cancel", QMessageBox.RejectRole)
                 box.exec_()
                 clicked = box.clickedButton()
                 if clicked == minimize_btn:
@@ -1157,17 +1381,24 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         try:
-            if hasattr(self, 'retrieval_section') and self.retrieval_section:
+            if hasattr(self, "retrieval_section") and self.retrieval_section:
                 # Cap header to a reasonable height; allow up to ~25% but not overly large
                 cap = int(min(max(120, self.height() * 0.25), 240))
                 self.retrieval_section.setMaximumHeight(cap)
             # Rescale limited-mode splash to fill window while preserving aspect
-            if hasattr(self, 'limited_logo_label') and self.limited_logo_label.isVisible():
+            if (
+                hasattr(self, "limited_logo_label")
+                and self.limited_logo_label.isVisible()
+            ):
                 pix = getattr(self, "_splash_pixmap_orig", QPixmap())
                 if pix.isNull():
                     pix = QPixmap(os.path.join(self.base_dir, "images", "splash.png"))
                 if not pix.isNull():
-                    self.limited_logo_label.setPixmap(pix.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    self.limited_logo_label.setPixmap(
+                        pix.scaled(
+                            self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                        )
+                    )
         except Exception:
             pass
         return super().resizeEvent(event)
@@ -1179,8 +1410,11 @@ class MainWindow(QMainWindow):
         Uses device_config[AutoUpdate][current_version] as the last-seen marker.
         """
         try:
-            prev = str(device_config.get("AutoUpdate", "current_version", "") or "").strip()
+            prev = str(
+                device_config.get("AutoUpdate", "current_version", "") or ""
+            ).strip()
             current = str(__version__ or "").strip()
+
             def major(v: str) -> int:
                 try:
                     v = v.strip()
@@ -1190,12 +1424,13 @@ class MainWindow(QMainWindow):
                     return int((core.split(".")[0] or "0"))
                 except Exception:
                     return 0
+
             show = False
             if not prev:
                 # First run on this device; only auto-pop for v2+
                 show = major(current) >= 2
             else:
-                show = (prev != current)
+                show = prev != current
             if show:
                 try:
                     # Prefer the pre-created dialog instance for consistency
@@ -1246,7 +1481,9 @@ class MainWindow(QMainWindow):
             box = QMessageBox(self)
             box.setWindowTitle("Update Available")
             box.setIcon(QMessageBox.Information)
-            box.setText(f"A new version of FaxRetriever is available: {version}.\n\nInstall now? The current version will be backed up and the app will restart.")
+            box.setText(
+                f"A new version of FaxRetriever is available: {version}.\n\nInstall now? The current version will be backed up and the app will restart."
+            )
             yes_btn = box.addButton("Install Now", QMessageBox.AcceptRole)
             later_btn = box.addButton("Later", QMessageBox.RejectRole)
             box.exec_()
@@ -1260,8 +1497,12 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Downloading update...", 3000)
             self._update_installer = UpdateInstaller(version, url, self.exe_dir)
             try:
-                self._update_installer.progress.connect(lambda msg: self.status_bar.showMessage(msg, 5000))
-                self._update_installer.completed.connect(self._on_update_install_started)
+                self._update_installer.progress.connect(
+                    lambda msg: self.status_bar.showMessage(msg, 5000)
+                )
+                self._update_installer.completed.connect(
+                    self._on_update_install_started
+                )
                 self._update_installer.failed.connect(self._on_update_failed)
             except Exception:
                 pass

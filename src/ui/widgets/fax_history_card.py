@@ -1,10 +1,13 @@
 import os
 from typing import Optional
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
+from PyQt5.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
+                             QVBoxLayout, QWidget)
 
 from core.address_book import AddressBookManager
+
 from .pdf_viewer_dialog import open_pdf_viewer
 
 
@@ -55,7 +58,7 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     elif any(k in status_lc for k in ["deliv", "success", "sent", "ok"]):
         status_color = "#2e7d32"  # green
     else:
-        status_color = "#555"      # default/unknown
+        status_color = "#555"  # default/unknown
     lbl_status = QLabel(status_text)
     lbl_status.setStyleSheet(f"color: {status_color}; font-weight: bold;")
     top.addWidget(lbl_status)
@@ -69,6 +72,7 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     # Localize
     try:
         from datetime import datetime, timezone
+
         dt = None
         if created_iso:
             if created_iso.endswith("Z"):
@@ -77,7 +81,7 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
             dt = dt.astimezone()
-        ts_local = dt.strftime('%Y-%m-%d %H:%M:%S %Z') if dt else ""
+        ts_local = dt.strftime("%Y-%m-%d %H:%M:%S %Z") if dt else ""
     except Exception:
         ts_local = created_iso
 
@@ -87,18 +91,18 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     link_from = None
     link_to = None
     try:
-        addr_mgr = getattr(panel, 'addr_mgr', None)
+        addr_mgr = getattr(panel, "addr_mgr", None)
         if addr_mgr:
             addr_mgr.refresh_contacts()
             if direction == "inbound":
                 idx, c = addr_mgr.find_contact_by_phone(from_num)
                 if c:
-                    name_from = (c.get('name') or c.get('company') or '').strip()
+                    name_from = (c.get("name") or c.get("company") or "").strip()
                     link_from = AddressBookManager._sanitize_phone(from_num)
             elif direction == "outbound":
                 idx, c = addr_mgr.find_contact_by_phone(to_num)
                 if c:
-                    name_to = (c.get('name') or c.get('company') or '').strip()
+                    name_to = (c.get("name") or c.get("company") or "").strip()
                     link_to = AddressBookManager._sanitize_phone(to_num)
     except Exception:
         pass
@@ -136,7 +140,9 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
 
     preview = QLabel()
     preview.setAlignment(Qt.AlignCenter)
-    preview.setStyleSheet("background:#fff; color:#555; border: none; border-radius: 4px;")
+    preview.setStyleSheet(
+        "background:#fff; color:#555; border: none; border-radius: 4px;"
+    )
     preview.setToolTip("Click to open full preview")
     preview.setCursor(Qt.PointingHandCursor)
     try:
@@ -151,18 +157,26 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
         thumb = thumb_helper.render_pdf_thumbnail(pdf_path, preview_w)
         if thumb:
             preview.setPixmap(thumb)
-            preview.mousePressEvent = lambda _e, ent=entry, p=pdf_path: open_pdf_viewer(panel, ent, p, panel.app_state, panel.base_dir, panel.exe_dir)
+            preview.mousePressEvent = lambda _e, ent=entry, p=pdf_path: open_pdf_viewer(
+                panel, ent, p, panel.app_state, panel.base_dir, panel.exe_dir
+            )
         else:
             preview.setText("No preview")
-            preview.setStyleSheet("background:#fafafa; color:#888; border: 1px dashed #ddd; border-radius: 4px;")
+            preview.setStyleSheet(
+                "background:#fafafa; color:#888; border: 1px dashed #ddd; border-radius: 4px;"
+            )
     else:
         thumb_url = entry.get("thumbnail") or thumb_helper.thumbnail_url_for(entry)
         if thumb_url:
             thumb_helper.fetch_remote_thumbnail(preview, thumb_url)
-            preview.mousePressEvent = lambda _e, ent=entry: open_pdf_viewer(panel, ent, None, panel.app_state, panel.base_dir, panel.exe_dir)
+            preview.mousePressEvent = lambda _e, ent=entry: open_pdf_viewer(
+                panel, ent, None, panel.app_state, panel.base_dir, panel.exe_dir
+            )
         else:
             preview.setText("No preview")
-            preview.setStyleSheet("background:#fafafa; color:#888; border: 1px dashed #ddd; border-radius: 4px;")
+            preview.setStyleSheet(
+                "background:#fafafa; color:#888; border: 1px dashed #ddd; border-radius: 4px;"
+            )
     mid.addWidget(preview, 0)
 
     # Actions column
@@ -170,6 +184,7 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     actions_col.setSpacing(6)
 
     from utils.history_index import is_downloaded
+
     fax_id = str(entry.get("id") or entry.get("fax_id") or entry.get("uuid") or "")
     downloaded_logged = is_downloaded(panel.base_dir, fax_id) if fax_id else False
     has_local = bool(pdf_path and os.path.exists(pdf_path))
@@ -190,7 +205,11 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     btn_view = QPushButton("View")
     btn_view.setEnabled(available)
     btn_view.setToolTip("Open the fax in the built-in viewer")
-    btn_view.clicked.connect(lambda _, ent=entry, p=pdf_path: open_pdf_viewer(panel, ent, p, panel.app_state, panel.base_dir, panel.exe_dir))
+    btn_view.clicked.connect(
+        lambda _, ent=entry, p=pdf_path: open_pdf_viewer(
+            panel, ent, p, panel.app_state, panel.base_dir, panel.exe_dir
+        )
+    )
     actions_col.addWidget(btn_view)
 
     btn_dl = QPushButton("Download PDF")
@@ -202,7 +221,9 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     if direction == "outbound" and entry.get("confirmation"):
         btn_conf_view = QPushButton("View Confirmation")
         btn_conf_view.setToolTip("Open the confirmation receipt in the viewer")
-        btn_conf_view.clicked.connect(lambda _, ent=entry: panel._on_view_confirmation(ent))
+        btn_conf_view.clicked.connect(
+            lambda _, ent=entry: panel._on_view_confirmation(ent)
+        )
         actions_col.addWidget(btn_conf_view)
 
         btn_conf = QPushButton("Download Confirmation")

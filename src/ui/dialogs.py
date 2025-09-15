@@ -11,25 +11,28 @@ Includes reusable QDialog subclasses:
 
 import os
 
-from PyQt5.QtCore import Qt, QTimer, QUrl
-from PyQt5.QtGui import QIcon, QPixmap, QTextCursor
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QCheckBox, QTextBrowser, QTextEdit, QHBoxLayout
-from PyQt5.QtGui import QFont
 from PyQt5.Qt import QDesktopServices
+from PyQt5.QtCore import Qt, QTimer, QUrl
+from PyQt5.QtGui import QFont, QIcon, QPixmap, QTextCursor
+from PyQt5.QtWidgets import (QCheckBox, QDialog, QHBoxLayout, QLabel,
+                             QPushButton, QTextBrowser, QTextEdit, QVBoxLayout)
 
 from core.app_state import app_state
-from core.config_loader import global_config, device_config
+from core.config_loader import device_config, global_config
 
 
 class LogViewer(QDialog):
     """
     Displays the contents of the application log in real time.
     """
+
     def __init__(self, base_dir, parent=None):
         super().__init__(parent)
         self.base_dir = base_dir
         self.setWindowIcon(QIcon(os.path.join(self.base_dir, "images", "logo.ico")))
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)  # Remove '?' button
+        self.setWindowFlags(
+            self.windowFlags() & ~Qt.WindowContextHelpButtonHint
+        )  # Remove '?' button
 
         self.setWindowTitle("System Log Viewer")
         self.setMinimumSize(700, 500)
@@ -56,7 +59,7 @@ class LogViewer(QDialog):
 
     def closeEvent(self, event):
         try:
-            if hasattr(self, 'timer') and self.timer:
+            if hasattr(self, "timer") and self.timer:
                 self.timer.stop()
         except Exception:
             pass
@@ -71,28 +74,40 @@ class LogViewer(QDialog):
                 if new:
                     self.log_view.moveCursor(QTextCursor.End)
                     self.log_view.insertPlainText(new)
-                    self.log_view.verticalScrollBar().setValue(self.log_view.verticalScrollBar().maximum())
+                    self.log_view.verticalScrollBar().setValue(
+                        self.log_view.verticalScrollBar().maximum()
+                    )
+
 
 class IntegrationAcknowledgement(QDialog):
     """
     One-time warning dialog for third-party integration limitations.
     """
+
     def __init__(self, base_dir, parent=None):
         super().__init__(parent)
         self.base_dir = base_dir
         self.setWindowIcon(QIcon(os.path.join(self.base_dir, "images", "logo.ico")))
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)  # Remove '?' button
+        self.setWindowFlags(
+            self.windowFlags() & ~Qt.WindowContextHelpButtonHint
+        )  # Remove '?' button
         self.setWindowTitle("Third-Party Integration Notice")
         self.setFixedSize(450, 250)
 
         layout = QVBoxLayout()
 
         logo = QLabel()
-        logo.setPixmap(QPixmap(os.path.join(self.base_dir, "images", "logo.png")).scaled(48, 48, Qt.KeepAspectRatio))
+        logo.setPixmap(
+            QPixmap(os.path.join(self.base_dir, "images", "logo.png")).scaled(
+                48, 48, Qt.KeepAspectRatio
+            )
+        )
         logo.setAlignment(Qt.AlignCenter)
         layout.addWidget(logo)
 
-        message = QLabel("Third-party integrations are still in development and may not be fully stable.")
+        message = QLabel(
+            "Third-party integrations are still in development and may not be fully stable."
+        )
         message.setWordWrap(True)
         message.setAlignment(Qt.AlignCenter)
         layout.addWidget(message)
@@ -131,11 +146,14 @@ class WhatsNewDialog(QDialog):
     """
     Simple viewer for changelog content in Markdown format.
     """
+
     def __init__(self, base_dir, parent=None):
         super().__init__(parent)
         self.base_dir = base_dir
         self.setWindowIcon(QIcon(os.path.join(self.base_dir, "images", "logo.ico")))
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)  # Remove '?' button
+        self.setWindowFlags(
+            self.windowFlags() & ~Qt.WindowContextHelpButtonHint
+        )  # Remove '?' button
         self.setWindowTitle("What's New")
         self.setMinimumSize(650, 500)
 
@@ -152,10 +170,11 @@ class WhatsNewDialog(QDialog):
         btn_row.addStretch()
         btn_print = QPushButton("Print")
         btn_close = QPushButton("Close")
-        
+
         def _do_print():
             try:
-                from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
+                from PyQt5.QtPrintSupport import QPrintDialog, QPrinter
+
                 printer = QPrinter(QPrinter.HighResolution)
                 dlg = QPrintDialog(printer, self)
                 dlg.setWindowTitle("Print What's New")
@@ -165,13 +184,13 @@ class WhatsNewDialog(QDialog):
             except Exception:
                 # Silently ignore print errors to avoid blocking the user
                 pass
-        
+
         btn_print.clicked.connect(_do_print)
         btn_close.clicked.connect(self.accept)
         btn_row.addWidget(btn_print)
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row)
-        
+
         self.setLayout(layout)
 
         # Prefer src\docs\changes.md; fallback to top-level docs\changes.md
@@ -183,7 +202,10 @@ class WhatsNewDialog(QDialog):
         if changelog_path:
             try:
                 from PyQt5.QtCore import QUrl
-                self.text_view.document().setBaseUrl(QUrl.fromLocalFile(os.path.dirname(changelog_path) + os.sep))
+
+                self.text_view.document().setBaseUrl(
+                    QUrl.fromLocalFile(os.path.dirname(changelog_path) + os.sep)
+                )
             except Exception:
                 pass
             with open(changelog_path, "r", encoding="utf-8") as f:
@@ -194,7 +216,10 @@ class WhatsNewDialog(QDialog):
 
 class MarkdownViewer(QDialog):
     """Reusable, polished Markdown viewer dialog (modeless-capable)."""
-    def __init__(self, base_dir: str, title: str, md_path: str | None = None, parent=None):
+
+    def __init__(
+        self, base_dir: str, title: str, md_path: str | None = None, parent=None
+    ):
         super().__init__(parent)
         self.base_dir = base_dir
         self.setWindowIcon(QIcon(os.path.join(self.base_dir, "images", "logo.ico")))
@@ -220,7 +245,9 @@ class MarkdownViewer(QDialog):
     def load_markdown(self, md_path: str):
         try:
             # Resolve relative paths for images/links
-            self.viewer.document().setBaseUrl(QUrl.fromLocalFile(os.path.dirname(md_path) + os.sep))
+            self.viewer.document().setBaseUrl(
+                QUrl.fromLocalFile(os.path.dirname(md_path) + os.sep)
+            )
             if os.path.exists(md_path):
                 with open(md_path, "r", encoding="utf-8") as f:
                     self.viewer.setMarkdown(f.read())

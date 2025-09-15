@@ -1,7 +1,8 @@
 import os
 from typing import Optional
-from PyQt5.QtCore import QUrl, Qt
-from PyQt5.QtGui import QPixmap, QImage
+
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QLabel
 
 
@@ -10,6 +11,7 @@ class ThumbnailHelper:
     Handles thumbnail caching, local PDF to image rendering, and async remote thumbnail fetches.
     Keeps track of active QNetworkReply objects to support aborts on panel refresh/teardown.
     """
+
     def __init__(self, base_dir: str, exe_dir: Optional[str], app_state, parent_widget):
         self.base_dir = base_dir
         self.exe_dir = exe_dir or base_dir
@@ -30,6 +32,7 @@ class ThumbnailHelper:
     def _thumb_cache_path(self, url: str) -> str:
         try:
             import hashlib
+
             key = hashlib.md5((url or "").encode("utf-8")).hexdigest()
             return os.path.join(self._thumb_cache_dir(), f"{key}.png")
         except Exception:
@@ -51,15 +54,19 @@ class ThumbnailHelper:
     def thumbnail_url_for(self, entry: dict) -> Optional[str]:
         try:
             import sys
+
             fax_id = entry.get("id") or entry.get("fax_id") or entry.get("uuid")
             if not fax_id:
                 return None
-            fax_user = getattr(self.app_state.global_cfg, 'fax_user', None)
+            fax_user = getattr(self.app_state.global_cfg, "fax_user", None)
             if not fax_user:
                 # Do not attempt API calls without fax_user; skip thumbnail.
                 try:
                     from utils.logging_utils import get_logger
-                    get_logger("thumb_loader").warning("fax_user missing while building thumbnail URL; skipping thumbnail request.")
+
+                    get_logger("thumb_loader").warning(
+                        "fax_user missing while building thumbnail URL; skipping thumbnail request."
+                    )
                 except Exception:
                     pass
                 return None
@@ -68,11 +75,14 @@ class ThumbnailHelper:
         except Exception:
             return None
 
-    def render_pdf_thumbnail(self, pdf_path: str, target_max_w: int) -> Optional[QPixmap]:
+    def render_pdf_thumbnail(
+        self, pdf_path: str, target_max_w: int
+    ) -> Optional[QPixmap]:
         try:
             # First, try rendering with PyMuPDF (fitz) to avoid spawning Poppler subprocesses (no console windows)
             try:
                 import fitz  # PyMuPDF
+
                 doc = fitz.open(pdf_path)
                 if doc.page_count <= 0:
                     return None
@@ -81,14 +91,18 @@ class ThumbnailHelper:
                 pix = page.get_pixmap(dpi=120, alpha=False)
                 img_bytes = pix.tobytes("png")
                 from io import BytesIO
+
                 qimg = QImage.fromData(img_bytes)
                 pm = QPixmap.fromImage(qimg)
                 max_w = max(260, min(480, int(target_max_w)))
                 max_h = int(max_w * 1.3)
-                return pm.scaled(max_w, max_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                return pm.scaled(
+                    max_w, max_h, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
             except Exception:
                 # Fallback to pdf2image + Poppler if PyMuPDF is unavailable
                 from pdf2image import convert_from_path
+
                 # Prefer MEIPASS/base_dir (onefile extraction) for Poppler, then fallback to exe_dir
                 candidates = [
                     os.path.join(self.base_dir, "poppler", "bin"),
@@ -103,13 +117,16 @@ class ThumbnailHelper:
                     return None
                 img = pages[0]
                 from io import BytesIO
+
                 buf = BytesIO()
-                img.save(buf, format='PNG')
+                img.save(buf, format="PNG")
                 qimg = QImage.fromData(buf.getvalue())
                 pm = QPixmap.fromImage(qimg)
                 max_w = max(260, min(480, int(target_max_w)))
                 max_h = int(max_w * 1.3)
-                return pm.scaled(max_w, max_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                return pm.scaled(
+                    max_w, max_h, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
         except Exception:
             return None
 
@@ -118,7 +135,7 @@ class ThumbnailHelper:
             if os.path.exists(cache_path):
                 data_bytes = None
                 try:
-                    with open(cache_path, 'rb') as f:
+                    with open(cache_path, "rb") as f:
                         data_bytes = f.read()
                 except Exception:
                     data_bytes = None
@@ -132,7 +149,14 @@ class ThumbnailHelper:
                     if not isinstance(target_w, int) or target_w <= 0:
                         target_w = 320
                     target_h = int(target_w * 1.3)
-                    label.setPixmap(pm.scaled(target_w, target_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    label.setPixmap(
+                        pm.scaled(
+                            target_w,
+                            target_h,
+                            Qt.KeepAspectRatio,
+                            Qt.SmoothTransformation,
+                        )
+                    )
                 except Exception:
                     return False
                 return True
@@ -145,8 +169,10 @@ class ThumbnailHelper:
         if self._load_cached_thumbnail(label, cache_path):
             return
         try:
-            from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
             import weakref
+
+            from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
+
             try:
                 import sip
             except Exception:
@@ -181,7 +207,7 @@ class ThumbnailHelper:
                         # Cache atomically
                         try:
                             tmp_path = cache_path + ".part"
-                            with open(tmp_path, 'wb') as f:
+                            with open(tmp_path, "wb") as f:
                                 f.write(data_bytes)
                             try:
                                 os.replace(tmp_path, cache_path)
@@ -199,7 +225,14 @@ class ThumbnailHelper:
                         try:
                             target_w = lbl.width() or 320
                             target_h = int(target_w * 1.3)
-                            lbl.setPixmap(pm.scaled(target_w, target_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                            lbl.setPixmap(
+                                pm.scaled(
+                                    target_w,
+                                    target_h,
+                                    Qt.KeepAspectRatio,
+                                    Qt.SmoothTransformation,
+                                )
+                            )
                         except Exception:
                             try:
                                 lbl.setVisible(False)
@@ -224,4 +257,3 @@ class ThumbnailHelper:
                 label.setVisible(False)
             except Exception:
                 pass
-

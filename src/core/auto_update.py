@@ -1,21 +1,21 @@
 import os
-import sys
 import shutil
 import subprocess
-from datetime import datetime, timezone, timedelta
+import sys
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from utils.logging_utils import get_logger
 from core.config_loader import device_config
+from utils.logging_utils import get_logger
 
 API_URL = "https://api.github.com/repos/TheMrDr/FaxRetriever/releases/latest"
 REQUEST_TIMEOUT = 10  # seconds
 GITHUB_HEADERS = {
     "Accept": "application/vnd.github+json",
-    "User-Agent": "ClinicFax-FaxRetriever/2.x (AutoUpdate)"
+    "User-Agent": "ClinicFax-FaxRetriever/2.x (AutoUpdate)",
 }
 
 log = get_logger("auto_update")
@@ -63,6 +63,7 @@ def _is_newer(latest: str, current: str) -> bool:
 def get_current_version() -> str:
     try:
         from version import __version__  # type: ignore
+
         return str(__version__)
     except Exception:
         # Fallback to device config cached value
@@ -87,14 +88,18 @@ class UpdateChecker(QThread):
                     try:
                         dt = datetime.fromisoformat(last_check)
                         if datetime.now(timezone.utc) - dt < timedelta(hours=24):
-                            self.no_update.emit("Checked recently; skipping (24h window).")
+                            self.no_update.emit(
+                                "Checked recently; skipping (24h window)."
+                            )
                             return
                     except Exception:
                         pass
 
             current_version = get_current_version()
             log.info(f"Checking for updates (current={current_version})")
-            resp = requests.get(API_URL, headers=GITHUB_HEADERS, timeout=REQUEST_TIMEOUT)
+            resp = requests.get(
+                API_URL, headers=GITHUB_HEADERS, timeout=REQUEST_TIMEOUT
+            )
             if resp.status_code != 200:
                 msg = f"GitHub API error: {resp.status_code}"
                 log.warning(msg)
@@ -148,13 +153,16 @@ class UpdateInstaller(QThread):
     def run(self):
         try:
             # If not frozen (development run), just open the URL and fail gracefully
-            if not getattr(sys, 'frozen', False):
+            if not getattr(sys, "frozen", False):
                 try:
                     import webbrowser
+
                     webbrowser.open(self.download_url)
                 except Exception:
                     pass
-                self.failed.emit("Running from source; please install from GitHub release.")
+                self.failed.emit(
+                    "Running from source; please install from GitHub release."
+                )
                 return
 
             current_exe = sys.executable
@@ -162,15 +170,19 @@ class UpdateInstaller(QThread):
             tmp_path = os.path.join(self.exe_dir, f"update_{self.version}.exe")
             tmp_part = tmp_path + ".part"
             try:
-                with requests.get(self.download_url, timeout=REQUEST_TIMEOUT, stream=True) as r:
+                with requests.get(
+                    self.download_url, timeout=REQUEST_TIMEOUT, stream=True
+                ) as r:
                     if r.status_code != 200:
-                        self.failed.emit(f"Failed to download update: HTTP {r.status_code}")
+                        self.failed.emit(
+                            f"Failed to download update: HTTP {r.status_code}"
+                        )
                         return
                     total = int(r.headers.get("Content-Length", 0))
                     if total:
                         mb = max(1, total // (1024 * 1024))
                         self.progress.emit(f"Downloading update ({mb} MB)...")
-                    with open(tmp_part, 'wb') as f:
+                    with open(tmp_part, "wb") as f:
                         for chunk in r.iter_content(chunk_size=1024 * 128):
                             if chunk:
                                 f.write(chunk)
@@ -188,8 +200,8 @@ class UpdateInstaller(QThread):
                     pass
 
             # Create timestamped backup directory
-            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_dir = os.path.join(self.exe_dir, 'backup', ts)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_dir = os.path.join(self.exe_dir, "backup", ts)
             os.makedirs(backup_dir, exist_ok=True)
             backup_exe = os.path.join(backup_dir, os.path.basename(current_exe))
 
@@ -201,43 +213,43 @@ class UpdateInstaller(QThread):
                 "@echo off",
                 "setlocal enableextensions",
                 "rem Use robust quoting for all path variables",
-                f"set \"CURRENT={current_exe}\"",
-                f"set \"TMPFILE={tmp_path}\"",
-                f"set \"BACKUPDIR={backup_dir}\"",
-                f"set \"BACKUPEXE={backup_exe}\"",
+                f'set "CURRENT={current_exe}"',
+                f'set "TMPFILE={tmp_path}"',
+                f'set "BACKUPDIR={backup_dir}"',
+                f'set "BACKUPEXE={backup_exe}"',
                 "rem Script directory (installation directory)",
-                "set \"SCRIPT_DIR=%~dp0\"",
+                'set "SCRIPT_DIR=%~dp0"',
                 "echo Stopping FaxRetriever...",
                 f"taskkill /f /im {os.path.basename(current_exe)} >nul 2>&1",
                 ":waitloop",
-                f"tasklist /fi \"IMAGENAME eq {os.path.basename(current_exe)}\" | find /i \"{os.path.basename(current_exe)}\" >nul",
+                f'tasklist /fi "IMAGENAME eq {os.path.basename(current_exe)}" | find /i "{os.path.basename(current_exe)}" >nul',
                 "if errorlevel 1 goto do_update",
                 "timeout /t 1 >nul",
                 "goto waitloop",
                 ":do_update",
                 "echo Backing up current version...",
-                "if not exist \"%BACKUPDIR%\" mkdir \"%BACKUPDIR%\"",
-                "copy /y \"%CURRENT%\" \"%BACKUPEXE%\" >nul",
+                'if not exist "%BACKUPDIR%" mkdir "%BACKUPDIR%"',
+                'copy /y "%CURRENT%" "%BACKUPEXE%" >nul',
                 "echo Installing update...",
-                "move /y \"%TMPFILE%\" \"%CURRENT%\" >nul",
+                'move /y "%TMPFILE%" "%CURRENT%" >nul',
                 "if errorlevel 1 goto restore",
                 "echo Update successful. Restarting...",
-                "pushd \"%SCRIPT_DIR%\"",
-                "start \"\" \"%CURRENT%\"",
+                'pushd "%SCRIPT_DIR%"',
+                'start "" "%CURRENT%"',
                 "popd",
                 "goto end",
                 ":restore",
                 "echo Update failed. Restoring backup...",
-                "copy /y \"%BACKUPEXE%\" \"%CURRENT%\" >nul",
+                'copy /y "%BACKUPEXE%" "%CURRENT%" >nul',
                 ":end",
-                "del \"%~f0\"",
+                'del "%~f0"',
             ]
-            with open(bat_path, 'w', encoding='utf-8') as bf:
+            with open(bat_path, "w", encoding="utf-8") as bf:
                 bf.write("\r\n".join(bat_lines) + "\r\n")
 
             # Launch updater and exit app
             self.progress.emit("Applying update... The app will restart.")
-            subprocess.Popen(['cmd.exe', '/c', bat_path], close_fds=True)
+            subprocess.Popen(["cmd.exe", "/c", bat_path], close_fds=True)
             self.completed.emit()
         except Exception as e:
             log.exception(f"Update install failed: {e}")

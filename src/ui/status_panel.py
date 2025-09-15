@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from PyQt5.QtCore import QTimer, pyqtSignal
 from PyQt5.QtWidgets import QProgressBar
 
-from core.config_loader import global_config, device_config
 from core.app_state import app_state
+from core.config_loader import device_config, global_config
 from utils.logging_utils import get_logger
 
 
@@ -22,6 +22,7 @@ class TokenLifespanProgressBar(QProgressBar):
     Progress bar showing time until token expiration.
     Updates every 10 seconds. Emits a signal when nearing expiration.
     """
+
     token_expiring_soon = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -31,7 +32,7 @@ class TokenLifespanProgressBar(QProgressBar):
         self.setMinimum(0)
         self.setMaximum(100)
         self.token_lifetime_sec = 3600  # default fallback: 1 hour
-        self.warning_threshold_sec = 3600   # 1 hour
+        self.warning_threshold_sec = 3600  # 1 hour
         self.warned_already = False
 
         self.timer = QTimer(self)
@@ -95,20 +96,24 @@ class FaxPollTimerProgressBar(QProgressBar):
     Progress bar for visualizing polling interval countdown.
     Intended to be reset every successful poll cycle.
     """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.log = get_logger("poll_bar")
         self.setFormat("Next poll in --:--")
         self.setMinimum(0)
         self.setMaximum(100)
-        self.refresh_bearer_cb = None   # callable set by MainWindow
-
+        self.refresh_bearer_cb = None  # callable set by MainWindow
 
         try:
-            self.interval_secs = int(app_state.device_cfg.polling_frequency)*60  # convert minutes to seconds
+            self.interval_secs = (
+                int(app_state.device_cfg.polling_frequency) * 60
+            )  # convert minutes to seconds
         except (TypeError, ValueError):
             self.interval_secs = 300  # fallback to 5 minutes
-            self.log.warning("Invalid polling_frequency in config; using default 300 seconds.")
+            self.log.warning(
+                "Invalid polling_frequency in config; using default 300 seconds."
+            )
 
         self.elapsed = 0
 
@@ -119,11 +124,15 @@ class FaxPollTimerProgressBar(QProgressBar):
         if not app_state.device_cfg.save_path:
             self.setValue(0)
             self.timer.stop()
-            self.log.warning("Polling disabled: save_location not set at initialization.")
+            self.log.warning(
+                "Polling disabled: save_location not set at initialization."
+            )
 
     def restart_progress(self):
         if not app_state.device_cfg.save_path:
-            self.log.warning("Cannot restart polling progress: save_location is not set.")
+            self.log.warning(
+                "Cannot restart polling progress: save_location is not set."
+            )
             self.setValue(0)
             self.timer.stop()
             return
@@ -138,6 +147,7 @@ class FaxPollTimerProgressBar(QProgressBar):
             if not exp:
                 return -1
             from datetime import datetime, timezone
+
             exp_dt = datetime.fromisoformat(exp)
             if exp_dt.tzinfo is None:
                 exp_dt = exp_dt.replace(tzinfo=timezone.utc)

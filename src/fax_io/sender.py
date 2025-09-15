@@ -4,18 +4,22 @@ Builds payload, generates cover sheet, and sends attachments as multipart/form.
 """
 
 import os
-import requests
 import tempfile
-from utils.logging_utils import get_logger
+
+import requests
+
 from core.app_state import app_state
-from utils.document_utils import normalize_pdf, generate_cover_sheet_pdf
+from utils.document_utils import generate_cover_sheet_pdf, normalize_pdf
+from utils.logging_utils import get_logger
 
 log = get_logger("send_client")
 
 
 class FaxSender:
     @staticmethod
-    def send_fax(base_dir, recipient: str, attachments: list, include_cover: bool) -> bool:
+    def send_fax(
+        base_dir, recipient: str, attachments: list, include_cover: bool
+    ) -> bool:
         """
         Sends a fax to the specified recipient with optional cover sheet.
 
@@ -30,7 +34,9 @@ class FaxSender:
         """
         if not app_state.global_cfg.fax_user or not app_state.global_cfg.bearer_token:
             if not app_state.global_cfg.fax_user:
-                log.error("fax_user missing from config; cannot send fax until account is configured.")
+                log.error(
+                    "fax_user missing from config; cannot send fax until account is configured."
+                )
                 return False
             log.error("Missing access_token; cannot send fax.")
             return False
@@ -47,12 +53,19 @@ class FaxSender:
             working_dir = tempfile.gettempdir()
 
             # Resolve fax_user for API (prefer full ext@domain if stored)
-            fax_user = (getattr(app_state.global_cfg, 'fax_user', None) or app_state.global_cfg.fax_user)
+            fax_user = (
+                getattr(app_state.global_cfg, "fax_user", None)
+                or app_state.global_cfg.fax_user
+            )
 
             # Sanitize numbers
-            dest_digits = ''.join(ch for ch in (recipient or '') if ch.isdigit())
-            caller_raw = app_state.device_cfg.selected_fax_number or (app_state.global_cfg.all_numbers[0] if app_state.global_cfg.all_numbers else '')
-            caller_digits = ''.join(ch for ch in (caller_raw or '') if ch.isdigit())
+            dest_digits = "".join(ch for ch in (recipient or "") if ch.isdigit())
+            caller_raw = app_state.device_cfg.selected_fax_number or (
+                app_state.global_cfg.all_numbers[0]
+                if app_state.global_cfg.all_numbers
+                else ""
+            )
+            caller_digits = "".join(ch for ch in (caller_raw or "") if ch.isdigit())
 
             # Attachments are provided by UI (SendFaxPanel), which has already
             # inserted the user-designed cover sheet at index 0 when enabled.
@@ -65,14 +78,24 @@ class FaxSender:
                 if os.path.exists(normalized):
                     # Track temp normalized PDFs for cleanup (only if different from original and in temp dir)
                     try:
-                        if normalized != path and normalized.startswith(tempfile.gettempdir()):
+                        if normalized != path and normalized.startswith(
+                            tempfile.gettempdir()
+                        ):
                             temp_paths.append(normalized)
                     except Exception:
                         pass
 
-                    mime = "application/pdf" if normalized.lower().endswith(".pdf") else "application/octet-stream"
+                    mime = (
+                        "application/pdf"
+                        if normalized.lower().endswith(".pdf")
+                        else "application/octet-stream"
+                    )
                     fh = open(normalized, "rb")
-                    files[f"filename[{file_index}]"] = (os.path.basename(normalized), fh, mime)
+                    files[f"filename[{file_index}]"] = (
+                        os.path.basename(normalized),
+                        fh,
+                        mime,
+                    )
                     temp_handles.append(fh)
                     file_index += 1
                 else:
@@ -80,16 +103,15 @@ class FaxSender:
 
             # v1 endpoint and payload
             endpoint = f"https://telco-api.skyswitch.com/users/{fax_user}/faxes/send"
-            headers = {
-                "Authorization": f"Bearer {app_state.global_cfg.bearer_token}"
-            }
-            data = {
-                "caller_id": caller_digits,
-                "destination": dest_digits
-            }
+            headers = {"Authorization": f"Bearer {app_state.global_cfg.bearer_token}"}
+            data = {"caller_id": caller_digits, "destination": dest_digits}
 
-            log.info(f"Sending fax to {dest_digits} from {caller_digits} with {len(files)} attachment(s) -> {endpoint}")
-            response = requests.post(endpoint, data=data, files=files, headers=headers, timeout=60)
+            log.info(
+                f"Sending fax to {dest_digits} from {caller_digits} with {len(files)} attachment(s) -> {endpoint}"
+            )
+            response = requests.post(
+                endpoint, data=data, files=files, headers=headers, timeout=60
+            )
 
             if response.status_code == 200:
                 log.info("Fax sent successfully.")
