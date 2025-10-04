@@ -1,21 +1,25 @@
 import os
 
 from PyQt5.QtCore import Qt, QUrl
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox, QWidget, QScrollArea, QFrame, QSizePolicy, QFileDialog
+from PyQt5.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel,
+                             QLineEdit, QMessageBox, QPushButton, QScrollArea,
+                             QSizePolicy, QVBoxLayout, QWidget)
 
-from utils.logging_utils import get_logger
 from core.address_book import AddressBookManager
 from ui.address_book_dialog import AddContactDialog
+from ui.threads.retrieve_faxes_thread import RetrieveFaxesThread
 from ui.utils.thumb_loader import ThumbnailHelper
 from ui.widgets.fax_history_card import create_fax_card
-from ui.widgets.pdf_viewer_dialog import open_pdf_viewer, open_pdf_viewer_confirmation
-from ui.threads.retrieve_faxes_thread import RetrieveFaxesThread
+from ui.widgets.pdf_viewer_dialog import (open_pdf_viewer,
+                                          open_pdf_viewer_confirmation)
+from utils.logging_utils import get_logger
 
 
 class FaxHistoryPanel(QWidget):
     """
     Right-hand embedded panel: vertical scrolling list of fax entries with metadata and preview (inbound only).
     """
+
     def __init__(self, base_dir, app_state, exe_dir=None, parent=None):
         super().__init__(parent)
         self.base_dir = base_dir
@@ -46,8 +50,12 @@ class FaxHistoryPanel(QWidget):
         self.toggle_outbound = QPushButton("Outbound")
         self.toggle_outbound.setCheckable(True)
         self.toggle_outbound.setChecked(True)
-        self.toggle_inbound.toggled.connect(lambda _: self._apply_filter(self.search.text()))
-        self.toggle_outbound.toggled.connect(lambda _: self._apply_filter(self.search.text()))
+        self.toggle_inbound.toggled.connect(
+            lambda _: self._apply_filter(self.search.text())
+        )
+        self.toggle_outbound.toggled.connect(
+            lambda _: self._apply_filter(self.search.text())
+        )
         self.header_actions.addWidget(self.toggle_inbound)
         self.header_actions.addWidget(self.toggle_outbound)
         # Manual refresh button
@@ -85,7 +93,9 @@ class FaxHistoryPanel(QWidget):
         root.addWidget(self.scroll, 1)
 
         # Thumbnail/network helper
-        self.thumb_helper = ThumbnailHelper(self.base_dir, self.exe_dir, self.app_state, self)
+        self.thumb_helper = ThumbnailHelper(
+            self.base_dir, self.exe_dir, self.app_state, self
+        )
 
         # State for data and pagination
         self._all_data = []
@@ -123,7 +133,9 @@ class FaxHistoryPanel(QWidget):
         fax_user = getattr(self.app_state.global_cfg, "fax_user", None)
         if not fax_user:
             try:
-                self.log.error("fax_user missing from config during refresh; skipping API calls until account is configured.")
+                self.log.error(
+                    "fax_user missing from config during refresh; skipping API calls until account is configured."
+                )
             except Exception:
                 pass
             # Reset flags and keep panel empty
@@ -136,6 +148,7 @@ class FaxHistoryPanel(QWidget):
             inbound_page=self._next_inbound_page,
             outbound_page=self._next_outbound_page,
         )
+
         # When finished, populate and clear in-progress flag
         def _on_finished(data):
             try:
@@ -145,6 +158,7 @@ class FaxHistoryPanel(QWidget):
                 # If another refresh was requested while we were working, run again
                 if getattr(self, "_refresh_requested_again", False):
                     self.request_refresh()
+
         self.worker.finished.connect(_on_finished)
         self.worker.start()
 
@@ -164,7 +178,7 @@ class FaxHistoryPanel(QWidget):
 
     def _abort_active_replies(self):
         try:
-            if hasattr(self, 'thumb_helper') and self.thumb_helper:
+            if hasattr(self, "thumb_helper") and self.thumb_helper:
                 self.thumb_helper.abort_active()
         except Exception:
             pass
@@ -179,7 +193,9 @@ class FaxHistoryPanel(QWidget):
                 continue
             match_text = (w.property("match_text") or "").lower()
             direction = (w.property("direction") or "").lower()
-            dir_ok = (show_in and direction == "inbound") or (show_out and direction == "outbound")
+            dir_ok = (show_in and direction == "inbound") or (
+                show_out and direction == "outbound"
+            )
             w.setVisible(dir_ok and (text in match_text))
 
     def _populate_list(self, data):
@@ -197,7 +213,9 @@ class FaxHistoryPanel(QWidget):
         self._clear_items()
         # Interweave inbound/outbound sorted by created_at (already sorted in thread, but re-sort to be safe)
         try:
-            sorted_all = sorted(self._all_data, key=lambda x: x.get("created_at", ""), reverse=True)
+            sorted_all = sorted(
+                self._all_data, key=lambda x: x.get("created_at", ""), reverse=True
+            )
         except Exception:
             sorted_all = list(self._all_data)
 
@@ -223,7 +241,9 @@ class FaxHistoryPanel(QWidget):
         self._open_pdf_viewer(entry, local_pdf_path)
 
     def _open_pdf_viewer(self, entry: dict, local_pdf_path: str | None):
-        open_pdf_viewer(self, entry, local_pdf_path, self.app_state, self.base_dir, self.exe_dir)
+        open_pdf_viewer(
+            self, entry, local_pdf_path, self.app_state, self.base_dir, self.exe_dir
+        )
 
     def _on_scroll(self, _=None):
         try:
@@ -239,7 +259,11 @@ class FaxHistoryPanel(QWidget):
                     return
                 self._loading_more = True
                 self.worker = RetrieveFaxesThread(
-                    (getattr(self.app_state.global_cfg, "fax_user", None) or self.app_state.global_cfg.fax_user or ""),
+                    (
+                        getattr(self.app_state.global_cfg, "fax_user", None)
+                        or self.app_state.global_cfg.fax_user
+                        or ""
+                    ),
                     self.app_state.global_cfg.bearer_token or "",
                     inbound_page=in_p or 0,
                     outbound_page=out_p or 0,
@@ -256,37 +280,45 @@ class FaxHistoryPanel(QWidget):
                 QMessageBox.information(self, "Download", "No PDF URL available.")
                 return
             from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
-            if not hasattr(self, '_net_mgr_dw'):
+
+            if not hasattr(self, "_net_mgr_dw"):
                 self._net_mgr_dw = QNetworkAccessManager(self)
             req = QNetworkRequest(QUrl(url))
             token = self.app_state.global_cfg.bearer_token or ""
             if token:
                 req.setRawHeader(b"Authorization", f"Bearer {token}".encode("utf-8"))
             reply = self._net_mgr_dw.get(req)
+
             def _save():
                 try:
                     if reply.error() == 0:
                         data = reply.readAll().data()
                         # Ask user where to save the file
-                        fax_id = str(entry.get('id') or 'fax')
+                        fax_id = str(entry.get("id") or "fax")
                         default_name = f"{fax_id}.pdf"
-                        path, _ = QFileDialog.getSaveFileName(self, "Save Fax PDF", default_name, "PDF Files (*.pdf);;All Files (*.*)")
+                        path, _ = QFileDialog.getSaveFileName(
+                            self,
+                            "Save Fax PDF",
+                            default_name,
+                            "PDF Files (*.pdf);;All Files (*.*)",
+                        )
                         if not path:
                             # User canceled
                             return
                         # Ensure .pdf extension
-                        if not path.lower().endswith('.pdf'):
+                        if not path.lower().endswith(".pdf"):
                             path = f"{path}.pdf"
                         # Write file
                         try:
                             os.makedirs(os.path.dirname(path), exist_ok=True)
                         except Exception:
                             pass
-                        with open(path, 'wb') as f:
+                        with open(path, "wb") as f:
                             f.write(data)
                         # Mark as downloaded in local index
                         try:
                             from utils.history_index import mark_downloaded
+
                             mark_downloaded(self.base_dir, fax_id)
                         except Exception:
                             pass
@@ -296,9 +328,12 @@ class FaxHistoryPanel(QWidget):
                         except Exception:
                             pass
                     else:
-                        QMessageBox.warning(self, "Download", f"Failed with error: {reply.error()} ")
+                        QMessageBox.warning(
+                            self, "Download", f"Failed with error: {reply.error()} "
+                        )
                 finally:
                     reply.deleteLater()
+
             reply.finished.connect(_save)
         except Exception as e:
             QMessageBox.warning(self, "Download", f"Failed: {e}")
@@ -306,7 +341,9 @@ class FaxHistoryPanel(QWidget):
     def _resolve_local_pdf(self, entry: dict):
         try:
             # Preferred inbox path from device settings
-            inbox = self.app_state.device_cfg.save_path or os.path.join(self.base_dir, "Inbox")
+            inbox = self.app_state.device_cfg.save_path or os.path.join(
+                self.base_dir, "Inbox"
+            )
             if not os.path.isdir(inbox):
                 return None
             # Try matching by id or known fields embedded in filename
@@ -316,7 +353,7 @@ class FaxHistoryPanel(QWidget):
                 str(entry.get("uuid", "")),
             ]
             keys = [k for k in keys if k]
-            files = [f for f in os.listdir(inbox) if f.lower().endswith('.pdf')]
+            files = [f for f in os.listdir(inbox) if f.lower().endswith(".pdf")]
             # 1) Exact matches
             for k in keys:
                 for f in files:
@@ -338,7 +375,9 @@ class FaxHistoryPanel(QWidget):
     def _on_view_confirmation(self, entry):
         try:
             # Open the confirmation in the PDF viewer (fetches remote if needed)
-            open_pdf_viewer_confirmation(self, entry, None, self.app_state, self.base_dir, self.exe_dir)
+            open_pdf_viewer_confirmation(
+                self, entry, None, self.app_state, self.base_dir, self.exe_dir
+            )
         except Exception as e:
             try:
                 QMessageBox.warning(self, "Viewer", f"Failed to open confirmation: {e}")
@@ -349,38 +388,52 @@ class FaxHistoryPanel(QWidget):
         try:
             url = entry.get("confirmation")
             if not url:
-                QMessageBox.information(self, "Download", "No confirmation URL available.")
+                QMessageBox.information(
+                    self, "Download", "No confirmation URL available."
+                )
                 return
             from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
-            if not hasattr(self, '_net_mgr_conf'):
+
+            if not hasattr(self, "_net_mgr_conf"):
                 self._net_mgr_conf = QNetworkAccessManager(self)
             req = QNetworkRequest(QUrl(url))
             token = self.app_state.global_cfg.bearer_token or ""
             if token:
                 req.setRawHeader(b"Authorization", f"Bearer {token}".encode("utf-8"))
             reply = self._net_mgr_conf.get(req)
+
             def _save():
                 try:
                     if reply.error() == 0:
                         data = reply.readAll().data()
-                        fax_id = str(entry.get('id') or 'fax')
+                        fax_id = str(entry.get("id") or "fax")
                         default_name = f"{fax_id}-confirmation.pdf"
-                        path, _ = QFileDialog.getSaveFileName(self, "Save Confirmation PDF", default_name, "PDF Files (*.pdf);;All Files (*.*)")
+                        path, _ = QFileDialog.getSaveFileName(
+                            self,
+                            "Save Confirmation PDF",
+                            default_name,
+                            "PDF Files (*.pdf);;All Files (*.*)",
+                        )
                         if not path:
                             return
-                        if not path.lower().endswith('.pdf'):
+                        if not path.lower().endswith(".pdf"):
                             path = f"{path}.pdf"
                         try:
                             os.makedirs(os.path.dirname(path), exist_ok=True)
                         except Exception:
                             pass
-                        with open(path, 'wb') as f:
+                        with open(path, "wb") as f:
                             f.write(data)
-                        QMessageBox.information(self, "Download", f"Confirmation saved to:\n{path}")
+                        QMessageBox.information(
+                            self, "Download", f"Confirmation saved to:\n{path}"
+                        )
                     else:
-                        QMessageBox.warning(self, "Download", f"Failed with error: {reply.error()} ")
+                        QMessageBox.warning(
+                            self, "Download", f"Failed with error: {reply.error()} "
+                        )
                 finally:
                     reply.deleteLater()
+
             reply.finished.connect(_save)
         except Exception as e:
             QMessageBox.warning(self, "Download", f"Failed: {e}")
@@ -397,7 +450,7 @@ class FaxHistoryPanel(QWidget):
             if isinstance(href, str) and href.startswith("contact:"):
                 key = href.split("contact:", 1)[1]
             digits = AddressBookManager._sanitize_phone(key)
-            if not digits or not getattr(self, 'addr_mgr', None):
+            if not digits or not getattr(self, "addr_mgr", None):
                 return
             # Refresh contacts to ensure we have latest
             try:
@@ -416,7 +469,9 @@ class FaxHistoryPanel(QWidget):
                 dlg.exec_()
             except Exception as e:
                 try:
-                    QMessageBox.warning(self, "Address Book", f"Unable to open contact: {e}")
+                    QMessageBox.warning(
+                        self, "Address Book", f"Unable to open contact: {e}"
+                    )
                 except Exception:
                     pass
         except Exception:

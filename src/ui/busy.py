@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QProgressDialog, QApplication
+from PyQt5.QtWidgets import QApplication, QProgressDialog
 
 
 class BusyDialog:
@@ -10,6 +10,7 @@ class BusyDialog:
             do_blocking_work()
     Or manually call show()/close().
     """
+
     def __init__(self, parent=None, text: str = "Working...", modal: bool = True):
         self.parent = parent
         self.text = text
@@ -21,7 +22,9 @@ class BusyDialog:
             self._dlg = QProgressDialog(self.text, None, 0, 0, self.parent)
             # Allow caller to choose modality: default ApplicationModal (blocking), or NonModal for passive indicator
             try:
-                self._dlg.setWindowModality(Qt.ApplicationModal if self.modal else Qt.NonModal)
+                self._dlg.setWindowModality(
+                    Qt.ApplicationModal if self.modal else Qt.NonModal
+                )
             except Exception:
                 # Fallback: ignore if platform doesn't support modality change
                 pass
@@ -30,7 +33,9 @@ class BusyDialog:
             self._dlg.setWindowTitle("Please wait")
             # Optional: frameless for a cleaner look; fallback if unsupported
             try:
-                self._dlg.setWindowFlags(self._dlg.windowFlags() | Qt.FramelessWindowHint)
+                self._dlg.setWindowFlags(
+                    self._dlg.windowFlags() | Qt.FramelessWindowHint
+                )
             except Exception:
                 pass
             self._dlg.show()

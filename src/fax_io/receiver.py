@@ -7,22 +7,29 @@ Handles file conversion, archiving, optional printing, and cleanup.
 
 import os
 import shutil
-import tempfile
 import subprocess
-import requests
-from datetime import datetime, timezone, timedelta
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, QRect
-from PyQt5.QtGui import QImage, QPainter
-from PyQt5.QtPrintSupport import QPrinter
+import tempfile
+from datetime import datetime, timedelta, timezone
 
 import fitz  # PyMuPDF for in-app PDF rasterization (no external tools)
-from utils.history_index import is_downloaded
+import requests
+from PyQt5.QtCore import QRect, Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QImage, QPainter
+from PyQt5.QtPrintSupport import QPrinter
+from PIL import Image
 
 from core.app_state import app_state
+from utils.history_index import is_downloaded
 from utils.logging_utils import get_logger
+import threading
+
+# Module-level lock to ensure only one receiver run at a time within the process
+_RECEIVER_RUN_LOCK = threading.Lock()
 
 
-def convert_pdf_to_jpg(pdf_path: str, output_prefix: str, base_dir: str, dpi: int = 200) -> list:
+def convert_pdf_to_jpg(
+    pdf_path: str, output_prefix: str, base_dir: str, dpi: int = 200
+) -> list:
     """
     Convert a PDF into JPG image(s) using PyMuPDF (fitz), avoiding external tools.
     - pdf_path: source PDF file
@@ -55,7 +62,73 @@ def convert_pdf_to_jpg(pdf_path: str, output_prefix: str, base_dir: str, dpi: in
                 jpgs.append(out_path)
         return jpgs
     except Exception:
+        # Log at debug-level context using receiver logger
+        try:
+            get_logger("fax_receiver").exception(
+                f"Failed converting PDF to JPG(s): pdf='{pdf_path}', prefix='{output_prefix}'"
+            )
+        except Exception:
+            pass
         return []
+
+
+def convert_pdf_to_multipage_tiff(pdf_path: str, output_path: str, dpi: int = 200) -> bool:
+    """
+    Render a PDF to a multi-page TIFF using PyMuPDF for rasterization and Pillow for saving.
+    Returns True on success.
+    """
+    try:
+        # Render pages via PyMuPDF
+        try:
+            zoom = float(dpi) / 72.0 if dpi else 200.0 / 72.0
+        except Exception:
+            zoom = 200.0 / 72.0
+        if zoom <= 0:
+            zoom = 200.0 / 72.0
+        mat = fitz.Matrix(zoom, zoom)
+        images = []
+        with fitz.open(pdf_path) as doc:
+            for page in doc:
+                pix = page.get_pixmap(matrix=mat, alpha=False)
+                mode = "RGB"  # alpha is False, so RGB
+                img = Image.frombytes(mode, [pix.width, pix.height], pix.samples)
+                # For fax-friendly TIFF, convert to bilevel (1-bit) if possible
+                try:
+                    img_mono = img.convert("1")
+                except Exception:
+                    img_mono = img.convert("L")
+                images.append(img_mono)
+        if not images:
+            return False
+        os.makedirs(os.path.dirname(output_path) or os.path.dirname(pdf_path), exist_ok=True)
+        first, rest = images[0], images[1:]
+        # Try Group4 compression; fallback to LZW if not supported
+        try:
+            first.save(
+                output_path,
+                save_all=True,
+                append_images=rest,
+                compression="group4",
+                format="TIFF",
+            )
+        except Exception:
+            first.save(
+                output_path,
+                save_all=True,
+                append_images=rest,
+                compression="tiff_lzw",
+                format="TIFF",
+            )
+        return True
+    except Exception:
+        try:
+            get_logger("fax_receiver").exception(
+                f"Failed converting PDF to multi-page TIFF: pdf='{pdf_path}', out='{output_path}'"
+            )
+        except Exception:
+            pass
+        return False
+
 
 class FaxReceiver(QThread):
     finished = pyqtSignal()
@@ -65,25 +138,82 @@ class FaxReceiver(QThread):
         self.base_dir = base_dir
         self.log = get_logger("fax_receiver")
         # self.archive_manager = ArchiveManager(base_dir)
+        self._lock_held = False
+
+    def _acquire_run_lock(self) -> bool:
+        global _RECEIVER_RUN_LOCK
+        try:
+            acquired = _RECEIVER_RUN_LOCK.acquire(blocking=False)
+            self._lock_held = acquired
+            return acquired
+        except Exception:
+            # Fail closed; treat as not acquired
+            try:
+                self.log.exception("Failed to acquire receiver run lock")
+            except Exception:
+                pass
+            return False
+
+    def _release_run_lock(self) -> None:
+        global _RECEIVER_RUN_LOCK
+        try:
+            if self._lock_held:
+                self._lock_held = False
+                _RECEIVER_RUN_LOCK.release()
+        except Exception:
+            try:
+                self.log.debug("Failed to release receiver run lock", exc_info=True)
+            except Exception:
+                pass
 
     def run(self):
         self.start_download()
 
     def start_download(self):
+        # Ensure only one retrieval runs at a time
+        if not self._acquire_run_lock():
+            try:
+                self.log.info("Another fax retrieval is already in progress; skipping this run.")
+            except Exception:
+                pass
+            self.finished.emit()
+            return
         try:
-            inbox_path = app_state.device_cfg.save_path or os.path.join(self.base_dir, "Inbox")
+            # Authorization guard: only run if device is explicitly configured as sender_receiver and allowed
+            mode_ok = ((app_state.device_cfg.retriever_mode or "").lower() == "sender_receiver")
+            status_ok = ((app_state.device_cfg.retriever_status or "").lower() == "allowed")
+            if not (mode_ok and status_ok):
+                self.log.info("Receiver pass skipped: device not authorized as retriever.")
+                self.finished.emit()
+                return
+
+            inbox_path = app_state.device_cfg.save_path or os.path.join(
+                self.base_dir, "Inbox"
+            )
             os.makedirs(inbox_path, exist_ok=True)
 
-            download_format = (app_state.device_cfg.download_method or "PDF").upper()
-            should_print = str(app_state.device_cfg.print_faxes).strip().lower() == "yes"
+            # Parse selected download formats (multi-select). Legacy "BOTH" => PDF+JPG
+            raw_method = (app_state.device_cfg.download_method or "PDF")
+            method_text = str(raw_method or "").strip()
+            if not method_text:
+                method_text = "PDF"
+            if method_text.upper() == "BOTH":
+                selected_formats = {"PDF", "JPG"}
+            else:
+                selected_formats = {p.strip().upper() for p in method_text.split(",") if p.strip()}
+                if not selected_formats:
+                    selected_formats = {"PDF"}
 
-            fax_user = getattr(app_state.global_cfg, 'fax_user', None)
+            should_print = (
+                str(app_state.device_cfg.print_faxes).strip().lower() == "yes"
+            )
+
+            fax_user = getattr(app_state.global_cfg, "fax_user", None)
             bearer = app_state.global_cfg.bearer_token
             if not fax_user:
-                try:
-                    self.log.error("fax_user missing from config; skipping fax retrieval until account is configured.")
-                except Exception:
-                    pass
+                self.log.error(
+                    "fax_user missing from config; skipping fax retrieval until account is configured."
+                )
                 self.finished.emit()
                 return
             if not bearer:
@@ -91,7 +221,10 @@ class FaxReceiver(QThread):
                 self.finished.emit()
                 return
 
-            headers = {"accept": "application/json", "Authorization": f"Bearer {bearer}"}
+            headers = {
+                "accept": "application/json",
+                "Authorization": f"Bearer {bearer}",
+            }
             base_url = "https://telco-api.skyswitch.com"
             list_url = f"{base_url}/users/{fax_user}/faxes/inbound"
 
@@ -101,13 +234,17 @@ class FaxReceiver(QThread):
             while next_url:
                 resp = requests.get(next_url, headers=headers, timeout=30)
                 if resp.status_code != 200:
-                    self.log.error(f"Failed to list inbound faxes: HTTP {resp.status_code} {resp.text}")
+                    self.log.error(
+                        f"Failed to list inbound faxes: HTTP {resp.status_code} {resp.text}"
+                    )
                     break
                 payload = resp.json() or {}
                 all_faxes.extend(payload.get("data", []) or [])
                 links = payload.get("links", {}) or {}
                 nxt = links.get("next")
-                next_url = (list_url + nxt) if (nxt and not nxt.startswith("http")) else nxt
+                next_url = (
+                    (list_url + nxt) if (nxt and not nxt.startswith("http")) else nxt
+                )
 
             # Server-side cleanup threshold
             try:
@@ -135,15 +272,20 @@ class FaxReceiver(QThread):
                         if is_downloaded(self.base_dir, str(fax_id)):
                             continue
                     except Exception:
-                        pass
+                        self.log.exception("Failed to check history_index.is_downloaded")
 
                     # Parse timestamp (assume Zulu ISO)
                     try:
                         if "." in created_at:
-                            ts = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+                            ts = datetime.strptime(
+                                created_at, "%Y-%m-%dT%H:%M:%S.%fZ"
+                            ).replace(tzinfo=timezone.utc)
                         else:
-                            ts = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                            ts = datetime.strptime(
+                                created_at, "%Y-%m-%dT%H:%M:%SZ"
+                            ).replace(tzinfo=timezone.utc)
                     except Exception:
+                        self.log.exception(f"Failed to parse timestamp: created_at='{created_at}'")
                         ts = datetime.now(timezone.utc)
 
                     # Server retention delete: if older than cutoff, delete and skip processing
@@ -157,80 +299,103 @@ class FaxReceiver(QThread):
                     pdf_path = os.path.join(inbox_path, pdf_name)
                     jpg_prefix = os.path.join(inbox_path, file_base)
 
-                    # Skip if already downloaded (either pdf exists or jpgs exist for JPG/Both)
-                    if os.path.exists(pdf_path):
+                    # Skip if all requested outputs already exist
+                    already_have_pdf = os.path.exists(pdf_path)
+                    existing_jpgs = [
+                        n
+                        for n in os.listdir(inbox_path)
+                        if n.startswith(file_base + "-") and n.lower().endswith(".jpg")
+                    ]
+                    tiff_path = os.path.join(inbox_path, f"{file_base}.tiff")
+                    need_pdf = ("PDF" in selected_formats) or should_print
+                    need_jpg = ("JPG" in selected_formats)
+                    need_tiff = ("TIFF" in selected_formats)
+                    if ((not need_pdf or already_have_pdf) and
+                        (not need_jpg or existing_jpgs) and
+                        (not need_tiff or os.path.exists(tiff_path))):
                         continue
-                    if download_format in ("JPG", "BOTH"):
-                        existing_jpgs = [n for n in os.listdir(inbox_path) if n.startswith(file_base + "-") and n.lower().endswith('.jpg')]
-                        if existing_jpgs:
+
+                    # Download PDF if needed (conversion requires PDF)
+                    if not already_have_pdf:
+                        r = requests.get(pdf_url, headers=headers, timeout=60)
+                        if r.status_code != 200:
+                            self.log.error(
+                                f"Failed to download fax {fax_id}: HTTP {r.status_code}"
+                            )
                             continue
+                        with open(pdf_path, "wb") as f:
+                            f.write(r.content)
+                        self.log.info(f"Downloaded fax {fax_id} -> {pdf_path}")
+                        try:
+                            from utils.history_index import mark_downloaded
 
-                    # Download PDF
-                    r = requests.get(pdf_url, headers=headers, timeout=60)
-                    if r.status_code != 200:
-                        self.log.error(f"Failed to download fax {fax_id}: HTTP {r.status_code}")
-                        continue
-                    with open(pdf_path, "wb") as f:
-                        f.write(r.content)
-                    self.log.info(f"Downloaded fax {fax_id} -> {pdf_path}")
-                    try:
-                        from utils.history_index import mark_downloaded
-                        mark_downloaded(self.base_dir, str(fax_id))
-                    except Exception:
-                        pass
+                            mark_downloaded(self.base_dir, str(fax_id))
+                        except Exception:
+                            pass
 
-                    # Convert if needed
-                    if download_format == "JPG":
+                    # Convert as requested
+                    if "JPG" in selected_formats:
                         jpgs = convert_pdf_to_jpg(pdf_path, jpg_prefix, self.base_dir)
                         if not jpgs:
                             self.log.error(f"JPG conversion failed for {pdf_path}")
-                        else:
-                            # If printing is not requested, remove the PDF in JPG-only mode.
-                            if not should_print and os.path.exists(pdf_path):
-                                os.remove(pdf_path)
-                    elif download_format == "BOTH":
-                        _ = convert_pdf_to_jpg(pdf_path, jpg_prefix, self.base_dir)
+                    if "TIFF" in selected_formats:
+                        tiff_ok = convert_pdf_to_multipage_tiff(pdf_path, tiff_path, dpi=200)
+                        if not tiff_ok:
+                            self.log.error(f"TIFF conversion failed for {pdf_path}")
+
+                    # If PDF is not requested and not needed for printing, remove it
+                    if ("PDF" not in selected_formats) and (not should_print) and os.path.exists(pdf_path):
+                        try:
+                            os.remove(pdf_path)
+                        except Exception:
+                            self.log.debug("Failed to remove PDF after conversions", exc_info=True)
 
                     # Optional printing hook
                     if should_print:
                         try:
                             self._print_pdf(pdf_path)
                         except Exception as pe:
-                            self.log.error(f"Failed to start print job for {pdf_path}: {pe}")
+                            self.log.error(
+                                f"Failed to start print job for {pdf_path}: {pe}"
+                            )
 
                     processed += 1
                 except Exception as ie:
-                    self.log.error(f"Error processing fax item: {ie}")
+                    self.log.exception("Error processing fax item")
 
             try:
                 self._cleanup_server_outbound(base_url, fax_user, headers, cutoff_dt)
             except Exception as oe:
-                try:
-                    self.log.warning(f"Outbound cleanup encountered an error: {oe}")
-                except Exception:
-                    pass
+                self.log.exception("Outbound cleanup encountered an error")
 
             # Local inbox cleanup (delete old downloaded files)
             try:
                 self._cleanup_local_inbox(inbox_path, cutoff_dt)
             except Exception as le:
-                try:
-                    self.log.warning(f"Local inbox cleanup encountered an error: {le}")
-                except Exception:
-                    pass
+                self.log.exception("Local inbox cleanup encountered an error")
 
             self.log.info(f"Receiver pass complete. Processed {processed} item(s).")
             try:
-                notif_enabled = str(getattr(app_state.device_cfg, 'notifications_enabled', 'Yes') or 'Yes').strip().lower() == 'yes'
+                notif_enabled = (
+                    str(
+                        getattr(app_state.device_cfg, "notifications_enabled", "Yes")
+                        or "Yes"
+                    )
+                    .strip()
+                    .lower()
+                    == "yes"
+                )
                 if processed > 0 and notif_enabled:
                     self._notify_toast(processed)
             except Exception:
-                pass
+                self.log.exception("Failed to show toast notification")
             self.finished.emit()
-        
-        except Exception as e:
-            self.log.error(f"Fax retrieval failed: {e}")
+
+        except Exception:
+            self.log.exception("Fax retrieval failed")
             self.finished.emit()
+        finally:
+            self._release_run_lock()
 
     def _print_pdf(self, pdf_path: str):
         try:
@@ -239,7 +404,7 @@ class FaxReceiver(QThread):
                 self.log.warning(f"Print skipped; file not found: {pdf_path}")
                 return
             # Read printer settings from app_state
-            printer_name = getattr(app_state.device_cfg, 'printer_name', '') or ''
+            printer_name = getattr(app_state.device_cfg, "printer_name", "") or ""
             if not printer_name:
                 self.log.warning("Print requested but no printer configured.")
                 return
@@ -253,7 +418,7 @@ class FaxReceiver(QThread):
                 try:
                     shutil.rmtree(tmpdir, ignore_errors=True)
                 except Exception:
-                    pass
+                    self.log.debug("Failed to cleanup temp print dir after conversion failure", exc_info=True)
                 return
 
             # Prepare printer
@@ -262,6 +427,7 @@ class FaxReceiver(QThread):
             # Apply saved printer settings (best-effort)
             try:
                 from core.config_loader import device_config as _devcfg
+
                 ps = _devcfg.get("Fax Options", "printer_settings", {}) or {}
                 orient = ps.get("orientation")
                 if orient == "Portrait":
@@ -284,11 +450,13 @@ class FaxReceiver(QThread):
                 pass
 
             if not qprinter.isValid():
-                self.log.error(f"Selected printer is not valid or not found: '{printer_name}'")
+                self.log.error(
+                    f"Selected printer is not valid or not found: '{printer_name}'"
+                )
                 try:
                     shutil.rmtree(tmpdir, ignore_errors=True)
                 except Exception:
-                    pass
+                    self.log.debug("Failed to cleanup temp print dir after invalid printer", exc_info=True)
                 return
 
             painter = QPainter()
@@ -297,7 +465,7 @@ class FaxReceiver(QThread):
                 try:
                     shutil.rmtree(tmpdir, ignore_errors=True)
                 except Exception:
-                    pass
+                    self.log.debug("Failed to cleanup temp print dir after painter begin failure", exc_info=True)
                 return
 
             try:
@@ -308,7 +476,9 @@ class FaxReceiver(QThread):
                         continue
                     # Fit image to page rect preserving aspect ratio
                     page_rect = qprinter.pageRect()
-                    scaled_size = img.size().scaled(page_rect.size(), Qt.KeepAspectRatio)
+                    scaled_size = img.size().scaled(
+                        page_rect.size(), Qt.KeepAspectRatio
+                    )
                     # Center within page
                     x = page_rect.x() + (page_rect.width() - scaled_size.width()) // 2
                     y = page_rect.y() + (page_rect.height() - scaled_size.height()) // 2
@@ -316,15 +486,17 @@ class FaxReceiver(QThread):
                     painter.drawImage(target_rect, img)
                     if idx < len(jpgs) - 1:
                         qprinter.newPage()
-                self.log.info(f"Print job sent: {os.path.basename(pdf_path)} -> '{printer_name}' ({len(jpgs)} page(s))")
+                self.log.info(
+                    f"Print job sent: {os.path.basename(pdf_path)} -> '{printer_name}' ({len(jpgs)} page(s))"
+                )
             finally:
                 painter.end()
                 try:
                     shutil.rmtree(tmpdir, ignore_errors=True)
                 except Exception:
-                    pass
+                    self.log.debug("Failed to cleanup temp print dir after print job", exc_info=True)
         except Exception as e:
-            self.log.error(f"Print failed for {pdf_path}: {e}")
+            self.log.exception(f"Print failed for {pdf_path}")
 
     def _notify_toast(self, processed: int):
         # Safety: do not notify for zero or negative counts
@@ -348,37 +520,57 @@ class FaxReceiver(QThread):
         # Try winotify (PNG typically supported) first to ensure icon appears even if .ico is invalid
         try:
             from winotify import Notification
+
             try:
-                toast = Notification(app_id="FaxRetriever", title=title, msg=msg, icon=(icon_png if has_png else (icon_ico if has_ico else None)))
+                toast = Notification(
+                    app_id="FaxRetriever",
+                    title=title,
+                    msg=msg,
+                    icon=(icon_png if has_png else (icon_ico if has_ico else None)),
+                )
                 toast.show()
                 return
             except Exception:
-                pass
+                self.log.debug("winotify toast failed", exc_info=True)
         except Exception:
-            pass
+            self.log.debug("winotify not available", exc_info=True)
 
         # Fallback: win10toast (uses .ico)
         try:
             from win10toast import ToastNotifier
+
             try:
                 notifier = ToastNotifier()
-                notifier.show_toast(title, msg, icon_path=(icon_ico if has_ico else None), duration=5, threaded=True)
+                notifier.show_toast(
+                    title,
+                    msg,
+                    icon_path=(icon_ico if has_ico else None),
+                    duration=5,
+                    threaded=True,
+                )
                 return
             except Exception:
-                pass
+                self.log.debug("win10toast toast failed", exc_info=True)
         except Exception:
-            pass
+            self.log.debug("win10toast not available", exc_info=True)
 
         # Try plyer
         try:
             from plyer import notification
+
             try:
-                notification.notify(title=title, message=msg, app_name="FaxRetriever", app_icon=(icon_ico if has_ico else (icon_png if has_png else None)), timeout=5)
+                notification.notify(
+                    title=title,
+                    message=msg,
+                    app_name="FaxRetriever",
+                    app_icon=(icon_ico if has_ico else (icon_png if has_png else None)),
+                    timeout=5,
+                )
                 return
             except Exception:
-                pass
+                self.log.debug("plyer toast failed", exc_info=True)
         except Exception:
-            pass
+            self.log.debug("plyer not available", exc_info=True)
 
         # Try PowerShell BurntToast if available
         try:
@@ -387,29 +579,46 @@ class FaxReceiver(QThread):
                 ps_script = f"$title='{title}'; $msg='{msg}'; if (Get-Module -ListAvailable -Name BurntToast) {{ New-BurntToastNotification -Text $title,$msg -AppLogo '{icon_path}' }} else {{ $null }} "
             else:
                 ps_script = f"$title='{title}'; $msg='{msg}'; if (Get-Module -ListAvailable -Name BurntToast) {{ New-BurntToastNotification -Text $title,$msg }} else {{ $null }} "
-            subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    ps_script,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
             return
         except Exception:
-            pass
+            self.log.debug("PowerShell toast failed", exc_info=True)
 
         # If everything failed, just log
-        try:
-            self.log.debug("Toast notification could not be shown (no supported library found).")
-        except Exception:
-            pass
+        self.log.debug(
+            "Toast notification could not be shown (no supported library found)."
+        )
 
-    def _delete_server_fax(self, base_url: str, fax_user: str, fax_id: str, headers: dict):
+    def _delete_server_fax(
+        self, base_url: str, fax_user: str, fax_id: str, headers: dict
+    ):
         try:
             del_url = f"{base_url}/users/{fax_user}/faxes/{fax_id}/delete"
             resp = requests.post(del_url, headers=headers, timeout=15)
             if resp.status_code == 200:
                 self.log.info(f"Deleted server fax {fax_id} per retention policy.")
             else:
-                self.log.warning(f"Failed to delete server fax {fax_id}: HTTP {resp.status_code}")
+                self.log.warning(
+                    f"Failed to delete server fax {fax_id}: HTTP {resp.status_code}"
+                )
         except Exception as e:
-            self.log.warning(f"Delete server fax error for {fax_id}: {e}")
+            self.log.exception(f"Delete server fax error for {fax_id}")
 
-    def _cleanup_server_outbound(self, base_url: str, fax_user: str, headers: dict, cutoff_dt: datetime):
+    def _cleanup_server_outbound(
+        self, base_url: str, fax_user: str, headers: dict, cutoff_dt: datetime
+    ):
         """List outbound faxes and delete those older than cutoff_dt."""
         try:
             list_url = f"{base_url}/users/{fax_user}/faxes/outbound"
@@ -418,10 +627,12 @@ class FaxReceiver(QThread):
             while next_url:
                 resp = requests.get(next_url, headers=headers, timeout=30)
                 if resp.status_code != 200:
-                    self.log.error(f"Failed to list outbound faxes: HTTP {resp.status_code} {resp.text}")
+                    self.log.error(
+                        f"Failed to list outbound faxes: HTTP {resp.status_code} {resp.text}"
+                    )
                     break
                 payload = resp.json() or {}
-                for fax in (payload.get("data", []) or []):
+                for fax in payload.get("data", []) or []:
                     try:
                         fax_id = fax.get("id")
                         created_at = fax.get("created_at")
@@ -429,23 +640,31 @@ class FaxReceiver(QThread):
                             continue
                         try:
                             if "." in created_at:
-                                ts = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+                                ts = datetime.strptime(
+                                    created_at, "%Y-%m-%dT%H:%M:%S.%fZ"
+                                ).replace(tzinfo=timezone.utc)
                             else:
-                                ts = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                                ts = datetime.strptime(
+                                    created_at, "%Y-%m-%dT%H:%M:%SZ"
+                                ).replace(tzinfo=timezone.utc)
                         except Exception:
                             ts = datetime.now(timezone.utc)
                         if ts < cutoff_dt:
                             self._delete_server_fax(base_url, fax_user, fax_id, headers)
                             total_deleted += 1
                     except Exception as ie:
-                        self.log.warning(f"Error evaluating outbound fax for deletion: {ie}")
+                        self.log.exception("Error evaluating outbound fax for deletion")
                 links = payload.get("links", {}) or {}
                 nxt = links.get("next")
-                next_url = (list_url + nxt) if (nxt and not nxt.startswith("http")) else nxt
+                next_url = (
+                    (list_url + nxt) if (nxt and not nxt.startswith("http")) else nxt
+                )
             if total_deleted:
-                self.log.info(f"Outbound cleanup deleted {total_deleted} fax(es) older than retention.")
+                self.log.info(
+                    f"Outbound cleanup deleted {total_deleted} fax(es) older than retention."
+                )
         except Exception as e:
-            self.log.warning(f"Outbound cleanup error: {e}")
+            self.log.exception("Outbound cleanup error")
 
     def _cleanup_local_inbox(self, inbox_path: str, cutoff_dt: datetime):
         """Delete local inbox files (PDF/JPG) older than cutoff_dt based on file mtime."""
@@ -454,11 +673,13 @@ class FaxReceiver(QThread):
             removed = 0
             for name in os.listdir(inbox_path):
                 low = name.lower()
-                if not (low.endswith('.pdf') or low.endswith('.jpg')):
+                if not (low.endswith(".pdf") or low.endswith(".jpg") or low.endswith(".tiff") or low.endswith(".tif")):
                     continue
                 fpath = os.path.join(inbox_path, name)
                 try:
-                    mtime = datetime.fromtimestamp(os.path.getmtime(fpath), tz=timezone.utc)
+                    mtime = datetime.fromtimestamp(
+                        os.path.getmtime(fpath), tz=timezone.utc
+                    )
                 except Exception:
                     continue
                 if mtime < cutoff_dt:
@@ -466,17 +687,18 @@ class FaxReceiver(QThread):
                         os.remove(fpath)
                         removed += 1
                     except Exception as de:
-                        self.log.warning(f"Failed to remove old file '{fpath}': {de}")
+                        self.log.exception(f"Failed to remove old file '{fpath}'")
             if removed:
                 self.log.info(f"Local inbox cleanup removed {removed} old file(s).")
         except Exception as e:
-            self.log.warning(f"Local inbox cleanup error: {e}")
+            self.log.exception("Local inbox cleanup error")
 
     def _build_filename(self, fax_id: str, caller_id: str, ts: datetime) -> str:
         """
         Build a safe filename base for a fax using the configured naming scheme.
         Always returns a string and strips characters invalid for Windows filenames.
         """
+
         def _sanitize(part: str) -> str:
             try:
                 s = str(part)
@@ -484,9 +706,9 @@ class FaxReceiver(QThread):
                 s = ""
             # Replace invalid Windows filename characters
             invalid = '<>:"/\\|?*'
-            s = ''.join((ch if ch not in invalid else '_') for ch in s)
+            s = "".join((ch if ch not in invalid else "_") for ch in s)
             # Remove leading/trailing spaces and dots
-            s = s.strip().strip('.')
+            s = s.strip().strip(".")
             # Avoid empty component
             return s or "fax"
 

@@ -1,7 +1,7 @@
-import os
 import json
+import os
 import random
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
 _DEFAULT_MESSAGES = {
     "humorous": [
@@ -23,7 +23,7 @@ _DEFAULT_MESSAGES = {
         "The remainder of this page is intentionally left blank.",
         "Intentionally left blank.",
         "This page has been intentionally left blank.",
-    ]
+    ],
 }
 
 
@@ -55,9 +55,11 @@ def load_message_pool(base_dir: str) -> Dict[str, List[str]]:
 def random_footer(base_dir: str, category: str | None) -> str:
     pool = load_message_pool(base_dir)
     cat = (category or "classic").strip().lower()
-    messages = pool.get(cat) or pool.get("classic") or [
-        "The remainder of this page is intentionally left blank."
-    ]
+    messages = (
+        pool.get(cat)
+        or pool.get("classic")
+        or ["The remainder of this page is intentionally left blank."]
+    )
     try:
         return random.choice(messages)
     except Exception:

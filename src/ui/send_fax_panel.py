@@ -1,28 +1,33 @@
 import io
 import os
-
-from PyQt5.QtCore import Qt, QRectF, QSize, QThread, QTimer
-from PyQt5.QtGui import QIcon, QPixmap, QImage, QMovie
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QLineEdit, \
-    QGroupBox, QMessageBox, QListWidget, QGridLayout, QFileDialog, \
-    QGraphicsView, QGraphicsScene, QMenu, QComboBox, QDialog, QListWidgetItem, QSizePolicy
-
-from core.config_loader import global_config, device_config
-from fax_io.sender import FaxSender
-from utils.document_utils import normalize_document
-from tempfile import mkstemp
 import random
 import tempfile
+from tempfile import mkstemp
+
+from PyQt5.QtCore import QRectF, QSize, Qt, QThread, QTimer
+from PyQt5.QtGui import QIcon, QImage, QMovie, QPixmap
+from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
+                             QGraphicsScene, QGraphicsView, QGridLayout,
+                             QGroupBox, QHBoxLayout, QInputDialog, QLabel,
+                             QLineEdit, QListWidget, QListWidgetItem, QMenu,
+                             QMessageBox, QPushButton, QSizePolicy,
+                             QVBoxLayout, QWidget)
+
+from core.config_loader import device_config, global_config
+from fax_io.sender import FaxSender
+from utils.document_utils import normalize_document
+
 try:
     from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
     from reportlab.lib.units import inch
+    from reportlab.pdfgen import canvas
+
     REPORTLAB_AVAILABLE = True
 except Exception:
     REPORTLAB_AVAILABLE = False
+from ui.busy import BusyDialog
 from utils.logging_utils import get_logger
 from workers.scan_worker import ScanWorker
-from ui.busy import BusyDialog
 
 
 class SendFaxPanel(QWidget):
@@ -30,6 +35,7 @@ class SendFaxPanel(QWidget):
     Embedded send-fax panel for attaching files, selecting a recipient, and sending.
     Extracted from SendFaxDialog but implemented as a QWidget to live inside MainWindow.
     """
+
     def __init__(self, base_dir, exe_dir, app_state, address_book_manager, parent=None):
         super().__init__(parent)
         self.base_dir = base_dir
@@ -69,6 +75,7 @@ class SendFaxPanel(QWidget):
 
         # Caller ID (source number)
         from core.app_state import app_state as _app_state
+
         self.caller_id_combo = QComboBox()
         self.caller_id_combo.setEditable(False)
         nums = _app_state.global_cfg.all_numbers or []
@@ -76,14 +83,18 @@ class SendFaxPanel(QWidget):
         for n in nums:
             self.caller_id_combo.addItem(str(n))
         # Initialize selection from device settings if present
-        preselect = _app_state.device_cfg.selected_fax_number or (nums[0] if nums else "")
+        preselect = _app_state.device_cfg.selected_fax_number or (
+            nums[0] if nums else ""
+        )
         if preselect and preselect in nums:
             self.caller_id_combo.setCurrentText(preselect)
+
         # Persist selection to device settings when changed
         def _on_caller_changed(text):
             device_config.set("Account", "selected_fax_number", text)
             device_config.save()
             _app_state.device_cfg.selected_fax_number = text
+
         self.caller_id_combo.currentTextChanged.connect(_on_caller_changed)
 
         self.fax_area = QLineEdit()
@@ -93,6 +104,7 @@ class SendFaxPanel(QWidget):
         self.fax_area.setPlaceholderText("Area")
         try:
             from PyQt5.QtGui import QIntValidator
+
             self.fax_area.setValidator(QIntValidator(0, 999))
         except Exception:
             pass
@@ -104,6 +116,7 @@ class SendFaxPanel(QWidget):
         self.fax_prefix.setPlaceholderText("Prefix")
         try:
             from PyQt5.QtGui import QIntValidator
+
             self.fax_prefix.setValidator(QIntValidator(0, 999))
         except Exception:
             pass
@@ -115,12 +128,17 @@ class SendFaxPanel(QWidget):
         self.fax_suffix.setPlaceholderText("Suffix")
         try:
             from PyQt5.QtGui import QIntValidator
+
             self.fax_suffix.setValidator(QIntValidator(0, 9999))
         except Exception:
             pass
 
-        self.fax_area.textChanged.connect(lambda: self._auto_advance(self.fax_area, self.fax_prefix))
-        self.fax_prefix.textChanged.connect(lambda: self._auto_advance(self.fax_prefix, self.fax_suffix))
+        self.fax_area.textChanged.connect(
+            lambda: self._auto_advance(self.fax_area, self.fax_prefix)
+        )
+        self.fax_prefix.textChanged.connect(
+            lambda: self._auto_advance(self.fax_prefix, self.fax_suffix)
+        )
 
         # Address Book button
         self.address_book_btn = QPushButton("Address Book")
@@ -158,7 +176,9 @@ class SendFaxPanel(QWidget):
         self.cover_checkbox.setToolTip("Attach a cover sheet before the document(s)")
         # Add Configure Cover Sheet button next to the checkbox
         self.configure_cover_btn = QPushButton("Configure Cover Sheet")
-        self.configure_cover_btn.setToolTip("Set header details and footer options for the cover sheet")
+        self.configure_cover_btn.setToolTip(
+            "Set header details and footer options for the cover sheet"
+        )
         self.configure_cover_btn.clicked.connect(self._open_cover_config)
         recipient_layout.addWidget(self.cover_checkbox, row, 0, 1, 3)
         recipient_layout.addWidget(self.configure_cover_btn, row, 3, 1, 3)
@@ -167,7 +187,9 @@ class SendFaxPanel(QWidget):
         # Cover Sheet Fields: To/Attention and Memo
         self.cover_to_input = QLineEdit()
         self.cover_to_input.setPlaceholderText("To / Attention")
-        self.cover_to_input.setToolTip("Displayed on the cover sheet To / Attention line")
+        self.cover_to_input.setToolTip(
+            "Displayed on the cover sheet To / Attention line"
+        )
         try:
             self.cover_to_input.setClearButtonEnabled(True)
         except Exception:
@@ -182,6 +204,7 @@ class SendFaxPanel(QWidget):
         # Start disabled until include checkbox is checked
         self.cover_to_input.setEnabled(False)
         self.cover_memo_input.setEnabled(False)
+
         def _toggle_cover_fields(state):
             enabled = state == Qt.Checked
             self.cover_to_input.setEnabled(enabled)
@@ -190,11 +213,16 @@ class SendFaxPanel(QWidget):
                 self._ensure_cover_present(regenerate=True)
             else:
                 self._remove_cover_if_present()
+
         self.cover_checkbox.stateChanged.connect(_toggle_cover_fields)
         # Regenerate cover only when inputs are completed (editing finished), not on each change
         try:
-            self.cover_to_input.editingFinished.connect(lambda: self._ensure_cover_present(regenerate=True))
-            self.cover_memo_input.editingFinished.connect(lambda: self._ensure_cover_present(regenerate=True))
+            self.cover_to_input.editingFinished.connect(
+                lambda: self._ensure_cover_present(regenerate=True)
+            )
+            self.cover_memo_input.editingFinished.connect(
+                lambda: self._ensure_cover_present(regenerate=True)
+            )
         except Exception:
             # Fallback if editingFinished is unavailable in some contexts
             pass
@@ -237,7 +265,9 @@ class SendFaxPanel(QWidget):
         self.scan_gif_label.setAlignment(Qt.AlignCenter)
         self.scan_gif_label.setVisible(False)
         try:
-            self.scan_movie = QMovie(os.path.join(self.base_dir, "images", "scanner.gif"))
+            self.scan_movie = QMovie(
+                os.path.join(self.base_dir, "images", "scanner.gif")
+            )
             # Modest display size so it fits within the preview area
             self.scan_movie.setScaledSize(QSize(128, 128))
             self.scan_gif_label.setMovie(self.scan_movie)
@@ -268,32 +298,45 @@ class SendFaxPanel(QWidget):
         # Preview controls
         icon_size = QSize(24, 24)
         self.zoom_in_btn = QPushButton()
-        self.zoom_in_btn.setIcon(QIcon(os.path.join(self.base_dir, "images", "zoom.png")))
+        self.zoom_in_btn.setIcon(
+            QIcon(os.path.join(self.base_dir, "images", "zoom.png"))
+        )
         self.zoom_in_btn.setIconSize(icon_size)
         self.zoom_in_btn.setToolTip("Zoom In")
         self.zoom_in_btn.clicked.connect(self._on_zoom)
 
         self.zoom_out_btn = QPushButton()
-        self.zoom_out_btn.setIcon(QIcon(os.path.join(self.base_dir, "images", "unzoom.png")))
+        self.zoom_out_btn.setIcon(
+            QIcon(os.path.join(self.base_dir, "images", "unzoom.png"))
+        )
         self.zoom_out_btn.setIconSize(icon_size)
         self.zoom_out_btn.setToolTip("Zoom Out")
         self.zoom_out_btn.clicked.connect(self._on_unzoom)
 
         self.page_prev_btn = QPushButton()
-        self.page_prev_btn.setIcon(QIcon(os.path.join(self.base_dir, "images", "page_minus.png")))
+        self.page_prev_btn.setIcon(
+            QIcon(os.path.join(self.base_dir, "images", "page_minus.png"))
+        )
         self.page_prev_btn.setIconSize(icon_size)
         self.page_prev_btn.setToolTip("Previous Page")
         self.page_prev_btn.clicked.connect(self._on_prev_page)
         self.page_prev_btn.setEnabled(False)
 
         self.page_next_btn = QPushButton()
-        self.page_next_btn.setIcon(QIcon(os.path.join(self.base_dir, "images", "page_plus.png")))
+        self.page_next_btn.setIcon(
+            QIcon(os.path.join(self.base_dir, "images", "page_plus.png"))
+        )
         self.page_next_btn.setIconSize(icon_size)
         self.page_next_btn.setToolTip("Next Page")
         self.page_next_btn.clicked.connect(self._on_next_page)
         self.page_next_btn.setEnabled(False)
 
-        for btn in [self.zoom_in_btn, self.zoom_out_btn, self.page_prev_btn, self.page_next_btn]:
+        for btn in [
+            self.zoom_in_btn,
+            self.zoom_out_btn,
+            self.page_prev_btn,
+            self.page_next_btn,
+        ]:
             btn.setFixedSize(32, 32)
             controls_row.addWidget(btn)
 
@@ -310,7 +353,6 @@ class SendFaxPanel(QWidget):
         # Keep controls row at natural height (non-stretch) to avoid overlap
         main_layout.addLayout(controls_row, 0)
 
-
     def refresh_caller_id_numbers(self):
         """Refresh the Caller ID dropdown from current app_state.global_cfg.all_numbers.
         Preserves selection when possible and falls back to device selection or first available.
@@ -325,14 +367,17 @@ class SendFaxPanel(QWidget):
             current_text = ""
         # Obtain latest numbers
         nums = []
-        if _app_state and getattr(_app_state, 'global_cfg', None):
+        if _app_state and getattr(_app_state, "global_cfg", None):
             try:
                 nums = _app_state.global_cfg.all_numbers or []
             except Exception:
                 nums = []
         # Rebuild combo items only if changed to avoid flicker
         try:
-            existing = [self.caller_id_combo.itemText(i) for i in range(self.caller_id_combo.count())]
+            existing = [
+                self.caller_id_combo.itemText(i)
+                for i in range(self.caller_id_combo.count())
+            ]
         except Exception:
             existing = []
         try:
@@ -368,7 +413,9 @@ class SendFaxPanel(QWidget):
             return
 
     def _open_cover_config(self):
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QDialogButtonBox, QLabel, QHBoxLayout
+        from PyQt5.QtWidgets import (QDialog, QDialogButtonBox, QFormLayout,
+                                     QHBoxLayout, QLabel, QVBoxLayout)
+
         dlg = QDialog(self)
         dlg.setWindowTitle("Configure Cover Sheet")
         v = QVBoxLayout(dlg)
@@ -390,21 +437,36 @@ class SendFaxPanel(QWidget):
 
         # Footer enable + category + info (spoiler)
         footer_chk = QCheckBox("Add a little… to your cover page")
-        footer_chk.setChecked((device_config.get("Cover Sheet", "footer_enabled", "No") or "No").lower() == "yes")
+        footer_chk.setChecked(
+            (device_config.get("Cover Sheet", "footer_enabled", "No") or "No").lower()
+            == "yes"
+        )
 
         # Load categories dynamically from shared/cover_messages.json (normalized to lowercase)
         try:
             from utils.cover_messages import load_message_pool
+
             pool = load_message_pool(self.base_dir)
         except Exception:
-            pool = {"classic": ["The remainder of this page is intentionally left blank."]}
-        categories = sorted(list(pool.keys())) if isinstance(pool, dict) else ["classic"]
+            pool = {
+                "classic": ["The remainder of this page is intentionally left blank."]
+            }
+        categories = (
+            sorted(list(pool.keys())) if isinstance(pool, dict) else ["classic"]
+        )
 
         footer_combo = QComboBox()
         for key in categories:
             display = key.title()
             footer_combo.addItem(display, key)
-        cur_cat = (device_config.get("Cover Sheet", "footer_category", "classic") or "classic").strip().lower()
+        cur_cat = (
+            (
+                device_config.get("Cover Sheet", "footer_category", "classic")
+                or "classic"
+            )
+            .strip()
+            .lower()
+        )
         idx = max(0, footer_combo.findData(cur_cat))
         footer_combo.setCurrentIndex(idx)
 
@@ -413,7 +475,9 @@ class SendFaxPanel(QWidget):
         info_lbl.setToolTip("")
         info_lbl.setFixedWidth(18)
         info_lbl.setAlignment(Qt.AlignCenter)
-        info_lbl.setStyleSheet("QLabel { border: 1px solid #999; border-radius: 9px; color: #555; font-weight: bold; }")
+        info_lbl.setStyleSheet(
+            "QLabel { border: 1px solid #999; border-radius: 9px; color: #555; font-weight: bold; }"
+        )
 
         def _update_info_tooltip():
             key = footer_combo.currentData() or "classic"
@@ -459,8 +523,15 @@ class SendFaxPanel(QWidget):
                 device_config.set("Cover Sheet", "address", address.text().strip())
                 device_config.set("Cover Sheet", "phone", phone.text().strip())
                 device_config.set("Cover Sheet", "email", email.text().strip())
-                device_config.set("Cover Sheet", "footer_enabled", "Yes" if footer_chk.isChecked() else "No")
-                selected_key = footer_combo.currentData() or (footer_combo.currentText() or "classic").strip().lower()
+                device_config.set(
+                    "Cover Sheet",
+                    "footer_enabled",
+                    "Yes" if footer_chk.isChecked() else "No",
+                )
+                selected_key = (
+                    footer_combo.currentData()
+                    or (footer_combo.currentText() or "classic").strip().lower()
+                )
                 device_config.set("Cover Sheet", "footer_category", selected_key)
                 device_config.save()
             except Exception:
@@ -483,7 +554,7 @@ class SendFaxPanel(QWidget):
             self,
             "Attach Document",
             "",
-            "Documents (*.html *.pdf *.doc *.docx *.jpg *.jpeg *.png *.tiff *.txt)"
+            "Documents (*.html *.pdf *.doc *.docx *.jpg *.jpeg *.png *.tiff *.txt)",
         )
         if filepath:
             try:
@@ -494,7 +565,7 @@ class SendFaxPanel(QWidget):
                             self,
                             "Word Document Notice",
                             "FaxRetriever cannot alter Word documents.\n\n"
-                            "Please ensure your document is formatted using portrait orientation before attaching."
+                            "Please ensure your document is formatted using portrait orientation before attaching.",
                         )
                     self.attachments.append(result)
                     self.file_list.addItem(os.path.basename(filepath))
@@ -502,7 +573,9 @@ class SendFaxPanel(QWidget):
                         self._pin_cover_to_front()
                     self._preview_document(self.file_list.count() - 1)
                 else:
-                    QMessageBox.warning(self, "Failed", "Could not normalize document orientation.")
+                    QMessageBox.warning(
+                        self, "Failed", "Could not normalize document orientation."
+                    )
 
             except Exception as e:
                 self.log.exception("Document normalization failed")
@@ -516,7 +589,11 @@ class SendFaxPanel(QWidget):
             index = self.file_list.currentRow()
             # Prevent removing the generated cover via context menu; require unchecking the box
             if self._is_cover_index(index):
-                QMessageBox.information(self, "Cover Sheet", "Uncheck 'Include Cover Sheet' to remove the cover sheet.")
+                QMessageBox.information(
+                    self,
+                    "Cover Sheet",
+                    "Uncheck 'Include Cover Sheet' to remove the cover sheet.",
+                )
                 return
             if 0 <= index < len(self.attachments):
                 del self.attachments[index]
@@ -526,15 +603,108 @@ class SendFaxPanel(QWidget):
     def _on_scan(self):
         self.scan_button.setEnabled(False)
 
+        # Determine scanner selection before starting worker
+        selected_scanner = None
         try:
-            if hasattr(self, 'scan_movie') and self.scan_movie:
+            import pyinsane2
+            try:
+                pyinsane2.init()
+            except Exception:
+                pass
+            devices = pyinsane2.get_devices()
+            if not devices:
+                QMessageBox.warning(self, "Scanner", "No scanner detected.")
+                self.scan_button.setEnabled(True)
+                return
+            try:
+                saved_name = device_config.get("Scanner", "preferred_name", "")
+            except Exception:
+                saved_name = ""
+            # Build user-friendly labels while keeping internal names
+            internal_names = [getattr(d, "name", "") for d in devices]
+
+            def _sanitize(raw: str) -> str:
+                try:
+                    if not raw:
+                        return "Unknown Scanner"
+                    s = str(raw)
+                    # Remove simple {...} fragments which often contain GUIDs
+                    start = s.find("{")
+                    end = s.find("}")
+                    if start != -1 and end != -1 and end > start:
+                        s = (s[:start] + s[end + 1 :]).strip()
+                    # Cut off common separators that trail technical details
+                    for sep in ("|", ";"):
+                        if sep in s:
+                            s = s.split(sep)[0]
+                    # Prefer last segment after backslash (Windows) or slash (paths)
+                    if "\\" in s:
+                        s = s.split("\\")[-1]
+                    if "/" in s:
+                        s = s.split("/")[-1]
+                    return s.strip() or "Unknown Scanner"
+                except Exception:
+                    return "Unknown Scanner"
+
+            base_labels = []
+            for d in devices:
+                vendor = (getattr(d, "vendor", "") or "").strip()
+                model = (getattr(d, "model", "") or "").strip()
+                if vendor or model:
+                    label = f"{vendor} {model}".strip()
+                else:
+                    label = _sanitize(getattr(d, "name", ""))
+                base_labels.append(label)
+
+            # Ensure labels are unique for unambiguous selection
+            counts = {}
+            display_labels = []
+            for lbl in base_labels:
+                c = counts.get(lbl, 0) + 1
+                counts[lbl] = c
+                display_labels.append(lbl if c == 1 else f"{lbl} ({c})")
+
+            if len(devices) > 1:
+                default_index = (
+                    internal_names.index(saved_name) if saved_name in internal_names else 0
+                )
+                item, ok = QInputDialog.getItem(
+                    self,
+                    "Select Scanner",
+                    "Choose a scanner:",
+                    display_labels,
+                    default_index,
+                    False,
+                )
+                if not ok:
+                    self.scan_button.setEnabled(True)
+                    return
+                # Map the chosen display label back to the internal device name by index
+                try:
+                    idx = display_labels.index(item)
+                except ValueError:
+                    idx = default_index
+                selected_scanner = internal_names[idx]
+            else:
+                selected_scanner = internal_names[0]
+            try:
+                device_config.set("Scanner", "preferred_name", selected_scanner or "")
+                device_config.save()
+            except Exception:
+                pass
+        except Exception:
+            # If pyinsane2 is unavailable here, fall back to worker's internal selection
+            selected_scanner = None
+
+        try:
+            if hasattr(self, "scan_movie") and self.scan_movie:
                 self.scan_gif_label.setVisible(True)
                 self.scan_movie.start()
         except Exception:
             pass
 
         self.thread = QThread(self)
-        self.worker = ScanWorker(session_number=self.scan_session_count)
+        self.worker = ScanWorker(session_number=self.scan_session_count, scanner_name=selected_scanner)
         self.worker.moveToThread(self.thread)
 
         # Signals
@@ -579,7 +749,7 @@ class SendFaxPanel(QWidget):
     def _on_scan_error(self, message):
         # Hide scanning GIF on error
         try:
-            if hasattr(self, 'scan_movie') and self.scan_movie:
+            if hasattr(self, "scan_movie") and self.scan_movie:
                 self.scan_movie.stop()
                 self.scan_gif_label.setVisible(False)
         except Exception:
@@ -599,7 +769,7 @@ class SendFaxPanel(QWidget):
 
     def _update_preview_zoom(self, factor, center=None):
         self.preview_scene.clear()
-        if hasattr(self, 'original_pixmap'):
+        if hasattr(self, "original_pixmap"):
             if center:
                 w, h = self.original_pixmap.width(), self.original_pixmap.height()
                 x = int(center.x() * (w / self.preview_view.viewport().width()))
@@ -612,7 +782,9 @@ class SendFaxPanel(QWidget):
                     self.preview_view.setSceneRect(QRectF(self.original_pixmap.rect()))
                 else:
                     viewport_size = self.preview_view.viewport().size()
-                    scaled = self.original_pixmap.scaled(viewport_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    scaled = self.original_pixmap.scaled(
+                        viewport_size, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                    )
                     self.preview_scene.addPixmap(scaled)
                     self.preview_view.setSceneRect(QRectF(scaled.rect()))
 
@@ -634,6 +806,7 @@ class SendFaxPanel(QWidget):
                 # Try PyMuPDF (fitz) first to avoid spawning Poppler subprocesses (no console windows)
                 try:
                     import fitz  # PyMuPDF
+
                     doc = fitz.open(path)
                     if doc.page_count <= 0:
                         raise RuntimeError("Empty PDF")
@@ -646,19 +819,22 @@ class SendFaxPanel(QWidget):
                 except Exception:
                     # Fallback to pdf2image + Poppler if PyMuPDF is unavailable
                     from pdf2image import convert_from_path
+
                     # Prefer MEIPASS/base_dir (onefile extraction) for Poppler, then fallback to exe_dir
                     candidates = [
                         os.path.join(self.base_dir, "poppler", "bin"),
                         os.path.join(self.exe_dir or self.base_dir, "poppler", "bin"),
                     ]
-                    poppler_bin = next((p for p in candidates if os.path.isdir(p)), None)
+                    poppler_bin = next(
+                        (p for p in candidates if os.path.isdir(p)), None
+                    )
                     kwargs = {"dpi": 200}
                     if poppler_bin:
                         kwargs["poppler_path"] = poppler_bin
                     pages = convert_from_path(path, **kwargs)
                     for pil_image in pages:
                         buf = io.BytesIO()
-                        pil_image.save(buf, format='PNG')
+                        pil_image.save(buf, format="PNG")
                         qt_image = QImage.fromData(buf.getvalue())
                         imgs.append(QPixmap.fromImage(qt_image))
 
@@ -705,8 +881,12 @@ class SendFaxPanel(QWidget):
             self._ensure_cover_present(regenerate=True)
 
         # Require at least one non-cover document? Spec says include cover in picker; still require any doc
-        if not self.attachments or (len(self.attachments) == 1 and self._is_cover_index(0)):
-            QMessageBox.warning(self, "Missing", "You must attach at least one non-cover document.")
+        if not self.attachments or (
+            len(self.attachments) == 1 and self._is_cover_index(0)
+        ):
+            QMessageBox.warning(
+                self, "Missing", "You must attach at least one non-cover document."
+            )
             return
 
         # Caller ID selection persisted above; include cover choice and (optionally) To/Memo metadata
@@ -722,13 +902,15 @@ class SendFaxPanel(QWidget):
         # Capture the current attachment paths (and cover path if any) to schedule temp cleanup after send
         to_delete = list(self.attachments)
         try:
-            if getattr(self, '_cover_temp_path', None):
+            if getattr(self, "_cover_temp_path", None):
                 to_delete.append(self._cover_temp_path)
         except Exception:
             pass
 
         with BusyDialog(self, "Sending fax..."):
-            success = FaxSender.send_fax(self.base_dir, fax, self.attachments, include_cover)
+            success = FaxSender.send_fax(
+                self.base_dir, fax, self.attachments, include_cover
+            )
 
         # Always schedule cleanup after attempt (both success and failure) with a 5-minute delay
         try:
@@ -744,23 +926,23 @@ class SendFaxPanel(QWidget):
                 # Refresh History and trigger polling via MainWindow if available
                 mw = self.window()
                 if mw:
-                    if hasattr(mw, 'fax_history_panel'):
+                    if hasattr(mw, "fax_history_panel"):
                         # Use consolidated refresh entry-point
-                        if hasattr(mw.fax_history_panel, 'request_refresh'):
+                        if hasattr(mw.fax_history_panel, "request_refresh"):
                             mw.fax_history_panel.request_refresh()
                         else:
                             mw.fax_history_panel.refresh()
                     # Trigger an immediate inbound poll so received faxes are up-to-date
                     try:
-                        if hasattr(mw, '_manual_poll'):
+                        if hasattr(mw, "_manual_poll"):
                             mw._manual_poll()
-                        elif hasattr(mw, 'poll_bar') and getattr(mw, 'poll_bar'):
+                        elif hasattr(mw, "poll_bar") and getattr(mw, "poll_bar"):
                             mw.poll_bar.retrieveFaxes()
                     except Exception:
                         pass
                     # Restart the poll progress bar countdown if present
                     try:
-                        if hasattr(mw, 'poll_bar') and getattr(mw, 'poll_bar'):
+                        if hasattr(mw, "poll_bar") and getattr(mw, "poll_bar"):
                             mw.poll_bar.restart_progress()
                     except Exception:
                         pass
@@ -773,7 +955,7 @@ class SendFaxPanel(QWidget):
         # Schedule deletion of any temp files from current attachments (including cover) after 5 minutes
         try:
             to_delete = list(self.attachments)
-            if getattr(self, '_cover_temp_path', None):
+            if getattr(self, "_cover_temp_path", None):
                 to_delete.append(self._cover_temp_path)
             self._schedule_temp_cleanup(to_delete, delay_ms=300000)
         except Exception:
@@ -800,12 +982,13 @@ class SendFaxPanel(QWidget):
         try:
             # Prefer MainWindow handler (modeless, single-instance reuse)
             mw = self.window()
-            if mw and hasattr(mw, 'open_address_book_dialog'):
+            if mw and hasattr(mw, "open_address_book_dialog"):
                 mw.open_address_book_dialog()
                 return
             from ui.address_book_dialog import AddressBookDialog
+
             # Fallback: open modelessly with reuse within this panel
-            existing = getattr(self, '_address_book_dialog', None)
+            existing = getattr(self, "_address_book_dialog", None)
             if existing is not None:
                 try:
                     existing.show()
@@ -820,11 +1003,13 @@ class SendFaxPanel(QWidget):
             dlg = AddressBookDialog(self.base_dir, self.address_book_manager, self)
             dlg.setModal(False)
             dlg.setAttribute(Qt.WA_DeleteOnClose, True)
+
             def _on_destroyed(_obj=None):
                 try:
                     self._address_book_dialog = None
                 except Exception:
                     pass
+
             try:
                 dlg.destroyed.connect(_on_destroyed)
             except Exception:
@@ -833,14 +1018,16 @@ class SendFaxPanel(QWidget):
             dlg.show()
         except Exception as e:
             try:
-                QMessageBox.warning(self, "Address Book", f"Failed to open Address Book: {e}")
+                QMessageBox.warning(
+                    self, "Address Book", f"Failed to open Address Book: {e}"
+                )
             except Exception:
                 pass
 
     def populate_phone_fields(self, phone: str):
         # Accepts 10-digit string, optionally with punctuation
-        digits = ''.join([c for c in (phone or '') if c.isdigit()])
-        if len(digits) == 11 and digits.startswith('1'):
+        digits = "".join([c for c in (phone or "") if c.isdigit()])
+        if len(digits) == 11 and digits.startswith("1"):
             digits = digits[1:]
         if len(digits) >= 10:
             digits = digits[:10]
@@ -862,7 +1049,7 @@ class SendFaxPanel(QWidget):
     def populate_from_contact(self, contact: dict):
         try:
             # name = contact.get('name', '')
-            phone = contact.get('phone', '')
+            phone = contact.get("phone", "")
             # self.recipient_name.setText(name)
             self.populate_phone_fields(phone)
             self.populate_cover_from_contact(contact)
@@ -884,44 +1071,52 @@ class SendFaxPanel(QWidget):
             address = device_config.get("Cover Sheet", "address", "")
             phone = device_config.get("Cover Sheet", "phone", "")
             email = device_config.get("Cover Sheet", "email", "")
-            footer_enabled = (device_config.get("Cover Sheet", "footer_enabled", "No") or "No").lower() == "yes"
-            footer_category = device_config.get("Cover Sheet", "footer_category", "classic")
+            footer_enabled = (
+                device_config.get("Cover Sheet", "footer_enabled", "No") or "No"
+            ).lower() == "yes"
+            footer_category = device_config.get(
+                "Cover Sheet", "footer_category", "classic"
+            )
         except Exception:
             company = address = phone = email = ""
             footer_enabled = False
             footer_category = "classic"
         try:
-            fd, path = mkstemp(suffix='.pdf')
+            fd, path = mkstemp(suffix=".pdf")
             os.close(fd)
             c = canvas.Canvas(path, pagesize=letter)
             width, height = letter
 
             # Header block: company info (centered for a professional presentation)
-            top = height - 0.9*inch
+            top = height - 0.9 * inch
             c.setFont("Helvetica-Bold", 16)
             if company:
-                c.drawCentredString(width/2.0, top, company)
-                top -= 0.22*inch
+                c.drawCentredString(width / 2.0, top, company)
+                top -= 0.22 * inch
             c.setFont("Helvetica", 10)
             if address:
-                c.drawCentredString(width/2.0, top, address)
-                top -= 0.18*inch
+                c.drawCentredString(width / 2.0, top, address)
+                top -= 0.18 * inch
             if phone or email:
-                contact_line = " ".join([x for x in [phone, (f"| {email}" if email else "")] if x])
-                c.drawCentredString(width/2.0, top, contact_line)
-                top -= 0.18*inch
+                contact_line = " ".join(
+                    [x for x in [phone, (f"| {email}" if email else "")] if x]
+                )
+                c.drawCentredString(width / 2.0, top, contact_line)
+                top -= 0.18 * inch
 
             # Title centered both horizontally and vertically
             c.setFont("Helvetica-Bold", 28)
             center_y = height / 2.0
-            c.drawCentredString(width / 2.0, center_y + 0.35*inch, "COVER SHEET")
+            c.drawCentredString(width / 2.0, center_y + 0.35 * inch, "COVER SHEET")
 
             # Body: To / Memo centered beneath the title
             c.setFont("Helvetica", 12)
             attn = (self.cover_to_input.text() or "").strip()
             memo = (self.cover_memo_input.text() or "").strip()
-            c.drawCentredString(width / 2.0, center_y - 0.05*inch, f"To / Attn: {attn}")
-            c.drawCentredString(width / 2.0, center_y - 0.35*inch, f"Memo: {memo}")
+            c.drawCentredString(
+                width / 2.0, center_y - 0.05 * inch, f"To / Attn: {attn}"
+            )
+            c.drawCentredString(width / 2.0, center_y - 0.35 * inch, f"Memo: {memo}")
 
             # Footer: either random from pool or classic default
             footer_text = "The remainder of this page is intentionally left blank."
@@ -931,7 +1126,7 @@ class SendFaxPanel(QWidget):
             except Exception:
                 pass
             c.setFont("Helvetica-Oblique", 10)
-            c.drawCentredString(width/2.0, 0.75*inch, footer_text)
+            c.drawCentredString(width / 2.0, 0.75 * inch, footer_text)
 
             c.showPage()
             c.save()
@@ -1020,21 +1215,25 @@ class SendFaxPanel(QWidget):
             tempdir = os.path.abspath(tempfile.gettempdir())
             app_cache = os.path.abspath(os.path.join(self.base_dir, "cache"))
             safe_paths = []
-            for p in (paths or []):
+            for p in paths or []:
                 try:
                     if not p:
                         continue
                     ap = os.path.abspath(p)
                     if ap.startswith(tempdir) or ap.startswith(app_cache):
                         safe_paths.append(ap)
-                    elif getattr(self, '_cover_temp_path', None) and ap == os.path.abspath(self._cover_temp_path):
+                    elif getattr(
+                        self, "_cover_temp_path", None
+                    ) and ap == os.path.abspath(self._cover_temp_path):
                         safe_paths.append(ap)
                 except Exception:
                     continue
             if not safe_paths:
                 return
             try:
-                self.log.info(f"Scheduling deletion of {len(safe_paths)} temp file(s) in {max(0, delay_ms // 1000)}s")
+                self.log.info(
+                    f"Scheduling deletion of {len(safe_paths)} temp file(s) in {max(0, delay_ms // 1000)}s"
+                )
             except Exception:
                 pass
 
@@ -1052,6 +1251,7 @@ class SendFaxPanel(QWidget):
                             self.log.exception(f"Failed to delete temp file: {p}")
                         except Exception:
                             pass
+
             # Use a single-shot QTimer on the UI thread
             QTimer.singleShot(int(max(0, delay_ms)), _do_delete)
         except Exception:

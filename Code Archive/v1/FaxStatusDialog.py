@@ -5,12 +5,13 @@ from datetime import datetime, timezone
 
 import pytz
 import requests
-from PyQt5.QtCore import pyqtSignal, QThread, QTimer, Qt, QUrl
+from PyQt5.QtCore import Qt, QThread, QTimer, QUrl, pyqtSignal
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
-from PyQt5.QtWidgets import (QDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QLineEdit, QWidget,
-                             QLabel, QMessageBox)
-
+from PyQt5.QtNetwork import (QNetworkAccessManager, QNetworkReply,
+                             QNetworkRequest)
+from PyQt5.QtWidgets import (QDialog, QLabel, QLineEdit, QMessageBox,
+                             QTableWidget, QTableWidgetItem, QVBoxLayout,
+                             QWidget)
 from SaveManager import SaveManager
 
 # Determine if running as a bundled executable

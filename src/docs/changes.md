@@ -1,3 +1,25 @@
+# What's new in FaxRetriever 2.1.0
+
+- New: Multi-format download selection. In Options → Fax Retrieval, the PDF/JPG/Both radio buttons were replaced with three checkboxes: PDF, JPG, and TIFF. Users can select any combination. Legacy configurations with "Both" are automatically mapped to PDF + JPG.
+- New: Multi-page TIFF support. Inbound fax PDFs can now be converted to multi-page .tiff files. Rendering uses PyMuPDF (in-app) and saving uses Pillow with Group 4 compression (fallback to LZW when needed).
+- Receiver behavior refined for multi-format outputs: the engine skips a fax only if all requested outputs already exist; it avoids re-downloading when the PDF is already present, performs the requested conversions (JPG and/or TIFF), and removes the PDF if it isn’t selected and printing is disabled. Local cleanup now includes .tiff/.tif files.
+- Stabilized inbound deduplication index location to prevent accidental re-downloads when the app is launched from a different working directory (e.g., via a scheduler). The downloaded_index.json now always lives under <base_dir>\\log regardless of CWD; existing indexes are migrated automatically from prior locations.
+- Saving Options no longer resets the app to Sender-only. The current retrieval mode (Sender or Sender/Receiver) is preserved when updating settings.
+- Status bar save message simplified to "Settings saved." to avoid implying a mode change.
+- Minor Options refinements: improved startup shortcut handling (Start with System), persisted printer preferences per device, and integration settings mirrored to device scope for runtime gating.
+
+---
+
+# What's new in FaxRetriever 2.0.9
+
+- Enforced receiver authorization: FaxRetriever will never retrieve faxes unless the device is configured as Sender/Receiver and the FRA assignments indicate this device is Allowed to retrieve for at least one number.
+- Manual and scheduled polling now respect authorization and are disabled when not permitted.
+- Startup and UI improvements clarify current authorization: retrieval controls are greyed out and the poll timer is stopped when unauthorized; logs indicate the current mode and status.
+- Reliability: Added guards in the receiver engine and poll triggers to prevent inadvertent downloads.
+- Scanner selection dialog now shows friendly device names (Vendor + Model) instead of GUID/USB identifiers, making it easier to pick the correct scanner when multiple are installed.
+
+---
+
 # What's new in FaxRetriever 2.0.8
 
 - Scanner refactored to use pyinsane2 instead of direct WIA calls. This should resolve issues with scanners failing to scan on some systems.
@@ -17,30 +39,30 @@
 
 # What's new in FaxRetriever 2.0.6
 
-A typo in the download_methods would crash the application during new deployments when no download method was pre-specified. 
-The change now defaults the system to PDF in the event that no download method is specified.
+- A typo in the download_methods would crash the application during new deployments when no download method was pre-specified. 
+- The change now defaults the system to PDF in the event that no download method is specified.
 
 ---
 
 # What's new in FaxRetriever 2.0.5
 
-The scanner operations were adjusted to remove hard-coded file formatting and will now dynamically query the scanner for 
+- The scanner operations were adjusted to remove hard-coded file formatting and will now dynamically query the scanner for 
 file format options. Images are scanned in as .JPG if available, otherwise .PDF will be used.
 
 ---
 
 # What's new in FaxRetriever 2.0.4
 
-The fax history indexer was refactored to ensure that it saves the history to ./log instead of MEIPASS. This ensures that 
+- The fax history indexer was refactored to ensure that it saves the history to ./log instead of MEIPASS. This ensures that 
 already-downloaded faxes are not redownloaded, even after being deleted from the fax inbox. Manual download is not impacted.
 
-The scanner operations were enhanced to auto-select the system scanner if only 1 is present or to allow the user to select 
+- The scanner operations were enhanced to auto-select the system scanner if only 1 is present or to allow the user to select 
 from any installed scanner if multiple scanners are present. This reduces user input when scanning documents. 
 
 ---
 
 # What's new in FaxRetriever 2.0.3
-The `scan_worker` was updated to allow scanning multiple pages in a single operation by replacing the single-page acquisition
+- The `scan_worker` was updated to allow scanning multiple pages in a single operation by replacing the single-page acquisition
 with a multi-page loop using WIA. This change eliminates the need for users to click "Scan Document" for each page, and the 
 output now aggregates all scanned paths into a list. The previous functionality for flatbed devices is preserved as a fallback.
 
@@ -49,14 +71,14 @@ Updates to the Auto Upgrade processes are intended to ensure that the applicatio
 ---
 
 # What's new in FaxRetriever 2.0.2
-The Auto Update process was improved by forcing a startup check for new versions, enhancing the GitHub API call with headers 
+- The Auto Update process was improved by forcing a startup check for new versions, enhancing the GitHub API call with headers 
 for reliability, and implementing a streaming download with atomic replace for updates. As a result, the system now performs u
 pdates more effectively while retaining a 24-hour check gating for non-startup instances.
 
 ---
 
 # What's New in FaxRetriever 2.0.1
-Version 2.0.1 replaces PDFtoPPM with Fitz to reduce dependencies on 3rd party applications.
+- Version 2.0.1 replaces PDFtoPPM with Fitz to reduce dependencies on 3rd party applications.
 No additional changes have been made.
 
 ---

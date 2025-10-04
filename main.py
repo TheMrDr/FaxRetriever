@@ -21,9 +21,18 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 
 from ui.main_window import MainWindow
-from utils.logging_utils import get_logger
+from utils.logging_utils import get_logger, set_global_logging_level
+from core.config_loader import global_config
 
 def main():
+    # Apply persisted logging level as early as possible
+    try:
+        lvl = global_config.get("UserSettings", "logging_level", "Debug") or "Debug"
+        set_global_logging_level(lvl)
+    except Exception:
+        # Proceed with defaults if config not ready
+        pass
+
     log = get_logger("startup")
     log.info("FaxRetriever 2.0 Starting")
 

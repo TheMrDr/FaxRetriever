@@ -1,13 +1,15 @@
 # core\license_client
 
-import os
 import json
+import os
+from datetime import datetime, timezone
+from platform import node
+
 import jwt
 import requests
-from datetime import datetime, timezone
+
+from core.config_loader import device_config, global_config
 from utils.logging_utils import get_logger
-from core.config_loader import global_config, device_config
-from platform import node
 
 log = get_logger("license")
 
@@ -15,7 +17,9 @@ FRA_INIT_URL = "http://licensing.clinicnetworking.com:8000/init"
 FRA_BEARER_URL = "http://licensing.clinicnetworking.com:8000/bearer"
 
 
-def initialize_session(app_state, client_domain: str, auth_token: str, mode: str = "sender") -> dict:
+def initialize_session(
+    app_state, client_domain: str, auth_token: str, mode: str = "sender"
+) -> dict:
     try:
         # FaxRetriever must always store and send the full fax_user (e.g., "100@sample.12345.service").
         # FRA will strip the extension internally during /init processing.
@@ -112,13 +116,17 @@ def retrieve_skyswitch_token(app_state) -> dict:
         # Apply to config
         global_config.set("Token", "bearer_token", token)
         global_config.set("Token", "bearer_token_expires_at", expiration)
-        global_config.set("Token", "bearer_token_retrieved", datetime.now(timezone.utc).isoformat())
+        global_config.set(
+            "Token", "bearer_token_retrieved", datetime.now(timezone.utc).isoformat()
+        )
         global_config.save()
 
         # Apply to runtime state
         app_state.global_cfg.bearer_token = token
         app_state.global_cfg.bearer_token_expiration = expiration
-        app_state.global_cfg.bearer_token_retrieved = datetime.now(timezone.utc).isoformat()
+        app_state.global_cfg.bearer_token_retrieved = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         log.info("SkySwitch bearer token retrieved and applied.")
         return data

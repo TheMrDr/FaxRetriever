@@ -1,12 +1,14 @@
 import os
 
-from PyQt5.QtCore import Qt, QTimer, QSize
+from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QLineEdit, \
-    QMessageBox, QWidget, QSpacerItem, QSizePolicy, \
-    QScrollArea, QTextEdit, QGridLayout, QFileDialog, QTabWidget
+from PyQt5.QtWidgets import (QCheckBox, QDialog, QFileDialog, QGridLayout,
+                             QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+                             QPushButton, QScrollArea, QSizePolicy,
+                             QSpacerItem, QTabWidget, QTextEdit, QVBoxLayout,
+                             QWidget)
 
-from core.config_loader import global_config, device_config
+from core.config_loader import device_config, global_config
 
 
 class AddressBookDialog(QDialog):
@@ -21,7 +23,9 @@ class AddressBookDialog(QDialog):
 
         # Cache commonly used icons (avoid disk hits per card)
         self._icon_edit = QIcon(os.path.join(self.base_dir, "images", "edit.png"))
-        self._icon_select = QIcon(os.path.join(self.base_dir, "images", "CheckMark.png"))
+        self._icon_select = QIcon(
+            os.path.join(self.base_dir, "images", "CheckMark.png")
+        )
         self._icon_delete = QIcon(os.path.join(self.base_dir, "images", "TrashCan.png"))
 
         self.layout = QVBoxLayout(self)
@@ -123,15 +127,15 @@ class AddressBookDialog(QDialog):
         Accepts inputs with punctuation or leading +1; falls back to digits if <10.
         """
         try:
-            digits = ''.join(ch for ch in (raw or '') if ch.isdigit())
-            if len(digits) == 11 and digits.startswith('1'):
+            digits = "".join(ch for ch in (raw or "") if ch.isdigit())
+            if len(digits) == 11 and digits.startswith("1"):
                 digits = digits[1:]
             if len(digits) >= 10:
                 d = digits[:10]
                 return f"({d[:3]}) {d[3:6]}-{d[6:]}"
             return digits
         except Exception:
-            return raw or ''
+            return raw or ""
 
     def populate_cards(self):
         # Contacts tab population with favorites pinned and spacer
@@ -140,19 +144,35 @@ class AddressBookDialog(QDialog):
 
         query = self.search_bar.text().strip().lower()
         has_query = bool(query)
-        query_digits = ''.join(ch for ch in query if ch.isdigit())
+        query_digits = "".join(ch for ch in query if ch.isdigit())
 
         contacts = self.address_book_manager.contacts or []
         # filter by name/company/email or phone digits
         filtered = [
-            (i, c) for i, c in enumerate(contacts)
+            (i, c)
+            for i, c in enumerate(contacts)
             if (query in (c.get("name", "") or "").lower())
-               or (query in (c.get("company", "") or "").lower())
-               or (query in (c.get("email", "") or "").lower())
-               or (query_digits and (
-                    (query_digits in (''.join(ch for ch in (c.get('phone') or '') if ch.isdigit()))) or
-                    (query_digits in (''.join(ch for ch in (c.get('phone1') or '') if ch.isdigit())))
-               ))
+            or (query in (c.get("company", "") or "").lower())
+            or (query in (c.get("email", "") or "").lower())
+            or (
+                query_digits
+                and (
+                    (
+                        query_digits
+                        in (
+                            "".join(ch for ch in (c.get("phone") or "") if ch.isdigit())
+                        )
+                    )
+                    or (
+                        query_digits
+                        in (
+                            "".join(
+                                ch for ch in (c.get("phone1") or "") if ch.isdigit()
+                            )
+                        )
+                    )
+                )
+            )
         ]
 
         # If searching and nothing matched, display a helpful message.
@@ -164,8 +184,18 @@ class AddressBookDialog(QDialog):
             return
 
         # Split favorites and non-favorites (placeholders treated as non-fav)
-        favs = [(i, c) for i, c in filtered if c and not c.get('is_placeholder', False) and c.get('favorite', False)]
-        others_mix = [(i, c) for i, c in filtered if not (c and not c.get('is_placeholder', False) and c.get('favorite', False))]
+        favs = [
+            (i, c)
+            for i, c in filtered
+            if c and not c.get("is_placeholder", False) and c.get("favorite", False)
+        ]
+        others_mix = [
+            (i, c)
+            for i, c in filtered
+            if not (
+                c and not c.get("is_placeholder", False) and c.get("favorite", False)
+            )
+        ]
 
         # Ensure at least 4 visible cards overall (placeholders appended later only if no search query)
         min_cards = 4
@@ -174,10 +204,19 @@ class AddressBookDialog(QDialog):
         if (not has_query) and total_now < min_cards:
             needed = min_cards - total_now
             tips = [
-                {"name": "Add a contact", "notes": "Click + Add Contact to get started."},
+                {
+                    "name": "Add a contact",
+                    "notes": "Click + Add Contact to get started.",
+                },
                 {"name": "Import JSON", "notes": "Use 'Import Contact File' below."},
-                {"name": "Add Company", "notes": "Include Company to enable smart grouping."},
-                {"name": "Add Fax Number", "notes": "Provide Fax for one‑click sending."},
+                {
+                    "name": "Add Company",
+                    "notes": "Include Company to enable smart grouping.",
+                },
+                {
+                    "name": "Add Fax Number",
+                    "notes": "Provide Fax for one‑click sending.",
+                },
             ]
             for n in range(needed):
                 t = tips[n % len(tips)]
@@ -196,12 +235,15 @@ class AddressBookDialog(QDialog):
                 placeholders.append((-1, placeholder))
 
         # Split others into real vs placeholders (any persisted placeholders should already be removed by manager)
-        real_non_favs = [(i, c) for i, c in others_mix if not (c or {}).get('is_placeholder', False)]
+        real_non_favs = [
+            (i, c) for i, c in others_mix if not (c or {}).get("is_placeholder", False)
+        ]
 
         # Sort within each bucket by name (or company fallback)
         def sort_key(pair):
             c = pair[1]
-            return ((c.get('name') or c.get('company') or "").lower())
+            return (c.get("name") or c.get("company") or "").lower()
+
         favs.sort(key=sort_key)
         real_non_favs.sort(key=sort_key)
         placeholders.sort(key=sort_key)
@@ -218,7 +260,9 @@ class AddressBookDialog(QDialog):
         # spacer between favorites and others if both exist
         if favs and real_non_favs:
             r, _ = divmod(row, col_count)
-            self._add_spacer_row(self.grid_layout_contacts, r, cols=col_count, height=10)
+            self._add_spacer_row(
+                self.grid_layout_contacts, r, cols=col_count, height=10
+            )
             row = (r + 1) * col_count
         # other real contacts
         for idx, (true_index, contact) in enumerate(real_non_favs):
@@ -249,19 +293,35 @@ class AddressBookDialog(QDialog):
         self.companies_container.setUpdatesEnabled(False)
         query = self.search_bar.text().strip().lower()
         has_query = bool(query)
-        query_digits = ''.join(ch for ch in query if ch.isdigit())
+        query_digits = "".join(ch for ch in query if ch.isdigit())
 
         contacts = self.address_book_manager.contacts or []
         # apply global filter on name/company/email or phone digits
         filtered = [
-            (i, c) for i, c in enumerate(contacts)
+            (i, c)
+            for i, c in enumerate(contacts)
             if (query in (c.get("name", "") or "").lower())
-               or (query in (c.get("company", "") or "").lower())
-               or (query in (c.get("email", "") or "").lower())
-               or (query_digits and (
-                    (query_digits in (''.join(ch for ch in (c.get('phone') or '') if ch.isdigit()))) or
-                    (query_digits in (''.join(ch for ch in (c.get('phone1') or '') if ch.isdigit())))
-               ))
+            or (query in (c.get("company", "") or "").lower())
+            or (query in (c.get("email", "") or "").lower())
+            or (
+                query_digits
+                and (
+                    (
+                        query_digits
+                        in (
+                            "".join(ch for ch in (c.get("phone") or "") if ch.isdigit())
+                        )
+                    )
+                    or (
+                        query_digits
+                        in (
+                            "".join(
+                                ch for ch in (c.get("phone1") or "") if ch.isdigit()
+                            )
+                        )
+                    )
+                )
+            )
         ]
         # If searching and nothing matched, display a helpful message.
         if has_query and not filtered:
@@ -277,22 +337,30 @@ class AddressBookDialog(QDialog):
         # Group by company
         groups = {}
         for idx, c in filtered:
-            comp = (c.get('company') or '').strip() or 'Unspecified'
+            comp = (c.get("company") or "").strip() or "Unspecified"
             groups.setdefault(comp, []).append((idx, c))
 
         # Sort group names alphabetically (Unspecified last)
-        group_names = sorted([g for g in groups.keys() if g != 'Unspecified'])
-        if 'Unspecified' in groups:
-            group_names.append('Unspecified')
+        group_names = sorted([g for g in groups.keys() if g != "Unspecified"])
+        if "Unspecified" in groups:
+            group_names.append("Unspecified")
 
         for gname in group_names:
             items = groups[gname]
             # Split favorites
-            favs = [(i, c) for i, c in items if c.get('favorite', False) and not c.get('is_placeholder', False)]
-            non_favs = [(i, c) for i, c in items if not (c.get('favorite', False) and not c.get('is_placeholder', False))]
+            favs = [
+                (i, c)
+                for i, c in items
+                if c.get("favorite", False) and not c.get("is_placeholder", False)
+            ]
+            non_favs = [
+                (i, c)
+                for i, c in items
+                if not (c.get("favorite", False) and not c.get("is_placeholder", False))
+            ]
 
-            favs.sort(key=lambda pair: (pair[1].get('name') or '').lower())
-            non_favs.sort(key=lambda pair: (pair[1].get('name') or '').lower())
+            favs.sort(key=lambda pair: (pair[1].get("name") or "").lower())
+            non_favs.sort(key=lambda pair: (pair[1].get("name") or "").lower())
 
             # Group header
             header = QLabel(f"<b>{gname}</b>")
@@ -344,32 +412,50 @@ class AddressBookDialog(QDialog):
 
         # Header with avatar/initials and name/company
         header = QWidget()
-        header.setStyleSheet("QWidget { background: #fafafa; border-top-left-radius: 8px; border-top-right-radius: 8px; }")
+        header.setStyleSheet(
+            "QWidget { background: #fafafa; border-top-left-radius: 8px; border-top-right-radius: 8px; }"
+        )
         h = QHBoxLayout(header)
         h.setContentsMargins(10, 10, 10, 10)
         h.setSpacing(10)
 
         # Avatar/initials
         avatar = QLabel()
-        initials = ''.join([w[0].upper() for w in (contact.get('company') or contact.get('name') or ' ').split()[:2]]).strip() or "?"
+        initials = (
+            "".join(
+                [
+                    w[0].upper()
+                    for w in (
+                        contact.get("company") or contact.get("name") or " "
+                    ).split()[:2]
+                ]
+            ).strip()
+            or "?"
+        )
         avatar.setText(initials)
         avatar.setAlignment(Qt.AlignCenter)
         avatar.setFixedSize(36, 36)
-        avatar.setStyleSheet("QLabel { background: #1976d2; color: white; font-weight: bold; border-radius: 18px; }")
+        avatar.setStyleSheet(
+            "QLabel { background: #1976d2; color: white; font-weight: bold; border-radius: 18px; }"
+        )
         h.addWidget(avatar)
 
         title_box = QVBoxLayout()
-        name_txt = contact.get('name') or contact.get('company') or ("New Contact" if is_placeholder else "")
+        name_txt = (
+            contact.get("name")
+            or contact.get("company")
+            or ("New Contact" if is_placeholder else "")
+        )
         name_lbl = QLabel(f"<b>{name_txt}</b>")
         name_lbl.setContentsMargins(0, 0, 0, 0)
-        company = contact.get('company', '')
+        company = contact.get("company", "")
         comp_lbl = QLabel(company)
         comp_lbl.setStyleSheet("color:#666;")
         title_box.addWidget(name_lbl)
         if company:
             title_box.addWidget(comp_lbl)
         else:
-            note = (contact.get('notes') or "") if is_placeholder else ""
+            note = (contact.get("notes") or "") if is_placeholder else ""
             if note:
                 hint = QLabel(note)
                 hint.setStyleSheet("color:#777; font-style: italic;")
@@ -391,18 +477,26 @@ class AddressBookDialog(QDialog):
             text = f"<span style='color:#888'>{lbl}</span> {val}"
             body_layout.addWidget(QLabel(text))
 
-        fax_disp = self._format_phone_display(contact.get('phone', '')) if contact.get('phone') else ''
-        phone_disp = self._format_phone_display(contact.get('phone1', '')) if contact.get('phone1') else ''
+        fax_disp = (
+            self._format_phone_display(contact.get("phone", ""))
+            if contact.get("phone")
+            else ""
+        )
+        phone_disp = (
+            self._format_phone_display(contact.get("phone1", ""))
+            if contact.get("phone1")
+            else ""
+        )
         line("Fax:", fax_disp)
         line("Phone:", phone_disp)
-        line("Email:", contact.get('email', ''))
+        line("Email:", contact.get("email", ""))
 
         # Smart hints (non-blocking)
         smart_notes = []
         if not is_placeholder:
-            if not (contact.get('phone') or '').strip():
+            if not (contact.get("phone") or "").strip():
                 smart_notes.append("Missing Fax number for one‑click send")
-            if contact.get('email') and '@' not in contact.get('email'):
+            if contact.get("email") and "@" not in contact.get("email"):
                 smart_notes.append("Email looks invalid")
         if smart_notes:
             warn = QLabel(" \u26A0\uFE0F  " + " • ".join(smart_notes))
@@ -414,12 +508,12 @@ class AddressBookDialog(QDialog):
         f = QHBoxLayout(footer)
         f.setContentsMargins(10, 6, 10, 10)
         f.setSpacing(6)
-        
+
         # Favorite toggle button (star)
         fav_btn = QPushButton("☆")
         fav_btn.setFixedSize(32, 32)
         fav_btn.setToolTip("Mark as Favorite")
-        is_fav = bool(contact.get('favorite', False))
+        is_fav = bool(contact.get("favorite", False))
         if is_fav:
             fav_btn.setText("★")
             fav_btn.setToolTip("Unmark Favorite")
@@ -471,7 +565,7 @@ class AddressBookDialog(QDialog):
             if index is None or index < 0:
                 return
             if 0 <= index < len(self.address_book_manager.contacts):
-                self.address_book_manager.contacts[index]['favorite'] = bool(new_value)
+                self.address_book_manager.contacts[index]["favorite"] = bool(new_value)
                 self.address_book_manager.save_contacts()
         except Exception:
             pass
@@ -486,7 +580,9 @@ class AddressBookDialog(QDialog):
             self.populate_companies()
 
     def open_edit_dialog(self, contact, index):
-        dlg = AddContactDialog(self.base_dir, self.address_book_manager, self, contact, index)
+        dlg = AddContactDialog(
+            self.base_dir, self.address_book_manager, self, contact, index
+        )
         if dlg.exec_() == QDialog.Accepted:
             self.populate_cards()
             self.populate_companies()
@@ -494,35 +590,44 @@ class AddressBookDialog(QDialog):
     def select_contact(self, index):
         contact = self.address_book_manager.contacts[index]
         parent = self.parent()
-        if hasattr(parent, 'populate_from_contact'):
+        if hasattr(parent, "populate_from_contact"):
             parent.populate_from_contact(contact)
         else:
             # Backward compatible behavior
-            selected_fax = contact.get('phone', '')
-            if hasattr(parent, 'populate_phone_fields'):
+            selected_fax = contact.get("phone", "")
+            if hasattr(parent, "populate_phone_fields"):
                 parent.populate_phone_fields(selected_fax)
-            if hasattr(parent, 'populate_cover_from_contact'):
+            if hasattr(parent, "populate_cover_from_contact"):
                 parent.populate_cover_from_contact(contact)
         self.accept()
 
     def confirm_delete(self, row):
         contact = self.address_book_manager.contacts[row]
         name = contact.get("name", "")
-        reply = QMessageBox.question(self, "Confirm Delete", f"Are you sure you want to delete '{name}'?", QMessageBox.Yes | QMessageBox.No)
+        reply = QMessageBox.question(
+            self,
+            "Confirm Delete",
+            f"Are you sure you want to delete '{name}'?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
         if reply == QMessageBox.Yes:
             self.address_book_manager.delete_contact(row)
             self.populate_cards()
             self.populate_companies()
 
     def import_contacts(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Import Contacts", "", "JSON Files (*.json)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import Contacts", "", "JSON Files (*.json)"
+        )
         if path:
             self.address_book_manager.import_contacts(path)
             self.populate_cards()
             self.populate_companies()
 
     def export_contacts(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Export Contacts", "", "JSON Files (*.json)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Contacts", "", "JSON Files (*.json)"
+        )
         if path:
             self.address_book_manager.export_contacts(path)
 
@@ -613,7 +718,9 @@ class AddContactDialog(QDialog):
         # Save button aligned right
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self.save_btn = QPushButton("Save Contact" if contact is None else "Update Contact")
+        self.save_btn = QPushButton(
+            "Save Contact" if contact is None else "Update Contact"
+        )
         self.save_btn.clicked.connect(self.save)
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
@@ -656,7 +763,11 @@ class AddContactDialog(QDialog):
             changed = self.cover_checkbox.isChecked() != self._initial_cover
             if not changed:
                 for key, widget in self.fields.items():
-                    current = widget.toPlainText().strip() if isinstance(widget, QTextEdit) else widget.text().strip()
+                    current = (
+                        widget.toPlainText().strip()
+                        if isinstance(widget, QTextEdit)
+                        else widget.text().strip()
+                    )
                     if current != self._initial_values.get(key, ""):
                         changed = True
                         break
@@ -668,18 +779,26 @@ class AddContactDialog(QDialog):
     def _update_save_enabled_for_new(self):
         name_ok = bool(self.fields.get("name").text().strip())
         phone = (self.fields.get("phone").text() or "").strip()
-        digits = ''.join([c for c in phone if c.isdigit()])
-        phone_ok = len(digits) >= 7  # allow non-10 digit but require something reasonable
+        digits = "".join([c for c in phone if c.isdigit()])
+        phone_ok = (
+            len(digits) >= 7
+        )  # allow non-10 digit but require something reasonable
         self.save_btn.setEnabled(name_ok and phone_ok)
 
     def save(self):
         # Gather form values
         values = {}
         for key, widget in self.fields.items():
-            values[key] = widget.toPlainText().strip() if isinstance(widget, QTextEdit) else widget.text().strip()
+            values[key] = (
+                widget.toPlainText().strip()
+                if isinstance(widget, QTextEdit)
+                else widget.text().strip()
+            )
         values["custom_cover_sheet"] = self.cover_checkbox.isChecked()
 
-        if self.edit_index is not None and 0 <= self.edit_index < len(self.manager.contacts):
+        if self.edit_index is not None and 0 <= self.edit_index < len(
+            self.manager.contacts
+        ):
             # Delegate to manager to normalize and persist
             self.manager.update_contact(self.edit_index, values)
         else:

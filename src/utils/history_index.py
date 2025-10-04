@@ -1,74 +1,78 @@
-import os
 import json
+import os
 from typing import Dict
 
 
 def _index_path(base_dir: str) -> str:
     """
-    Resolve the path for the downloaded index file.
-    Requirement: downloaded_index.json must live in the same directory as ClinicFax.log (./log).
-    Primary location is the logging directory configured by utils.logging_utils.
-    Fallback: <base_dir>\\log\\downloaded_index.json
-    Also migrate legacy locations if present.
+    Resolve a stable path for the downloaded index file.
+    Stable location: <base_dir>\\log\\downloaded_index.json (independent of CWD and logging handler path).
+    Also migrate legacy locations if present (including any prior logging_utils-based log dir or cache).
     """
     try:
-        # Prefer the actual logging directory used by ClinicFax.log
-        log_dir = None
-        try:
-            # Importing here avoids hard coupling at module import time
-            from utils.logging_utils import LOG_FILE, LOG_DIR  # type: ignore
-            if isinstance(LOG_FILE, str) and LOG_FILE:
-                log_dir = os.path.dirname(LOG_FILE)
-            elif isinstance(LOG_DIR, str) and LOG_DIR:
-                log_dir = LOG_DIR
-        except Exception:
-            log_dir = None
+        # Stable target path under the application base_dir
+        stable_log_dir = os.path.join(base_dir, "log")
+        os.makedirs(stable_log_dir, exist_ok=True)
+        target_path = os.path.join(stable_log_dir, "downloaded_index.json")
 
-        if not log_dir:
-            # Fallback to base_dir\\log
-            log_dir = os.path.join(base_dir, "log")
-        os.makedirs(log_dir, exist_ok=True)
-        new_path = os.path.join(log_dir, "downloaded_index.json")
+        # If already exists, use it directly
+        if os.path.exists(target_path):
+            return target_path
 
-        # Migrate legacy files if needed
+        # Attempt migrations from legacy locations
         try:
-            # 1) From <base_dir>\\cache\\downloaded_index.json
-            old_cache = os.path.join(base_dir, "cache", "downloaded_index.json")
-            if os.path.exists(old_cache) and not os.path.exists(new_path):
+            candidates = []
+            # 1) From the logging_utils-configured LOG_DIR/LOG_FILE directory (may depend on CWD)
+            try:
+                from utils.logging_utils import LOG_DIR, LOG_FILE  # type: ignore
+
+                if isinstance(LOG_FILE, str) and LOG_FILE:
+                    candidates.append(os.path.join(os.path.dirname(LOG_FILE), "downloaded_index.json"))
+                if isinstance(LOG_DIR, str) and LOG_DIR:
+                    candidates.append(os.path.join(LOG_DIR, "downloaded_index.json"))
+            except Exception:
+                pass
+            # 2) From <base_dir>\\cache
+            candidates.append(os.path.join(base_dir, "cache", "downloaded_index.json"))
+            # 3) From a previous <base_dir> root fallback
+            candidates.append(os.path.join(base_dir, "downloaded_index.json"))
+
+            # Copy/move the first existing candidate
+            for old_path in candidates:
                 try:
-                    os.replace(old_cache, new_path)
-                except Exception:
-                    try:
-                        with open(old_cache, "r", encoding="utf-8") as rf:
-                            data = rf.read()
-                        with open(new_path, "w", encoding="utf-8") as wf:
-                            wf.write(data)
+                    if old_path and os.path.exists(old_path) and old_path != target_path:
                         try:
-                            os.remove(old_cache)
+                            os.replace(old_path, target_path)
                         except Exception:
-                            pass
-                    except Exception:
-                        pass
-            # 2) From <base_dir>\\log\\downloaded_index.json if different from current log_dir
-            old_log = os.path.join(base_dir, "log", "downloaded_index.json")
-            if os.path.exists(old_log) and old_log != new_path and not os.path.exists(new_path):
-                try:
-                    os.replace(old_log, new_path)
+                            # Fallback to copy+remove
+                            try:
+                                with open(old_path, "r", encoding="utf-8") as rf:
+                                    data = rf.read()
+                                with open(target_path, "w", encoding="utf-8") as wf:
+                                    wf.write(data)
+                                try:
+                                    os.remove(old_path)
+                                except Exception:
+                                    pass
+                            except Exception:
+                                # If copy failed, try next candidate
+                                pass
+                        # If we successfully moved or copied, break
+                        if os.path.exists(target_path):
+                            return target_path
                 except Exception:
-                    try:
-                        with open(old_log, "r", encoding="utf-8") as rf:
-                            data = rf.read()
-                        with open(new_path, "w", encoding="utf-8") as wf:
-                            wf.write(data)
-                        try:
-                            os.remove(old_log)
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
+                    continue
         except Exception:
             pass
-        return new_path
+
+        # Create an empty index at the stable location if none existed
+        try:
+            with open(target_path, "w", encoding="utf-8") as f:
+                import json as _json
+                _json.dump({}, f, indent=2)
+        except Exception:
+            pass
+        return target_path
     except Exception:
         # Fallback: put it under base_dir as a last resort
         return os.path.join(base_dir, "downloaded_index.json")

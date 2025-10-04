@@ -2,10 +2,11 @@ import json
 import os
 import sys
 
-from PyQt5.QtCore import Qt, QRegExp
-from PyQt5.QtGui import QIcon, QFont, QRegExpValidator
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget,
-                             QTableWidgetItem, QHeaderView, QFileDialog, QWidget)
+from PyQt5.QtCore import QRegExp, Qt
+from PyQt5.QtGui import QFont, QIcon, QRegExpValidator
+from PyQt5.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QHeaderView,
+                             QLabel, QLineEdit, QPushButton, QTableWidget,
+                             QTableWidgetItem, QVBoxLayout, QWidget)
 
 # Determine if running as a bundled executable
 if hasattr(sys, '_MEIPASS'):

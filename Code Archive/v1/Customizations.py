@@ -3,10 +3,11 @@ import sys
 
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QTextCursor, QIcon
-from PyQt5.QtWidgets import (QPushButton, QDialog, QListView, QDialogButtonBox, QProgressBar, QMessageBox, QVBoxLayout,
-                             QLabel, QHBoxLayout, QLineEdit, QTextEdit, QCheckBox)
-
+from PyQt5.QtGui import (QFont, QIcon, QStandardItem, QStandardItemModel,
+                         QTextCursor)
+from PyQt5.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout,
+                             QLabel, QLineEdit, QListView, QMessageBox,
+                             QProgressBar, QPushButton, QTextEdit, QVBoxLayout)
 from SaveManager import SaveManager
 from SystemLog import SystemLog
 

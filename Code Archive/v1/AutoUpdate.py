@@ -6,7 +6,6 @@ import sys
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QApplication
-
 from SystemLog import SystemLog
 from Version import __version__
 

@@ -1,9 +1,9 @@
-import os
-import json
-import sys
 import configparser
+import json
+import os
+import sys
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
 try:
     import winreg as reg  # type: ignore
@@ -15,14 +15,14 @@ try:
 except Exception:
     Fernet = None  # type: ignore
 
+from core.config_loader import device_config, global_config
 from utils.logging_utils import get_logger
-from core.config_loader import global_config, device_config
 
 log = get_logger("v1_migration")
 
 # v1 locations/config
-V1_APP_DIR = os.path.join(os.getenv('LOCALAPPDATA') or '', 'CN-FaxRetriever')
-V1_INI_PATH = os.path.join(V1_APP_DIR, 'config.ini')
+V1_APP_DIR = os.path.join(os.getenv("LOCALAPPDATA") or "", "CN-FaxRetriever")
+V1_INI_PATH = os.path.join(V1_APP_DIR, "config.ini")
 V1_REG_PATH = r"Software\Clinic Networking, LLC"
 V1_REG_VALUE = "FaxRetriever"
 
@@ -76,7 +76,9 @@ def _decrypt_v1_ini(enc_key: str, ini_path: str) -> Dict[str, Dict[str, str]] | 
         return None
 
 
-def _map_v1_to_v2(v1: Dict[str, Dict[str, str]]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def _map_v1_to_v2(
+    v1: Dict[str, Dict[str, str]]
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Returns (global_updates, device_updates)
     Sensitive credentials from v1 Account section are intentionally excluded.
@@ -85,51 +87,60 @@ def _map_v1_to_v2(v1: Dict[str, Dict[str, str]]) -> Tuple[Dict[str, Any], Dict[s
     d: Dict[str, Any] = {}
 
     # Global: Account
-    acc = v1.get('Account', {})
-    fax_user = (acc.get('fax_user') or '').strip()
+    acc = v1.get("Account", {})
+    fax_user = (acc.get("fax_user") or "").strip()
     if fax_user:
-        g.setdefault('Account', {})['fax_user'] = fax_user
+        g.setdefault("Account", {})["fax_user"] = fax_user
 
     # Global: UserSettings.logging_level
-    usr = v1.get('UserSettings', {})
-    logging_level = (usr.get('logging_level') or '').strip()
+    usr = v1.get("UserSettings", {})
+    logging_level = (usr.get("logging_level") or "").strip()
     if logging_level:
-        g.setdefault('UserSettings', {})['logging_level'] = logging_level
+        g.setdefault("UserSettings", {})["logging_level"] = logging_level
 
     # Device: Fax Options mapping
-    fax = v1.get('Fax Options', {})
+    fax = v1.get("Fax Options", {})
     # v1 stored save_path under UserSettings.save_path
-    save_path = (usr.get('save_path') or '').strip()
+    save_path = (usr.get("save_path") or "").strip()
     if save_path:
-        d.setdefault('Fax Options', {})['save_path'] = save_path
+        d.setdefault("Fax Options", {})["save_path"] = save_path
     # Direct mappings
     for k in [
-        'download_method', 'delete_faxes', 'print_faxes', 'printer_name',
-        'archive_enabled', 'archive_duration', 'file_name_format'
+        "download_method",
+        "delete_faxes",
+        "print_faxes",
+        "printer_name",
+        "archive_enabled",
+        "archive_duration",
+        "file_name_format",
     ]:
-        val = (fax.get(k) or '').strip()
-        if val != '':
-            d.setdefault('Fax Options', {})[k] = val
+        val = (fax.get(k) or "").strip()
+        if val != "":
+            d.setdefault("Fax Options", {})[k] = val
 
     # Device: Integrations mapping
-    integ = v1.get('Integrations', {})
-    integration_enabled = (integ.get('integration_enabled') or '').strip()
-    software_integration = (integ.get('software_integration') or '').strip() or 'None'
-    winrx_path = (integ.get('winrx_path') or '').strip()
+    integ = v1.get("Integrations", {})
+    integration_enabled = (integ.get("integration_enabled") or "").strip()
+    software_integration = (integ.get("software_integration") or "").strip() or "None"
+    winrx_path = (integ.get("winrx_path") or "").strip()
 
     # Normalize to v2 structure: integration_settings dict and winrx_path
     integration_settings = {
-        'enable_third_party': 'Yes' if integration_enabled.lower() in ('yes', 'true', '1') else 'No',
-        'integration_software': software_integration if software_integration else 'None',
+        "enable_third_party": (
+            "Yes" if integration_enabled.lower() in ("yes", "true", "1") else "No"
+        ),
+        "integration_software": (
+            software_integration if software_integration else "None"
+        ),
     }
-    d.setdefault('Integrations', {})['integration_settings'] = integration_settings
+    d.setdefault("Integrations", {})["integration_settings"] = integration_settings
     if winrx_path:
-        d.setdefault('Integrations', {})['winrx_path'] = winrx_path
+        d.setdefault("Integrations", {})["winrx_path"] = winrx_path
 
     # Device: Optional UI preferences (not present in v1 defaults except maybe notifications)
-    notif = (fax.get('notifications_enabled') or '').strip()
+    notif = (fax.get("notifications_enabled") or "").strip()
     if notif:
-        d.setdefault('Fax Options', {})['notifications_enabled'] = notif
+        d.setdefault("Fax Options", {})["notifications_enabled"] = notif
 
     return g, d
 
@@ -148,8 +159,8 @@ def _apply_updates(g_updates: Dict[str, Any], d_updates: Dict[str, Any]) -> None
             for k, v in kv.items():
                 device_config.set(section, k, v)
         # Mark migration
-        device_config.set('Migration', 'v1_migrated', True)
-        device_config.set('Migration', 'migrated_at', _utc_now_iso())
+        device_config.set("Migration", "v1_migrated", True)
+        device_config.set("Migration", "migrated_at", _utc_now_iso())
         device_config.save()
     except Exception:
         log.exception("Failed to save device config during migration")
@@ -160,7 +171,9 @@ def _cleanup_v1_artifacts() -> None:
     try:
         if reg is not None:
             try:
-                with reg.OpenKey(reg.HKEY_CURRENT_USER, V1_REG_PATH, 0, reg.KEY_SET_VALUE) as key:
+                with reg.OpenKey(
+                    reg.HKEY_CURRENT_USER, V1_REG_PATH, 0, reg.KEY_SET_VALUE
+                ) as key:
                     try:
                         reg.DeleteValue(key, V1_REG_VALUE)
                         log.info("Removed v1 registry encryption value.")
@@ -204,10 +217,10 @@ def migrate_v1_if_present() -> bool:
     Returns True if a migration occurred (successfully applied at least some values), False otherwise.
     """
     try:
-        if device_config.get('Migration', 'v1_migrated', False):
+        if device_config.get("Migration", "v1_migrated", False):
             return False
         # Only on Windows and only if artifacts exist
-        if sys.platform != 'win32':
+        if sys.platform != "win32":
             return False
         if not os.path.exists(V1_INI_PATH):
             return False
