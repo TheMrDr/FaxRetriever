@@ -21,7 +21,6 @@ BACKUP_COUNT = 3
 # Ensure log directory exists
 os.makedirs(LOG_DIR, exist_ok=True)
 
-
 def get_logger(name: str) -> logging.Logger:
     """
     Return a configured logger instance.
@@ -33,11 +32,9 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
-    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s")
+    formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(name)s: %(message)s')
 
-    file_handler = RotatingFileHandler(
-        LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT
-    )
+    file_handler = RotatingFileHandler(LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT)
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.DEBUG)
 

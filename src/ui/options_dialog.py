@@ -1,37 +1,35 @@
 # /ui/options_dialog.py
 
 import os
-import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
-
+import subprocess
+from datetime import datetime, timezone, timedelta
 import jwt
+
 import requests
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
-from PyQt5.QtPrintSupport import QPrintDialog, QPrinter, QPrinterInfo
-from PyQt5.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog,
-                             QDialogButtonBox, QFileDialog, QFormLayout,
-                             QGroupBox, QHBoxLayout, QInputDialog, QLabel,
-                             QLineEdit, QListWidget, QListWidgetItem,
-                             QMessageBox, QPushButton, QRadioButton, QSpinBox,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtPrintSupport import QPrinterInfo, QPrinter, QPrintDialog
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QLabel, QLineEdit, QSpinBox, QComboBox, QCheckBox, QPushButton,
+    QGroupBox, QRadioButton, QButtonGroup, QInputDialog, QMessageBox,
+    QWidget, QListWidget, QListWidgetItem, QDialogButtonBox, QFileDialog
+)
 
-from core.config_loader import device_config, global_config
+from core.config_loader import global_config, device_config
 from core.license_client import initialize_session, retrieve_skyswitch_token
+from utils.logging_utils import get_logger
 from integrations.computer_rx import CRxIntegration2
 from ui.busy import BusyDialog
-from utils.logging_utils import get_logger
 
 SAFETY_BUFFER_MINUTES = 5
 
-
 def format_auth_token(raw: str) -> str:
-    digits = "".join(filter(str.isdigit, raw))
+    digits = ''.join(filter(str.isdigit, raw))
     if len(digits) != 10:
         return raw
     return f"{digits[:5]}-{digits[5:]}"
-
 
 def _ts_is_future_iso(ts: str, buffer_minutes: int = SAFETY_BUFFER_MINUTES) -> bool:
     if not ts:
@@ -42,7 +40,6 @@ def _ts_is_future_iso(ts: str, buffer_minutes: int = SAFETY_BUFFER_MINUTES) -> b
     except Exception:
         return False
 
-
 def _jwt_is_valid(token: str) -> bool:
     if not token:
         return False
@@ -51,9 +48,7 @@ def _jwt_is_valid(token: str) -> bool:
         exp = decoded.get("exp")
         if not exp:
             return False
-        return datetime.now(timezone.utc).timestamp() + (
-            SAFETY_BUFFER_MINUTES * 60
-        ) < float(exp)
+        return datetime.now(timezone.utc).timestamp() + (SAFETY_BUFFER_MINUTES * 60) < float(exp)
     except Exception:
         return False
 
@@ -90,9 +85,7 @@ class OptionsDialog(QDialog):
         header = QVBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         title = QLabel("<b style='font-size: 16pt'>FaxRetriever</b>")
-        subtitle = QLabel(
-            "<b style='font-size: 10pt'>developed by Clinic Networking, LLC</b>"
-        )
+        subtitle = QLabel("<b style='font-size: 10pt'>developed by Clinic Networking, LLC</b>")
         title.setAlignment(Qt.AlignCenter)
         subtitle.setAlignment(Qt.AlignCenter)
         header.addWidget(title)
@@ -133,13 +126,12 @@ class OptionsDialog(QDialog):
         layout = QVBoxLayout()
         layout.setSpacing(8)
 
+
         polling_row = QHBoxLayout()
         polling_row.addWidget(QLabel("Polling Frequency (minutes):"))
         self.polling_frequency_spinbox = QSpinBox()
         self.polling_frequency_spinbox.setRange(5, 60)
-        self.polling_frequency_spinbox.setValue(
-            device_config.get("Fax Options", "polling_frequency", 15) or 15
-        )
+        self.polling_frequency_spinbox.setValue(device_config.get("Fax Options", "polling_frequency", 15) or 15)
         polling_row.addWidget(self.polling_frequency_spinbox)
         layout.addLayout(polling_row)
 
@@ -155,7 +147,7 @@ class OptionsDialog(QDialog):
 
         raw_method = device_config.get("Fax Options", "download_method", "PDF")
         # Some legacy configs may store "None" or unexpected values; default to PDF safely
-        method = str(raw_method).strip().lower() if raw_method is not None else "pdf"
+        method = (str(raw_method).strip().lower() if raw_method is not None else "pdf")
         method_map = {
             "pdf": self.download_pdf_radio,
             "jpg": self.download_jpg_radio,
@@ -164,11 +156,7 @@ class OptionsDialog(QDialog):
         (method_map.get(method) or self.download_pdf_radio).setChecked(True)
 
         format_group = QButtonGroup()
-        for rb in [
-            self.download_pdf_radio,
-            self.download_jpg_radio,
-            self.download_both_radio,
-        ]:
+        for rb in [self.download_pdf_radio, self.download_jpg_radio, self.download_both_radio]:
             format_group.addButton(rb)
 
         layout.addWidget(QLabel("File Naming:"))
@@ -183,20 +171,14 @@ class OptionsDialog(QDialog):
         self.naming_group.addButton(self.naming_cid_radio)
         self.naming_group.addButton(self.naming_faxid_radio)
         self.naming_cid_radio.setChecked(
-            (device_config.get("Fax Options", "file_name_format", "cid") or "").lower()
-            == "cid"
-        )
+            (device_config.get("Fax Options", "file_name_format", "cid") or "").lower() == "cid")
 
         # Before the print_row widgets
-        self.selected_printer_label = QLabel(
-            device_config.get("Fax Options", "printer_name", "")
-        )
+        self.selected_printer_label = QLabel(device_config.get("Fax Options", "printer_name", ""))
         self.selected_printer_label.setStyleSheet("padding-left: 10px; color: #444;")
 
         self.print_checkbox = QCheckBox("Print Faxes")
-        self.print_checkbox.setChecked(
-            (self.app_state.device_cfg.print_faxes or "").lower() == "yes"
-        )
+        self.print_checkbox.setChecked((self.app_state.device_cfg.print_faxes or "").lower() == "yes")
         self.print_checkbox.stateChanged.connect(self._handle_print_checkbox_toggle)
 
         print_row = QHBoxLayout()
@@ -209,17 +191,10 @@ class OptionsDialog(QDialog):
         # Notifications + Close to Tray row
         notif_row = QHBoxLayout()
         self.notifications_checkbox = QCheckBox("Enable Notifications")
-        self.notifications_checkbox.setChecked(
-            (
-                (self.app_state.device_cfg.notifications_enabled or "Yes").lower()
-                == "yes"
-            )
-        )
+        self.notifications_checkbox.setChecked(((self.app_state.device_cfg.notifications_enabled or "Yes").lower() == "yes"))
         notif_row.addWidget(self.notifications_checkbox)
         self.close_to_tray_checkbox = QCheckBox("Close to Tray")
-        self.close_to_tray_checkbox.setChecked(
-            ((self.app_state.device_cfg.close_to_tray or "No").lower() == "yes")
-        )
+        self.close_to_tray_checkbox.setChecked(((self.app_state.device_cfg.close_to_tray or "No").lower() == "yes"))
         notif_row.addWidget(self.close_to_tray_checkbox)
         notif_row.addStretch()
         layout.addLayout(notif_row)
@@ -227,17 +202,16 @@ class OptionsDialog(QDialog):
         # Start with System row
         start_row = QHBoxLayout()
         self.start_with_system_checkbox = QCheckBox("Start with System")
-        self.start_with_system_checkbox.setChecked(
-            ((self.app_state.device_cfg.start_with_system or "No").lower() == "yes")
-        )
+        self.start_with_system_checkbox.setChecked(((self.app_state.device_cfg.start_with_system or "No").lower() == "yes"))
         start_row.addWidget(self.start_with_system_checkbox)
         start_row.addStretch()
         layout.addLayout(start_row)
-
+        
+        
         # Archival is always enabled; provide only server retention selector
         archive_row = QHBoxLayout()
         archive_row.addWidget(QLabel("Server Retention:"))
-
+        
         self.retention_input = QComboBox()
         self.retention_input.addItems(["15", "30", "60", "90", "180", "365"])
         # Coerce any previous invalid/legacy values to a safe bound
@@ -245,28 +219,27 @@ class OptionsDialog(QDialog):
             cur_val = int(self.app_state.device_cfg.archive_duration or 365)
             if cur_val > 365:
                 cur_val = 365
-            if str(cur_val) not in ["15", "30", "60", "90", "180", "365"]:
+            if str(cur_val) not in ["15","30","60","90","180","365"]:
                 cur_val = 365
             self.retention_input.setCurrentText(str(cur_val))
         except Exception:
             self.retention_input.setCurrentText("365")
-
+        
         archive_row.addWidget(self.retention_input)
         archive_row.addWidget(QLabel("days"))
         archive_row.addStretch()
         layout.addLayout(archive_row)
-
+        
         group.setLayout(layout)
         return group
+
 
     def _logging_section(self):
         group = QGroupBox("Logging")
         layout = QVBoxLayout()
         self.logging_combo = QComboBox()
         self.logging_combo.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
-        self.logging_combo.setCurrentText(
-            self.app_state.global_cfg.logging_level or "Info"
-        )
+        self.logging_combo.setCurrentText(self.app_state.global_cfg.logging_level or "Info")
         layout.addWidget(self.logging_combo)
         group.setLayout(layout)
         return group
@@ -280,36 +253,24 @@ class OptionsDialog(QDialog):
         settings = {**glob_settings, **dev_settings}
 
         self.integration_checkbox = QCheckBox("Enable 3rd Party Integrations")
-        self.integration_checkbox.setChecked(
-            (settings.get("enable_third_party", "") or "").lower() == "yes"
-        )
+        self.integration_checkbox.setChecked((settings.get("enable_third_party", "") or "").lower() == "yes")
         layout.addWidget(self.integration_checkbox)
 
         # Software selector
         self.integration_combo = QComboBox()
         self.integration_combo.addItems(["None", "Computer-Rx"])
-        self.integration_combo.setCurrentText(
-            settings.get("integration_software", "") or "None"
-        )
+        self.integration_combo.setCurrentText(settings.get("integration_software", "") or "None")
         layout.addWidget(self.integration_combo)
 
         # WinRx path row (visible only for Computer-Rx)
         path_row = QHBoxLayout()
-        self.winrx_path_input = QLineEdit(
-            self.app_state.device_cfg.winrx_path
-            or device_config.get("Integrations", "winrx_path", "")
-            or ""
-        )
-        self.winrx_path_input.setPlaceholderText(
-            "Select WinRx folder (contains FaxControl.btr)"
-        )
+        self.winrx_path_input = QLineEdit(self.app_state.device_cfg.winrx_path or device_config.get("Integrations", "winrx_path", "") or "")
+        self.winrx_path_input.setPlaceholderText("Select WinRx folder (contains FaxControl.btr)")
         browse_btn = QPushButton("Browse")
-
         def on_browse():
             path = QFileDialog.getExistingDirectory(self, "Select WinRx Folder")
             if path:
                 self.winrx_path_input.setText(path)
-
         browse_btn.clicked.connect(on_browse)
         path_row.addWidget(QLabel("WinRx Path:"))
         path_row.addWidget(self.winrx_path_input, 1)
@@ -324,7 +285,6 @@ class OptionsDialog(QDialog):
                 w = path_row.itemAt(i).widget()
                 if w:
                     w.setVisible(show)
-
         self.integration_checkbox.toggled.connect(lambda _: toggle_visibility())
         self.integration_combo.currentTextChanged.connect(lambda _: toggle_visibility())
         QTimer.singleShot(0, toggle_visibility)
@@ -340,9 +300,7 @@ class OptionsDialog(QDialog):
         self.client_domain_input.setPlaceholderText("100@sample.12345.service")
         self.auth_token_input = QLineEdit()
         self.auth_token_input.setEchoMode(QLineEdit.Password)
-        self.auth_token_input.setText(
-            self.app_state.global_cfg.authentication_token or ""
-        )
+        self.auth_token_input.setText(self.app_state.global_cfg.authentication_token or "")
         self.auth_token_input.textChanged.connect(self._format_token_live)
         self.change_account_button = QPushButton("Change Account")
         self.change_account_button.clicked.connect(self.toggle_account_settings)
@@ -354,6 +312,7 @@ class OptionsDialog(QDialog):
         # Keep a reference for subtle attention cues
         self.account_group = group
         return group
+
 
     def _apply_saved_printer_settings(self, qprinter: QPrinter):
         try:
@@ -381,7 +340,6 @@ class OptionsDialog(QDialog):
             if paper:
                 try:
                     from PyQt5.QtPrintSupport import QPrinterInfo as _QPI
-
                     # If the printer supports a default paper size mapping, we can attempt
                     pass
                 except Exception:
@@ -392,35 +350,27 @@ class OptionsDialog(QDialog):
     def _collect_printer_settings(self, qprinter: QPrinter) -> dict:
         try:
             settings = {
-                "orientation": (
-                    "Landscape"
-                    if qprinter.orientation() == QPrinter.Landscape
-                    else "Portrait"
-                ),
+                "orientation": "Landscape" if qprinter.orientation() == QPrinter.Landscape else "Portrait",
             }
             # Duplex
             try:
                 dp = qprinter.duplex()
                 settings["duplex"] = (
-                    "LongSide"
-                    if dp == QPrinter.DuplexLongSide
-                    else ("ShortSide" if dp == QPrinter.DuplexShortSide else "None")
+                    "LongSide" if dp == QPrinter.DuplexLongSide else (
+                        "ShortSide" if dp == QPrinter.DuplexShortSide else "None"
+                    )
                 )
             except Exception:
                 settings["duplex"] = "None"
             # Color
             try:
                 cm = qprinter.colorMode()
-                settings["color_mode"] = (
-                    "Color" if cm == QPrinter.Color else "GrayScale"
-                )
+                settings["color_mode"] = "Color" if cm == QPrinter.Color else "GrayScale"
             except Exception:
                 settings["color_mode"] = "Color"
             # Paper name (best-effort)
             try:
-                settings["paper_name"] = (
-                    str(qprinter.paperName()) if hasattr(qprinter, "paperName") else ""
-                )
+                settings["paper_name"] = str(qprinter.paperName()) if hasattr(qprinter, "paperName") else ""
             except Exception:
                 settings["paper_name"] = ""
             return settings
@@ -450,11 +400,7 @@ class OptionsDialog(QDialog):
                 if chosen:
                     self.selected_printer_label.setText(chosen)
                     device_config.set("Fax Options", "printer_name", chosen)
-                    device_config.set(
-                        "Fax Options",
-                        "printer_settings",
-                        self._collect_printer_settings(qprinter),
-                    )
+                    device_config.set("Fax Options", "printer_settings", self._collect_printer_settings(qprinter))
                 else:
                     # If no printer picked, uncheck and clear
                     self.print_checkbox.setChecked(False)
@@ -480,17 +426,10 @@ class OptionsDialog(QDialog):
 
     def _ensure_startup_shortcut(self, enable: bool):
         try:
-            startup = os.path.join(
-                os.environ.get("APPDATA", ""),
-                "Microsoft",
-                "Windows",
-                "Start Menu",
-                "Programs",
-                "Startup",
-            )
+            startup = os.path.join(os.environ.get('APPDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
             if not startup or not os.path.isdir(startup):
                 return
-            link_path = os.path.join(startup, "FaxRetriever.lnk")
+            link_path = os.path.join(startup, 'FaxRetriever.lnk')
             if not enable:
                 try:
                     if os.path.exists(link_path):
@@ -500,21 +439,21 @@ class OptionsDialog(QDialog):
                 return
 
             # Determine target and arguments
-            icon_path = os.path.join(self.base_dir, "images", "logo.ico")
+            icon_path = os.path.join(self.base_dir, 'images', 'logo.ico')
             workdir = self.base_dir
-            if getattr(sys, "frozen", False):
+            if getattr(sys, 'frozen', False):
                 target = sys.executable
-                args = ""
+                args = ''
             else:
                 # Prefer pythonw.exe if present to avoid console window
-                pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+                pyw = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
                 target = pyw if os.path.exists(pyw) else sys.executable
-                script = os.path.join(self.base_dir, "main.py")
+                script = os.path.join(self.base_dir, 'main.py')
                 args = f'"{script}"'
 
             # Escape for PowerShell single-quoted strings
             def esc(s: str) -> str:
-                return (s or "").replace("'", "''")
+                return (s or '').replace("'", "''")
 
             ps = (
                 f"$ws = New-Object -ComObject WScript.Shell; "
@@ -525,19 +464,7 @@ class OptionsDialog(QDialog):
                 f"$lnk.IconLocation = '{esc(icon_path)}'; "
                 f"$lnk.Save()"
             )
-            subprocess.run(
-                [
-                    "powershell",
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-Command",
-                    ps,
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
+            subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         except Exception:
             # Silently ignore failures
             pass
@@ -548,7 +475,7 @@ class OptionsDialog(QDialog):
             "Warning",
             "Changing account settings may prevent the application from activating.\n"
             "Are you sure you want to proceed?",
-            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No
         )
 
         if response == QMessageBox.Yes:
@@ -621,39 +548,23 @@ class OptionsDialog(QDialog):
             minutes = int(self.polling_frequency_spinbox.value())
 
             if not client_domain or not formatted_token:
-                QMessageBox.warning(
-                    self,
-                    "Missing Input",
-                    "Fax User and Authentication Token are required.",
-                )
+                QMessageBox.warning(self, "Missing Input", "Fax User and Authentication Token are required.")
                 return
 
             # 1) Persist UI choices immediately (write-through, no network)
             global_config.set("Account", "fax_user", client_domain)
             global_config.set("Account", "authentication_token", formatted_token)
-            global_config.set(
-                "UserSettings", "logging_level", self.logging_combo.currentText()
-            )
+            global_config.set("UserSettings", "logging_level", self.logging_combo.currentText())
             integration_settings = {
-                "enable_third_party": (
-                    "Yes" if self.integration_checkbox.isChecked() else "No"
-                ),
-                "integration_software": self.integration_combo.currentText(),
+                "enable_third_party": "Yes" if self.integration_checkbox.isChecked() else "No",
+                "integration_software": self.integration_combo.currentText()
             }
-            global_config.set(
-                "Integrations", "integration_settings", integration_settings
-            )
+            global_config.set("Integrations", "integration_settings", integration_settings)
             # Mirror to device-level for runtime gating
-            device_config.set(
-                "Integrations", "integration_settings", integration_settings
-            )
+            device_config.set("Integrations", "integration_settings", integration_settings)
             # Persist Computer-Rx WinRx path (device-level)
             try:
-                winrx_path = (
-                    self.winrx_path_input.text().strip()
-                    if hasattr(self, "winrx_path_input")
-                    else ""
-                )
+                winrx_path = self.winrx_path_input.text().strip() if hasattr(self, 'winrx_path_input') else ""
             except Exception:
                 winrx_path = ""
             device_config.set("Integrations", "winrx_path", winrx_path)
@@ -668,46 +579,23 @@ class OptionsDialog(QDialog):
             else:
                 device_config.set("Fax Options", "download_method", "Both")
 
-            device_config.set(
-                "Fax Options",
-                "file_name_format",
-                "faxid" if self.naming_faxid_radio.isChecked() else "cid",
-            )
+            device_config.set("Fax Options", "file_name_format",
+                              "faxid" if self.naming_faxid_radio.isChecked() else "cid")
             device_config.set("Fax Options", "polling_frequency", minutes)
-            device_config.set(
-                "Fax Options",
-                "print_faxes",
-                "Yes" if self.print_checkbox.isChecked() else "No",
-            )
-            device_config.set(
-                "Fax Options",
-                "notifications_enabled",
-                "Yes" if self.notifications_checkbox.isChecked() else "No",
-            )
-            device_config.set(
-                "Fax Options",
-                "close_to_tray",
-                "Yes" if self.close_to_tray_checkbox.isChecked() else "No",
-            )
-            device_config.set(
-                "Fax Options",
-                "start_with_system",
-                "Yes" if self.start_with_system_checkbox.isChecked() else "No",
-            )
+            device_config.set("Fax Options", "print_faxes", "Yes" if self.print_checkbox.isChecked() else "No")
+            device_config.set("Fax Options", "notifications_enabled", "Yes" if self.notifications_checkbox.isChecked() else "No")
+            device_config.set("Fax Options", "close_to_tray", "Yes" if self.close_to_tray_checkbox.isChecked() else "No")
+            device_config.set("Fax Options", "start_with_system", "Yes" if self.start_with_system_checkbox.isChecked() else "No")
             # Archival is always enabled; persist as Yes
             device_config.set("Fax Options", "archive_enabled", "Yes")
-            device_config.set(
-                "Fax Options", "archive_duration", self.retention_input.currentText()
-            )
+            device_config.set("Fax Options", "archive_duration", self.retention_input.currentText())
 
             global_config.save()
             device_config.save()
 
             # Apply Start with System shortcut
             try:
-                self._ensure_startup_shortcut(
-                    self.start_with_system_checkbox.isChecked()
-                )
+                self._ensure_startup_shortcut(self.start_with_system_checkbox.isChecked())
             except Exception:
                 pass
 
@@ -720,16 +608,11 @@ class OptionsDialog(QDialog):
             # 3) Ensure JWT via license_client only if needed
             if not have_valid_jwt:
                 with BusyDialog(self, "Initializing…"):
-                    init_result = initialize_session(
-                        self.app_state, client_domain, formatted_token, mode="sender"
-                    )
+                    init_result = initialize_session(self.app_state, client_domain, formatted_token, mode="sender")
                 if init_result.get("error"):
                     self.log.error(f"initialize_session failed: {init_result['error']}")
-                    QMessageBox.critical(
-                        self,
-                        "Init Failed",
-                        f"Initialization error: {init_result['error']}",
-                    )
+                    QMessageBox.critical(self, "Init Failed",
+                                         f"Initialization error: {init_result['error']}")
                     return
                 # license_client writes jwt_token, retriever_status, and validation_status to config/app_state
 
@@ -738,14 +621,9 @@ class OptionsDialog(QDialog):
                 with BusyDialog(self, "Retrieving token…"):
                     bearer_result = retrieve_skyswitch_token(self.app_state)
                 if bearer_result.get("error"):
-                    self.log.error(
-                        f"retrieve_skyswitch_token failed: {bearer_result['error']}"
-                    )
-                    QMessageBox.critical(
-                        self,
-                        "Token Error",
-                        f"Failed to retrieve bearer token: {bearer_result['error']}",
-                    )
+                    self.log.error(f"retrieve_skyswitch_token failed: {bearer_result['error']}")
+                    QMessageBox.critical(self, "Token Error",
+                                         f"Failed to retrieve bearer token: {bearer_result['error']}")
                     return
 
             # 5) Finalize persisted state
@@ -764,16 +642,12 @@ class OptionsDialog(QDialog):
                     self.main_window.poll_bar.interval_secs = minutes * 60
                     self.main_window.poll_bar.restart_progress()
                 if self.main_window.status_bar:
-                    self.main_window.status_bar.showMessage(
-                        "Settings saved. Sender mode enabled.", 5000
-                    )
+                    self.main_window.status_bar.showMessage("Settings saved. Sender mode enabled.", 5000)
                 # Update Send panel Caller ID numbers immediately if available
                 try:
-                    if hasattr(self.main_window, "send_fax_panel") and getattr(
-                        self.main_window, "send_fax_panel"
-                    ):
+                    if hasattr(self.main_window, 'send_fax_panel') and getattr(self.main_window, 'send_fax_panel'):
                         panel = self.main_window.send_fax_panel
-                        if hasattr(panel, "refresh_caller_id_numbers"):
+                        if hasattr(panel, 'refresh_caller_id_numbers'):
                             panel.refresh_caller_id_numbers()
                 except Exception:
                     pass
@@ -784,7 +658,7 @@ class OptionsDialog(QDialog):
                     pass
                 # Trigger integrations if applicable
                 try:
-                    if hasattr(self.main_window, "_maybe_run_integrations"):
+                    if hasattr(self.main_window, '_maybe_run_integrations'):
                         self.main_window._maybe_run_integrations()
                 except Exception:
                     pass
@@ -796,95 +670,52 @@ class OptionsDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
 
     @staticmethod
-    def compute_effective_mode(
-        requested_mode: str, retriever_status: str | None, jwt_valid: bool
-    ) -> str:
+    def compute_effective_mode(requested_mode: str, retriever_status: str | None, jwt_valid: bool) -> str:
         # FRA rules override local wishes when known
         if retriever_status == "denied":
             return "sender"
         if retriever_status == "allowed":
-            return (
-                "sender_receiver" if requested_mode == "sender_receiver" else "sender"
-            )
+            return "sender_receiver" if requested_mode == "sender_receiver" else "sender"
         # If we don't know yet (no init or no claims), be conservative
-        return (
-            "sender"
-            if not jwt_valid
-            else (
-                "sender_receiver" if requested_mode == "sender_receiver" else "sender"
-            )
-        )
+        return "sender" if not jwt_valid else ("sender_receiver" if requested_mode == "sender_receiver" else "sender")
 
     def load_state_into_form(self):
         naming = (self.app_state.device_cfg.file_name_format or "").lower()
         self.naming_faxid_radio.setChecked(naming == "faxid")
         self.naming_cid_radio.setChecked(naming == "cid")
-        self.polling_frequency_spinbox.setValue(
-            device_config.get("Fax Options", "polling_frequency", 15) or 15
-        )
-        self.selected_printer_label.setText(
-            self.app_state.device_cfg.printer_name or ""
-        )
-        self.print_checkbox.setChecked(
-            (self.app_state.device_cfg.print_faxes or "").lower() == "yes"
-        )
-        self.notifications_checkbox.setChecked(
-            (
-                (self.app_state.device_cfg.notifications_enabled or "Yes").lower()
-                == "yes"
-            )
-        )
+        self.polling_frequency_spinbox.setValue(device_config.get("Fax Options", "polling_frequency", 15) or 15)
+        self.selected_printer_label.setText(self.app_state.device_cfg.printer_name or "")
+        self.print_checkbox.setChecked((self.app_state.device_cfg.print_faxes or "").lower() == "yes")
+        self.notifications_checkbox.setChecked(((self.app_state.device_cfg.notifications_enabled or "Yes").lower() == "yes"))
         # New toggles
         try:
-            self.close_to_tray_checkbox.setChecked(
-                ((self.app_state.device_cfg.close_to_tray or "No").lower() == "yes")
-            )
+            self.close_to_tray_checkbox.setChecked(((self.app_state.device_cfg.close_to_tray or "No").lower() == "yes"))
         except Exception:
             pass
         try:
-            self.start_with_system_checkbox.setChecked(
-                ((self.app_state.device_cfg.start_with_system or "No").lower() == "yes")
-            )
+            self.start_with_system_checkbox.setChecked(((self.app_state.device_cfg.start_with_system or "No").lower() == "yes"))
         except Exception:
             pass
-        self.retention_input.setCurrentText(
-            self.app_state.device_cfg.archive_duration or "365"
-        )
-        self.logging_combo.setCurrentText(
-            self.app_state.global_cfg.logging_level or "Info"
-        )
+        self.retention_input.setCurrentText(self.app_state.device_cfg.archive_duration or "365")
+        self.logging_combo.setCurrentText(self.app_state.global_cfg.logging_level or "Info")
         # Use device-level settings when available
         dev_settings = self.app_state.device_cfg.integration_settings or {}
         glob_settings = self.app_state.global_cfg.integration_settings or {}
-        cur_enable = (
-            dev_settings.get("enable_third_party")
-            or glob_settings.get("enable_third_party")
-            or ""
-        )
+        cur_enable = (dev_settings.get("enable_third_party") or glob_settings.get("enable_third_party") or "")
         self.integration_checkbox.setChecked((cur_enable or "").lower() == "yes")
         # Prefer device-level integration software
         dev_settings = self.app_state.device_cfg.integration_settings or {}
         glob_settings = self.app_state.global_cfg.integration_settings or {}
-        cur_sw = (
-            dev_settings.get("integration_software")
-            or glob_settings.get("integration_software")
-            or "None"
-        )
+        cur_sw = (dev_settings.get("integration_software") or glob_settings.get("integration_software") or "None")
         self.integration_combo.setCurrentText(cur_sw)
         # WinRx path
         try:
-            if hasattr(self, "winrx_path_input"):
-                self.winrx_path_input.setText(
-                    self.app_state.device_cfg.winrx_path
-                    or device_config.get("Integrations", "winrx_path", "")
-                    or ""
-                )
+            if hasattr(self, 'winrx_path_input'):
+                self.winrx_path_input.setText(self.app_state.device_cfg.winrx_path or device_config.get("Integrations", "winrx_path", "") or "")
         except Exception:
             pass
         self.client_domain_input.setText(self.app_state.global_cfg.fax_user or "")
-        self.auth_token_input.setText(
-            self.app_state.global_cfg.authentication_token or ""
-        )
+        self.auth_token_input.setText(self.app_state.global_cfg.authentication_token or "")
 
         fax_user = self.app_state.global_cfg.fax_user
         auth_token = self.app_state.global_cfg.authentication_token

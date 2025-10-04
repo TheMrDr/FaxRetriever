@@ -70,8 +70,7 @@ Notes:
 ## Receiving Faxes
 1) Ensure FaxRetriever is running and authenticated
 2) Click `Configure Fax Retrieval`, choose your retrieval number(s), and select a `Save Location`
-3) FaxRetriever will only retrieve faxes when this device is authorized as the retriever (Sender/Receiver mode AND Allowed status). When not authorized, polling and manual checks are disabled.
-4) The app polls on a schedule and saves faxes to your folder
+3) The app polls on a schedule and saves faxes to your folder
 
 Options you can enable in System → Options:
 - Archive retention (e.g., 30, 60, 90, 120, 365 days)
@@ -122,11 +121,9 @@ Do not edit these files directly—use Options in the app.
   - Check log\ClinicFax.log for details
 
 - Not Receiving Faxes
-  - Ensure this device is authorized as the retriever (Allowed status) for at least one number. Only one active retriever per number is permitted.
   - Confirm you’re in Sender/Receiver mode
   - Verify you’ve claimed the correct fax number(s) via Configure Fax Retrieval
   - Ensure a Save Location is set and accessible
-  - When not authorized, manual and scheduled polling are disabled by design; request assignment via Configure Fax Retrieval or contact your administrator.
   - Check internet connectivity and firewall permissions
 
 - Token Expired or Authentication Errors

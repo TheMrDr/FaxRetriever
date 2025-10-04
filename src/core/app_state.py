@@ -1,10 +1,9 @@
 # app_state.py — Runtime memory cache for all operational config/state
 
+from typing import Optional, List
 from datetime import datetime, timezone
-from typing import List, Optional
-
-from core.config_loader import device_config, global_config
 from utils.logging_utils import get_logger
+from core.config_loader import global_config, device_config
 
 
 class GlobalState:
@@ -79,34 +78,25 @@ class DeviceState:
             # tolerate old stray string values
             self.selected_fax_numbers = [nums.strip()]
         else:
-            self.selected_fax_numbers = (
-                [self.selected_fax_number] if self.selected_fax_number else []
-            )
+            self.selected_fax_numbers = [self.selected_fax_number] if self.selected_fax_number else []
 
         # Always hydrate fax options so OptionsDialog and runtime have full config after restart
         self.save_path = cfg.get("Fax Options", "save_path", "")
         self.download_method = cfg.get("Fax Options", "download_method", "PDF")
         self.file_name_format = cfg.get("Fax Options", "file_name_format")
-        self.polling_frequency = int(
-            cfg.get("Fax Options", "polling_frequency", 15) or 15
-        )
+        self.polling_frequency = int(cfg.get("Fax Options", "polling_frequency", 15) or 15)
         self.print_faxes = cfg.get("Fax Options", "print_faxes", "No")
         self.delete_faxes = cfg.get("Fax Options", "delete_faxes", "No")
         # With archival checkbox removed, default to Yes to keep consistent behavior
         self.archive_enabled = cfg.get("Fax Options", "archive_enabled", "Yes")
         self.archive_duration = cfg.get("Fax Options", "archive_duration", "30")
         self.printer_name = cfg.get("Fax Options", "printer_name", "")
-        self.notifications_enabled = cfg.get(
-            "Fax Options", "notifications_enabled", "Yes"
-        )
+        self.notifications_enabled = cfg.get("Fax Options", "notifications_enabled", "Yes")
         self.close_to_tray = cfg.get("Fax Options", "close_to_tray", "No")
         self.start_with_system = cfg.get("Fax Options", "start_with_system", "No")
         # Integrations
-        self.integration_settings = (
-            cfg.get("Integrations", "integration_settings", {}) or {}
-        )
+        self.integration_settings = cfg.get("Integrations", "integration_settings", {}) or {}
         self.winrx_path = cfg.get("Integrations", "winrx_path", "") or ""
-
 
 class AppState:
     def __init__(self):
@@ -119,13 +109,9 @@ class AppState:
         self.global_cfg.load_from(global_config)
         self.device_cfg.load_from(device_config)
         self.log.info("App state hydrated from global and device configs.")
-        self.log.debug(
-            f"User: {self.global_cfg.fax_user} | Mode: {self.device_cfg.retriever_mode} | Status: {self.device_cfg.retriever_status}"
-        )
+        self.log.debug(f"User: {self.global_cfg.fax_user} | Mode: {self.device_cfg.retriever_mode} | Status: {self.device_cfg.retriever_status}")
 
-    def update_token_state(
-        self, bearer_token: str, expires_at: str, fax_numbers: list[str]
-    ):
+    def update_token_state(self, bearer_token: str, expires_at: str, fax_numbers: list[str]):
         now = datetime.now(timezone.utc).isoformat()
 
         self.global_cfg.bearer_token = bearer_token

@@ -8,17 +8,16 @@ import os
 import shutil
 import tempfile
 
-from PIL import Image, ImageDraw, ImageFont
 from pypdf import PdfReader, PdfWriter
 
 from utils.logging_utils import get_logger
+from PIL import Image, ImageDraw, ImageFont
 
 # Try to use reportlab for PDF generation when available
 try:
     from reportlab.lib.pagesizes import letter
-    from reportlab.lib.units import inch
     from reportlab.pdfgen import canvas
-
+    from reportlab.lib.units import inch
     REPORTLAB_AVAILABLE = True
 except Exception:
     REPORTLAB_AVAILABLE = False
@@ -26,19 +25,7 @@ except Exception:
 log = get_logger("doc_utils")
 
 # Allowed file types (no conversion)
-SUPPORTED_TYPES = (
-    ".pdf",
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".tif",
-    ".tiff",
-    ".doc",
-    ".docx",
-    ".html",
-    ".txt",
-)
-
+SUPPORTED_TYPES = ('.pdf', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.doc', '.docx', '.html', '.txt')
 
 def is_supported_filetype(filepath):
     return filepath.lower().endswith(SUPPORTED_TYPES)
@@ -102,7 +89,6 @@ def copy_to_temp(original_path):
         log.error(f"Failed to copy to temp: {original_path}: {e}")
         return None
 
-
 def normalize_document(input_path):
     """
     Validates support and ensures portrait orientation. All files copied to temp.
@@ -127,9 +113,7 @@ def normalize_document(input_path):
         return None
 
     if ext in (".doc", ".docx"):
-        log.warning(
-            f"User uploaded Word document: {input_path}. Cannot enforce orientation."
-        )
+        log.warning(f"User uploaded Word document: {input_path}. Cannot enforce orientation.")
 
     if ext == ".pdf":
         return normalize_orientation(input_path)
@@ -150,9 +134,8 @@ def convert_image_to_pdf(image_path, output_path):
     """
     try:
         from PIL import Image
-
         image = Image.open(image_path)
-        rgb_image = image.convert("RGB")
+        rgb_image = image.convert('RGB')
         rgb_image.save(output_path, "PDF", resolution=300.0)
         return output_path
     except Exception as e:
@@ -202,9 +185,7 @@ def generate_cover_sheet_pdf(recipient: str, user_fax: str, output_path: str):
         None: Always returns None and does not write a file.
     """
     try:
-        log.info(
-            "generate_cover_sheet_pdf is deprecated; using designer-provided cover if enabled."
-        )
+        log.info("generate_cover_sheet_pdf is deprecated; using designer-provided cover if enabled.")
     except Exception:
         pass
     return None

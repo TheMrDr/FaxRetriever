@@ -1,5 +1,5 @@
-import json
 import os
+import json
 from typing import Dict
 
 
@@ -16,8 +16,7 @@ def _index_path(base_dir: str) -> str:
         log_dir = None
         try:
             # Importing here avoids hard coupling at module import time
-            from utils.logging_utils import LOG_DIR, LOG_FILE  # type: ignore
-
+            from utils.logging_utils import LOG_FILE, LOG_DIR  # type: ignore
             if isinstance(LOG_FILE, str) and LOG_FILE:
                 log_dir = os.path.dirname(LOG_FILE)
             elif isinstance(LOG_DIR, str) and LOG_DIR:
@@ -52,11 +51,7 @@ def _index_path(base_dir: str) -> str:
                         pass
             # 2) From <base_dir>\\log\\downloaded_index.json if different from current log_dir
             old_log = os.path.join(base_dir, "log", "downloaded_index.json")
-            if (
-                os.path.exists(old_log)
-                and old_log != new_path
-                and not os.path.exists(new_path)
-            ):
+            if os.path.exists(old_log) and old_log != new_path and not os.path.exists(new_path):
                 try:
                     os.replace(old_log, new_path)
                 except Exception:

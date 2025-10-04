@@ -1,12 +1,3 @@
-# What's new in FaxRetriever 2.0.9
-
-- Enforced receiver authorization: FaxRetriever will never retrieve faxes unless the device is configured as Sender/Receiver and the FRA assignments indicate this device is Allowed to retrieve for at least one number.
-- Manual and scheduled polling now respect authorization and are disabled when not permitted.
-- Startup and UI improvements clarify current authorization: retrieval controls are greyed out and the poll timer is stopped when unauthorized; logs indicate the current mode and status.
-- Reliability: Added guards in the receiver engine and poll triggers to prevent inadvertent downloads.
-
----
-
 # What's new in FaxRetriever 2.0.8
 
 - Scanner refactored to use pyinsane2 instead of direct WIA calls. This should resolve issues with scanners failing to scan on some systems.

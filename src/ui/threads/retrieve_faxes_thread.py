@@ -5,9 +5,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 class RetrieveFaxesThread(QThread):
     finished = pyqtSignal(list)
 
-    def __init__(
-        self, fax_user, bearer_token, inbound_page: int = 1, outbound_page: int = 1
-    ):
+    def __init__(self, fax_user, bearer_token, inbound_page: int = 1, outbound_page: int = 1):
         super().__init__()
         self.fax_user = fax_user
         self.bearer_token = bearer_token
@@ -31,10 +29,7 @@ class RetrieveFaxesThread(QThread):
                 inbound_url += f"?page={self.inbound_page}"
             if self.outbound_page and self.outbound_page > 1:
                 outbound_url += f"?page={self.outbound_page}"
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {self.bearer_token}",
-            }
+            headers = {"accept": "application/json", "Authorization": f"Bearer {self.bearer_token}"}
             faxes = []
 
             inbound_json = None
@@ -45,10 +40,7 @@ class RetrieveFaxesThread(QThread):
                 try:
                     inbound_json = inbound_response.json()
                 except Exception:
-                    inbound_json = {
-                        "error": "invalid_json",
-                        "text": inbound_response.text,
-                    }
+                    inbound_json = {"error": "invalid_json", "text": inbound_response.text}
                 inbound_faxes = (inbound_json or {}).get("data", [])
                 for fax in inbound_faxes:
                     fax["direction"] = "Inbound"
@@ -67,10 +59,7 @@ class RetrieveFaxesThread(QThread):
                 try:
                     outbound_json = outbound_response.json()
                 except Exception:
-                    outbound_json = {
-                        "error": "invalid_json",
-                        "text": outbound_response.text,
-                    }
+                    outbound_json = {"error": "invalid_json", "text": outbound_response.text}
                 outbound_faxes = (outbound_json or {}).get("data", [])
                 for fax in outbound_faxes:
                     fax["direction"] = "Outbound"

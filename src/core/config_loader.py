@@ -5,7 +5,6 @@ import json
 import os
 import sys
 from typing import Any, Optional
-
 from utils.logging_utils import get_logger
 
 
@@ -13,60 +12,51 @@ def _resolve_global_config_path() -> str:
     cands: list[str] = []
 
     # 1) Explicit override by file or dir
-    env_file = os.environ.get("FR_GLOBAL_CONFIG_FILE")
+    env_file = os.environ.get('FR_GLOBAL_CONFIG_FILE')
     if env_file:
         if os.path.isdir(env_file):
-            cands.append(os.path.join(env_file, "config.json"))
+            cands.append(os.path.join(env_file, 'config.json'))
         else:
             cands.append(env_file)
 
-    env_dir = os.environ.get("FR_GLOBAL_CONFIG_DIR")
+    env_dir = os.environ.get('FR_GLOBAL_CONFIG_DIR')
     if env_dir:
-        cands.append(os.path.join(env_dir, "config.json"))
+        cands.append(os.path.join(env_dir, 'config.json'))
 
     # 2) Original network launch root provided by bootstrap
-    orig_root = os.environ.get("FR_ORIGINAL_ROOT")
+    orig_root = os.environ.get('FR_ORIGINAL_ROOT')
     if orig_root:
-        cands.append(os.path.join(orig_root, "shared", "config", "config.json"))
+        cands.append(os.path.join(orig_root, 'shared', 'config', 'config.json'))
 
     # 3) Origin path file written by bootstrap in local cache bin
     try:
-        local_appdata = os.environ.get("LOCALAPPDATA") or ""
-        origin_file = os.path.join(
-            local_appdata,
-            "Clinic Networking, LLC",
-            "FaxRetriever",
-            "2.0",
-            "bin",
-            "origin.path",
-        )
+        local_appdata = os.environ.get('LOCALAPPDATA') or ''
+        origin_file = os.path.join(local_appdata, 'Clinic Networking, LLC', 'FaxRetriever', '2.0', 'bin', 'origin.path')
         if os.path.exists(origin_file):
-            with open(origin_file, "r", encoding="utf-8") as f:
+            with open(origin_file, 'r', encoding='utf-8') as f:
                 origin_root = f.read().strip()
                 if origin_root:
-                    cands.append(
-                        os.path.join(origin_root, "shared", "config", "config.json")
-                    )
+                    cands.append(os.path.join(origin_root, 'shared', 'config', 'config.json'))
     except Exception:
         pass
 
     # 4) Path relative to the running process directory (exe or script)
     try:
         proc_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        cands.append(os.path.join(proc_dir, "shared", "config", "config.json"))
+        cands.append(os.path.join(proc_dir, 'shared', 'config', 'config.json'))
     except Exception:
         pass
 
     # 5) Path relative to project root when running from source (..\.. from src\core)
     try:
         here = os.path.dirname(os.path.abspath(__file__))
-        proj_root = os.path.abspath(os.path.join(here, "..", ".."))
-        cands.append(os.path.join(proj_root, "shared", "config", "config.json"))
+        proj_root = os.path.abspath(os.path.join(here, '..', '..'))
+        cands.append(os.path.join(proj_root, 'shared', 'config', 'config.json'))
     except Exception:
         pass
 
     # 6) Original default relative path (CWD)
-    cands.append(os.path.join("shared", "config", "config.json"))
+    cands.append(os.path.join('shared', 'config', 'config.json'))
 
     # Select the first existing path
     for p in cands:
@@ -78,14 +68,14 @@ def _resolve_global_config_path() -> str:
 
     # If none exist, prefer using the original root (so a new shared config is created there)
     if orig_root:
-        return os.path.join(orig_root, "shared", "config", "config.json")
+        return os.path.join(orig_root, 'shared', 'config', 'config.json')
 
     # Fallback to process-relative path
     try:
-        return os.path.join(proc_dir, "shared", "config", "config.json")  # type: ignore[name-defined]
+        return os.path.join(proc_dir, 'shared', 'config', 'config.json')  # type: ignore[name-defined]
     except Exception:
         # Last resort: current working directory
-        return os.path.join("shared", "config", "config.json")
+        return os.path.join('shared', 'config', 'config.json')
 
 
 GLOBAL_CONFIG_PATH = _resolve_global_config_path()
@@ -95,7 +85,7 @@ LOCAL_CONFIG_PATH = os.path.join(
     "Clinic Networking, LLC",
     "FaxRetriever",
     "2.0",
-    "config.json",
+    "config.json"
 )
 
 

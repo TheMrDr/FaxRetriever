@@ -1,25 +1,23 @@
 import os
-import random
 import tempfile
-
+import random
 import pyinsane2
+
 from PIL import Image
 from PyQt5.QtCore import QObject, pyqtSignal
-
 from core.config_loader import device_config
 
 _PYINSANE_READY = False
-
 
 class ScanWorker(QObject):
     finished = pyqtSignal()
     success = pyqtSignal(list)
     error = pyqtSignal(str)
 
-    def __init__(self, session_number, scanner_name=None, parent=None):
+
+    def __init__(self, session_number, parent=None):
         super().__init__(parent)
         self.session_number = session_number
-        self.scanner_name = scanner_name
 
     def _image_to_pdf(self, img_path: str) -> str | None:
         """
@@ -31,7 +29,6 @@ class ScanWorker(QObject):
         Returns output PDF path or None.
         """
         import os
-
         from PIL import Image
 
         base, _ = os.path.splitext(img_path)
@@ -47,17 +44,15 @@ class ScanWorker(QObject):
             im = Image.open(img_path)
 
             # Normalize to grayscale first
-            if im.mode != "L":
-                im = im.convert("L")
+            if im.mode != 'L':
+                im = im.convert('L')
 
             # Floyd–Steinberg dithering -> 1-bit (visually softer than hard threshold)
-            im = im.convert("1", dither=Image.FLOYDSTEINBERG)
+            im = im.convert('1', dither=Image.FLOYDSTEINBERG)
 
             # Save as CCITT Group 4 TIFF (fax-grade)
             tiff_g4 = base + "_g4.tiff"
-            im.save(
-                tiff_g4, format="TIFF", compression="group4", dpi=(dpi_hint, dpi_hint)
-            )
+            im.save(tiff_g4, format="TIFF", compression="group4", dpi=(dpi_hint, dpi_hint))
         except Exception:
             tiff_g4 = None
 
@@ -66,7 +61,6 @@ class ScanWorker(QObject):
             # 2a) Preferred: img2pdf (preserves CCITT and keeps files tiny)
             try:
                 import img2pdf
-
                 with open(tiff_g4, "rb") as tf, open(out_pdf, "wb") as pf:
                     pf.write(img2pdf.convert(tf, dpi=dpi_hint))
                 # cleanup
@@ -80,9 +74,9 @@ class ScanWorker(QObject):
 
             # 2b) Fallback: ReportLab wrapper
             try:
+                from reportlab.pdfgen import canvas
                 from reportlab.lib.pagesizes import letter
                 from reportlab.lib.utils import ImageReader
-                from reportlab.pdfgen import canvas
 
                 c = canvas.Canvas(out_pdf, pagesize=letter)
                 page_w, page_h = letter
@@ -97,7 +91,7 @@ class ScanWorker(QObject):
                 dw, dh = iw * scale, ih * scale
                 x, y = (page_w - dw) / 2, (page_h - dh) / 2
 
-                c.drawImage(img, x, y, dw, dh, mask="auto")
+                c.drawImage(img, x, y, dw, dh, mask='auto')
                 c.showPage()
                 c.save()
 
@@ -113,16 +107,16 @@ class ScanWorker(QObject):
         # 3) Last resort: compressed JPEG-in-PDF (still small enough)
         try:
             im = Image.open(img_path)
-            if im.mode not in ("L", "RGB"):
-                im = im.convert("L")
+            if im.mode not in ('L', 'RGB'):
+                im = im.convert('L')
 
             jpg_small = base + "_q40.jpg"
-            im.save(jpg_small, format="JPEG", quality=40, optimize=True, subsampling=2)
+            im.save(jpg_small, format='JPEG', quality=40, optimize=True, subsampling=2)
 
             # Write into PDF with ReportLab
+            from reportlab.pdfgen import canvas
             from reportlab.lib.pagesizes import letter
             from reportlab.lib.utils import ImageReader
-            from reportlab.pdfgen import canvas
 
             c = canvas.Canvas(out_pdf, pagesize=letter)
             page_w, page_h = letter
@@ -168,25 +162,15 @@ class ScanWorker(QObject):
                 self.error.emit("No scanner detected.")
                 return
 
-            try:
-                saved_name = device_config.get("Scanner", "preferred_name", "")
-            except Exception:
-                saved_name = ""
-            selected_name = self.scanner_name or saved_name
-
-            scanner = None
-            if selected_name:
-                scanner = next((s for s in devices if s.name == selected_name), None)
-
+            saved_name = device_config.get("Scanner", "preferred_name", "")
+            scanner = next((s for s in devices if s.name == saved_name), None)
             if scanner is None:
                 scanner = devices[0]
-
-            # Persist the chosen scanner for future sessions
-            try:
-                device_config.set("Scanner", "preferred_name", getattr(scanner, "name", ""))
-                device_config.save()
-            except Exception:
-                pass
+                try:
+                    device_config.set("Scanner", "preferred_name", scanner.name)
+                    device_config.save()
+                except Exception:
+                    pass
 
             def set_opt(opt, value):
                 try:
@@ -196,74 +180,49 @@ class ScanWorker(QObject):
                     pass
 
             # Safe defaults
-            set_opt("resolution", 300)
+            set_opt('resolution', 300)
             # Prefer true 1-bit B/W if the device supports it; else Gray
             try:
-                if "mode" in scanner.options:
-                    modes = scanner.options["mode"].constraint
+                if 'mode' in scanner.options:
+                    modes = scanner.options['mode'].constraint
                     pick = next(
-                        (
-                            m
-                            for m in [
-                                "Lineart",
-                                "Black & White",
-                                "BW",
-                                "Binary",
-                                "Mono",
-                                "Gray",
-                                "Grayscale",
-                                "Color",
-                            ]
-                            if m in modes
-                        ),
-                        None,
-                    )
+                        (m for m in ['Lineart', 'Black & White', 'BW', 'Binary', 'Mono', 'Gray', 'Grayscale', 'Color']
+                         if m in modes), None)
                     if pick:
-                        scanner.options["mode"].value = pick
+                        scanner.options['mode'].value = pick
                     else:
-                        set_opt("mode", "Gray")
+                        set_opt('mode', 'Gray')
             except Exception:
-                set_opt("mode", "Gray")
+                set_opt('mode', 'Gray')
 
             # Source selection
             source_val = None
-            if "source" in scanner.options:
+            if 'source' in scanner.options:
                 try:
-                    candidates = scanner.options["source"].constraint
-                    source_val = next(
-                        (
-                            s
-                            for s in ["ADF Duplex", "ADF", "FlatBed"]
-                            if s in candidates
-                        ),
-                        candidates[0],
-                    )
-                    scanner.options["source"].value = source_val
+                    candidates = scanner.options['source'].constraint
+                    source_val = next((s for s in ['ADF Duplex', 'ADF', 'FlatBed'] if s in candidates), candidates[0])
+                    scanner.options['source'].value = source_val
                 except Exception:
                     source_val = None
 
             # Geometry: full width, Letter height at current DPI
             try:
-                dpi = (
-                    scanner.options["resolution"].value
-                    if "resolution" in scanner.options
-                    else 300
-                )
+                dpi = scanner.options['resolution'].value if 'resolution' in scanner.options else 300
             except Exception:
                 dpi = 300
-            if all(o in scanner.options for o in ["tl-x", "tl-y", "br-x", "br-y"]):
+            if all(o in scanner.options for o in ['tl-x', 'tl-y', 'br-x', 'br-y']):
                 try:
-                    set_opt("tl-x", scanner.options["tl-x"].constraint[0])
-                    set_opt("tl-y", scanner.options["tl-y"].constraint[0])
-                    set_opt("br-x", scanner.options["br-x"].constraint[1])
-                    set_opt("br-y", int(11 * dpi))
+                    set_opt('tl-x', scanner.options['tl-x'].constraint[0])
+                    set_opt('tl-y', scanner.options['tl-y'].constraint[0])
+                    set_opt('br-x', scanner.options['br-x'].constraint[1])
+                    set_opt('br-y', int(11 * dpi))
                 except Exception:
                     pass
 
             outputs = []
             base = f"scan_{self.session_number}_{random.randint(1000, 9999)}"
             page_idx = 1
-            max_passes = 1 if (source_val == "FlatBed") else 200  # hard guard
+            max_passes = 1 if (source_val == 'FlatBed') else 200  # hard guard
 
             for _ in range(max_passes):
                 # Start single-page session
@@ -306,11 +265,7 @@ class ScanWorker(QObject):
 
                 # Validate exactly one image
                 try:
-                    images = [
-                        img
-                        for img in getattr(session, "images", [])
-                        if hasattr(img, "save")
-                    ]
+                    images = [img for img in getattr(session, "images", []) if hasattr(img, "save")]
                 except Exception:
                     images = []
 
@@ -320,9 +275,7 @@ class ScanWorker(QObject):
 
                 image = images[0]
                 try:
-                    jpg_path = os.path.join(
-                        tempfile.gettempdir(), f"{base}_p{page_idx:03d}.jpg"
-                    )
+                    jpg_path = os.path.join(tempfile.gettempdir(), f"{base}_p{page_idx:03d}.jpg")
                     image.save(jpg_path, "JPEG")
                     pdf_path = self._image_to_pdf(jpg_path)
                     if pdf_path:
@@ -336,7 +289,7 @@ class ScanWorker(QObject):
                     page_idx += 1
                 except Exception as e:
                     try:
-                        if "jpg_path" in locals() and os.path.exists(jpg_path):
+                        if 'jpg_path' in locals() and os.path.exists(jpg_path):
                             os.remove(jpg_path)
                     except Exception:
                         pass
@@ -353,7 +306,7 @@ class ScanWorker(QObject):
                         pass
 
                 # Flatbed: only one pass
-                if source_val == "FlatBed":
+                if source_val == 'FlatBed':
                     break
 
             if not outputs:
