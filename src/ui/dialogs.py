@@ -26,9 +26,10 @@ class LogViewer(QDialog):
     Displays the contents of the application log in real time.
     """
 
-    def __init__(self, base_dir, parent=None):
+    def __init__(self, base_dir, exe_dir=None, parent=None):
         super().__init__(parent)
         self.base_dir = base_dir
+        self.exe_dir = exe_dir or base_dir
         self.setWindowIcon(QIcon(os.path.join(self.base_dir, "images", "logo.ico")))
         self.setWindowFlags(
             self.windowFlags() & ~Qt.WindowContextHelpButtonHint
@@ -36,7 +37,10 @@ class LogViewer(QDialog):
 
         self.setWindowTitle("System Log Viewer")
         self.setMinimumSize(700, 500)
-        self.log_file = os.path.join(self.base_dir, "log", "ClinicFax.log")
+        # Prefer the log adjacent to the executable; fall back to base_dir
+        preferred = os.path.join(self.exe_dir, "log", "ClinicFax.log")
+        fallback = os.path.join(self.base_dir, "log", "ClinicFax.log")
+        self.log_file = preferred if os.path.exists(preferred) else fallback
 
         self.layout = QVBoxLayout()
         self.log_view = QTextEdit()

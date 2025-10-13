@@ -1,3 +1,27 @@
+# What's new in FaxRetriever 2.3.0
+
+- LibertyRx forwarding: Inbound faxes can be forwarded directly to LibertyRx. Enable in System → Options → Integrations, choose LibertyRx, and enter your Pharmacy NPI (10 digits) and 7‑digit API Key. Vendor authorization is fetched securely and stored encrypted.
+- Drop‑to‑send: You can drop PDFs into the Liberty queue folder to send them on the next poll: %LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\libertyrx_queue. Files are removed automatically after a successful handoff (HTTP 200).
+- Caller ID from filename (optional): If the dropped PDF name starts with 11‑digit CID using CID‑DDMM‑HHMM (or CID‑DDMMYY‑HHMMSS), that CID is used as FromNumber. Otherwise your selected caller ID is used.
+- Keep or purge local copies: When enabling LibertyRx, you can choose whether to keep local copies after a successful Liberty delivery. If you choose No, FaxRetriever purges the local PDF/JPG/TIFF for that fax after a 200 OK from Liberty.
+- Clear delivery visibility: Logs now include LibertyRx actions and results (attempts, success, 401/413 handling). See log\ClinicFax.log.
+- Robust delivery: Automatic retries with exponential backoff; if Liberty returns 413 (file too large), FaxRetriever splits the PDF into pages and delivers them individually.
+- Tip: To obtain your LibertyRx API Key: In Liberty RXQ/PharmacyOne → System → Settings → Utilities → API Keys, click Add to generate a random key. Use this key for Clinic Networking Faxing.
+- Fix: Help → View Log now opens and streams the live rotating log from the app folder next to FaxRetriever.exe (log\ClinicFax.log) instead of a temporary path.
+
+---
+
+# What's new in FaxRetriever 2.2.0
+
+- Critical reliability: FaxRetriever will never automatically re-download a fax that has been downloaded before. We replaced the fragile JSON map with an immutable, append-only ledger of FaxIDs stored on disk with flush+fsync durability. This guarantees that once a fax is recorded as downloaded, it will not be auto-downloaded again across restarts and environments.
+- Dual-location ledger for resilience: The downloaded-fax ledger is written to two stable locations and merged on read: (1) shared\history\downloaded_faxes.log in the app's shared folder, and (2) %LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\history\downloaded_faxes.log per Windows user. On first run, legacy JSON indices are migrated into the new logs and any divergence is synchronized both ways.
+- Receiver integration hardened: The receiver now marks FaxIDs as downloaded in additional paths to close remaining gaps. Specifically, when the local PDF already exists (no new download needed) and when all requested output formats (PDF/JPG/TIFF) are already present and the fax is skipped. These safeguards ensure previously processed faxes are always recorded in the ledger.
+- Backwards compatible APIs: The public history_index API (is_downloaded, mark_downloaded, load_index/save_index) is preserved; no UI changes are required. Manual, user-initiated downloads remain possible even if a fax is in the ledger.
+- Local cleanup parity: Inbox cleanup continues to cover PDF/JPG/TIFF files according to retention settings.
+- Fax History: The Download button on each history card is now a dropdown with PDF, JPG, or TIFF options. JPG saves one file per page (prefix-1.jpg, -2.jpg, ...); TIFF saves a single multi-page .tiff. Manual downloads are recorded in the ledger.
+
+---
+
 # What's new in FaxRetriever 2.1.0
 
 - New: Multi-format download selection. In Options → Fax Retrieval, the PDF/JPG/Both radio buttons were replaced with three checkboxes: PDF, JPG, and TIFF. Users can select any combination. Legacy configurations with "Both" are automatically mapped to PDF + JPG.

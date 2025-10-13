@@ -9,6 +9,8 @@ import jwt
 import requests
 
 from core.config_loader import device_config, global_config
+from core.admin_client import get_liberty_vendor_auth
+from utils.secure_store import secure_encrypt_for_machine, secure_decrypt_for_machine
 from utils.logging_utils import get_logger
 
 log = get_logger("license")
@@ -129,6 +131,86 @@ def retrieve_skyswitch_token(app_state) -> dict:
         ).isoformat()
 
         log.info("SkySwitch bearer token retrieved and applied.")
+
+        # After a successful bearer retrieval, attempt to fetch LibertyRx vendor Basic header
+        try:
+            resp2 = get_liberty_vendor_auth(jwt_token)
+        except Exception as e:
+            resp2 = {"error": str(e)}
+
+        if isinstance(resp2, dict) and not resp2.get("error"):
+            new_b64 = (resp2 or {}).get("basic_b64")
+            if new_b64:
+                try:
+                    old_b64_enc = global_config.get(
+                        "Integrations", "liberty_vendor_basic_b64_enc", ""
+                    )
+                    old_b64 = (
+                        secure_decrypt_for_machine(old_b64_enc) if old_b64_enc else None
+                    )
+                except Exception:
+                    old_b64 = None
+                if new_b64 != old_b64:
+                    try:
+                        enc = secure_encrypt_for_machine(new_b64)
+                        global_config.set(
+                            "Integrations", "liberty_vendor_basic_b64_enc", enc
+                        )
+                        # Clear Liberty 401 retry gate on vendor credential rotation
+                        try:
+                            from integrations.libertyrx_queue import clear_401_gate
+                            clear_401_gate()
+                        except Exception:
+                            pass
+                        global_config.save()
+                        log.info(
+                            "Liberty vendor credential updated (Basic header rotated)."
+                        )
+                    except Exception as e:
+                        log.warning(
+                            f"Failed to persist Liberty vendor header (encrypted): {e}"
+                        )
+        else:
+            # Graceful handling when not configured or unauthorized
+            status = resp2.get("status") if isinstance(resp2, dict) else None
+            try:
+                dev_settings = device_config.get(
+                    "Integrations", "integration_settings", {}
+                ) or {}
+            except Exception:
+                dev_settings = {}
+            try:
+                glob_settings = global_config.get(
+                    "Integrations", "integration_settings", {}
+                ) or {}
+            except Exception:
+                glob_settings = {}
+            software = (
+                dev_settings.get("integration_software")
+                or glob_settings.get("integration_software")
+                or "None"
+            )
+            enabled = (
+                (dev_settings.get("enable_third_party")
+                 or glob_settings.get("enable_third_party")
+                 or "No").strip().lower()
+                == "yes"
+            )
+            if enabled and software == "LibertyRx":
+                if status == 404:
+                    log.warning(
+                        "LibertyRx vendor credentials not configured on FRA; integration is selected."
+                    )
+                elif status == 401:
+                    log.warning(
+                        "LibertyRx vendor header retrieval unauthorized (JWT scope missing or expired)."
+                    )
+                elif isinstance(resp2, dict) and resp2.get("error"):
+                    log.warning(
+                        f"LibertyRx vendor header retrieval failed: {resp2.get('error')}"
+                    )
+            # If LibertyRx not enabled/selected, stay quiet
+
         return data
 
     except Exception as e:

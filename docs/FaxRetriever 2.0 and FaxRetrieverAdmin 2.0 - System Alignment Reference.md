@@ -279,3 +279,56 @@ ToDo: Update function to pull *all* existing fax numbers. Presently, it only pul
 - Develop system-wide “config drift” warning mechanism
 - Lock UI elements based on `active: false` state from FRA response
 - Phase in retriever handoff system (e.g., force release + reassign)
+
+---
+
+## 11. LibertyRx Integration (Inbound Forwarding)
+
+Overview
+- Purpose: Forward inbound faxes retrieved from SkySwitch directly to LibertyRx without traversing FRA servers (HIPAA minimum‑necessary).
+- Location: Entirely client‑side within FaxRetriever; FRA only brokers JWT and the Liberty vendor Basic header (precomputed).
+
+Build target selection
+- The Liberty endpoint is chosen at build time by an in‑code switch in src/integrations/libertyrx_client.py:
+  - env = "prod" → https://api.libertysoftware.com/fax
+  - env = "dev"  → https://devapi.libertysoftware.com/fax
+- The Options dialog displays a hint under the Liberty fields: “This build targets Production/Development.” There is no UI toggle.
+
+Credentials and headers
+- Authorization (vendor): “Basic <base64(vendor_username:vendor_password)>” — obtained by FR via FRA endpoint and stored encrypted (DPAPI) in global config.
+- Customer (pharmacy‑specific): “<base64(NPI:APIKEY)>” — NPI stored plaintext; API key stored encrypted (DPAPI) in device config.
+- Body JSON:
+  {
+    "FromNumber": 18175551212,
+    "ContentType": "application/pdf",
+    "FileData": "<base64 of raw PDF bytes>"
+  }
+
+Runtime flow (Receiver)
+1. FR polls SkySwitch for new inbound faxes (Bearer token from FRA).
+2. On each new fax, FR downloads the PDF and, when LibertyRx is enabled, posts it to Liberty’s /fax endpoint using the headers above.
+3. Responses are handled as follows:
+   - 200 OK: Success; FR logs a concise info message.
+   - 400 Bad Request: Logged and not retried.
+   - 401 Unauthorized: Logged, enqueued for retry with a 401 gate, and an operator toast is shown: “LibertyRx authentication failed. Check NPI/API key or contact support.”
+   - 413 Payload Too Large: FR splits the PDF into single‑page PDFs and posts each as a separate fax. On full success, FR logs an info message and shows a toast: “Fax delivered to LibertyRx in N parts.”
+   - 429/5xx: Enqueued with exponential backoff and jitter; respects Retry‑After when present.
+
+Security and storage
+- FRA never handles fax payloads.
+- At rest on the device: Liberty API key and vendor Basic header are stored as DPAPI‑protected blobs; logs avoid PHI and never print secrets.
+
+Operator experience
+- Options → Integrations → LibertyRx fields (NPI, API Key) with a build‑target hint. Inputs are validated (NPI=10 digits; API Key=7 digits).
+- Non‑modal toasts:
+  - 413 split success → “Fax delivered to LibertyRx in N parts.”
+  - 401 auth failure → “LibertyRx authentication failed. Check NPI/API key or contact support.”
+- Logging level “Info” provides concise outcome summaries.
+
+FRA responsibilities
+- Admin GUI Integrations tab allows storing the vendor Basic header per reseller (computed from username/password). FRA persists only the precomputed base64 value and a rotation timestamp.
+- Device endpoint requires scope liberty:basic.read and returns { basic_b64, rotated_at }.
+
+Testing notes
+- Development builds point to devapi.libertysoftware.com; release builds default to api.libertysoftware.com.
+- Unit tests exist for header encoding and environment selection; queue/backoff logic is unit tested separately.

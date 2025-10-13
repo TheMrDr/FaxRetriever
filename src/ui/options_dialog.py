@@ -15,13 +15,14 @@ from PyQt5.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog,
                              QGroupBox, QHBoxLayout, QInputDialog, QLabel,
                              QLineEdit, QListWidget, QListWidgetItem,
                              QMessageBox, QPushButton, QRadioButton, QSpinBox,
-                             QVBoxLayout, QWidget)
+                             QVBoxLayout, QWidget, QSizePolicy)
 
 from core.config_loader import device_config, global_config
 from core.license_client import initialize_session, retrieve_skyswitch_token
 from integrations.computer_rx import CRxIntegration2
 from ui.busy import BusyDialog
 from utils.logging_utils import get_logger, set_global_logging_level
+from utils.secure_store import secure_encrypt_for_machine
 
 SAFETY_BUFFER_MINUTES = 5
 
@@ -64,8 +65,11 @@ class OptionsDialog(QDialog):
         self.setWindowTitle("Options")
         self.base_dir = base_dir
         self.setWindowIcon(QIcon(os.path.join(self.base_dir, "images", "logo.ico")))
-        self.setFixedSize(900, 450)
         self.setModal(True)
+        # Make dialog resizable and DPI-friendly
+        self.setSizeGripEnabled(True)
+        self.setMinimumSize(700, 420)
+        self.resize(900, 500)
 
         self.log = get_logger("options_dialog")
         self.app_state = app_state
@@ -78,9 +82,11 @@ class OptionsDialog(QDialog):
         layout.addLayout(self._build_header())
 
         content = QHBoxLayout()
-        content.addWidget(self._build_left_column(), 1)
-        content.addWidget(self._build_right_column(), 1)
-        layout.addLayout(content)
+        left_col = self._build_left_column()
+        right_col = self._build_right_column()
+        content.addWidget(left_col, 1)
+        content.addWidget(right_col, 2)  # Enforce 1:2 ratio (left:right)
+        layout.addLayout(content, 1)  # Let main content take vertical stretch
 
         layout.addLayout(self._build_buttons())
 
@@ -89,19 +95,43 @@ class OptionsDialog(QDialog):
     def _build_header(self):
         header = QVBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(2)
         title = QLabel("<b style='font-size: 16pt'>FaxRetriever</b>")
         subtitle = QLabel(
             "<b style='font-size: 10pt'>developed by Clinic Networking, LLC</b>"
         )
         title.setAlignment(Qt.AlignCenter)
         subtitle.setAlignment(Qt.AlignCenter)
+        # Lock the title and subtitle heights so they don't change
+        try:
+            from PyQt5.QtWidgets import QSizePolicy as _QSP
+            title.setSizePolicy(_QSP.Preferred, _QSP.Fixed)
+            subtitle.setSizePolicy(_QSP.Preferred, _QSP.Fixed)
+        except Exception:
+            pass
+        try:
+            th = title.sizeHint().height()
+            sh = subtitle.sizeHint().height()
+            title.setMinimumHeight(th)
+            title.setMaximumHeight(th)
+            subtitle.setMinimumHeight(sh)
+            subtitle.setMaximumHeight(sh)
+        except Exception:
+            # Fallback: at least prevent vertical growth
+            try:
+                title.setMaximumHeight(28)
+                subtitle.setMaximumHeight(22)
+            except Exception:
+                pass
         header.addWidget(title)
         header.addWidget(subtitle)
         return header
 
     def _build_left_column(self):
         left = QVBoxLayout()
+        left.setSpacing(8)
         left.addWidget(self._retrieval_group())
+        left.addStretch(1)
         return self._wrap_group(left)
 
     def _build_right_column(self):
@@ -110,11 +140,17 @@ class OptionsDialog(QDialog):
         right.addWidget(self._logging_section())
         right.addWidget(self._integrations_section())
         right.addWidget(self._account_section())
+        right.addStretch(1)
         return self._wrap_group(right)
 
     def _wrap_group(self, layout):
         wrapper = QWidget()
         wrapper.setLayout(layout)
+        # Prevent vertical over-expansion of grouped sections; allow horizontal growth
+        try:
+            wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        except Exception:
+            pass
         return wrapper
 
     def _build_buttons(self):
@@ -132,6 +168,7 @@ class OptionsDialog(QDialog):
         group = QGroupBox("Fax Retrieval Settings")
         layout = QVBoxLayout()
         layout.setSpacing(8)
+        layout.setContentsMargins(8, 8, 8, 8)
 
         polling_row = QHBoxLayout()
         polling_row.addWidget(QLabel("Polling Frequency (minutes):"))
@@ -260,6 +297,8 @@ class OptionsDialog(QDialog):
     def _logging_section(self):
         group = QGroupBox("Logging")
         layout = QVBoxLayout()
+        layout.setSpacing(8)
+        layout.setContentsMargins(8, 8, 8, 8)
         self.logging_combo = QComboBox()
         self.logging_combo.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
         self.logging_combo.setCurrentText(
@@ -272,6 +311,8 @@ class OptionsDialog(QDialog):
     def _integrations_section(self):
         group = QGroupBox("Integrations")
         layout = QVBoxLayout()
+        layout.setSpacing(8)
+        layout.setContentsMargins(8, 8, 8, 8)
         # Prefer device-level settings; fallback to global
         dev_settings = self.app_state.device_cfg.integration_settings or {}
         glob_settings = self.app_state.global_cfg.integration_settings or {}
@@ -285,7 +326,7 @@ class OptionsDialog(QDialog):
 
         # Software selector
         self.integration_combo = QComboBox()
-        self.integration_combo.addItems(["None", "Computer-Rx"])
+        self.integration_combo.addItems(["None", "Computer-Rx", "LibertyRx"])
         self.integration_combo.setCurrentText(
             settings.get("integration_software", "") or "None"
         )
@@ -314,14 +355,57 @@ class OptionsDialog(QDialog):
         path_row.addWidget(browse_btn)
         layout.addLayout(path_row)
 
+        # LibertyRx form section (visible only when LibertyRx is selected)
+        self.liberty_container = QWidget()
+        lib_form = QFormLayout(self.liberty_container)
+        lib_form.setLabelAlignment(Qt.AlignRight)
+        lib_form.setFormAlignment(Qt.AlignTop)
+        try:
+            lib_form.setVerticalSpacing(6)
+        except Exception:
+            pass
+        # Load persisted NPI (plaintext OK)
+        saved_npi = device_config.get("Integrations", "liberty_npi", "") or ""
+        self.liberty_npi_input = QLineEdit(str(saved_npi))
+        self.liberty_npi_input.setPlaceholderText("10-digit NPI")
+        self.liberty_npi_input.setMaxLength(10)
+        self.liberty_npi_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # API key input (do not prefill; keep masked)
+        self.liberty_api_key_input = QLineEdit("")
+        self.liberty_api_key_input.setPlaceholderText("7-digit API Key")
+        self.liberty_api_key_input.setEchoMode(QLineEdit.Password)
+        self.liberty_api_key_input.setMaxLength(7)
+        self.liberty_api_key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        try:
+            from integrations.libertyrx_client import env as _lib_env
+            _target = "Production" if (_lib_env or "").lower().startswith("prod") else "Development"
+            _note = f"This build targets {_target}. Endpoint selection is automatic for this build."
+        except Exception:
+            _note = "Endpoint selection is automatic for this build."
+        self.liberty_note_label = QLabel(_note)
+        self.liberty_note_label.setObjectName("hint")
+        lib_form.addRow("Pharmacy NPI:", self.liberty_npi_input)
+        lib_form.addRow("Pharmacy API Key:", self.liberty_api_key_input)
+        lib_form.addRow(self.liberty_note_label)
+        layout.addWidget(self.liberty_container)
+
         def toggle_visibility():
             enabled = self.integration_checkbox.isChecked()
             software = self.integration_combo.currentText()
-            show = enabled and software == "Computer-Rx"
+            show_crx = enabled and software == "Computer-Rx"
+            show_lib = enabled and software == "LibertyRx"
             for i in range(path_row.count()):
                 w = path_row.itemAt(i).widget()
                 if w:
-                    w.setVisible(show)
+                    w.setVisible(show_crx)
+            # Toggle Liberty container visibility as a block
+            if hasattr(self, "liberty_container"):
+                self.liberty_container.setVisible(show_lib)
+            # Adjust dialog size to fit newly visible/hidden widgets
+            try:
+                self.adjustSize()
+            except Exception:
+                pass
 
         self.integration_checkbox.toggled.connect(lambda _: toggle_visibility())
         self.integration_combo.currentTextChanged.connect(lambda _: toggle_visibility())
@@ -334,6 +418,8 @@ class OptionsDialog(QDialog):
         group = QGroupBox("Account")
         group.setObjectName("accountGroup")
         layout = QFormLayout()
+        layout.setVerticalSpacing(8)
+        layout.setContentsMargins(8, 8, 8, 8)
         self.client_domain_input = QLineEdit(self.app_state.global_cfg.fax_user or "")
         self.client_domain_input.setPlaceholderText("100@sample.12345.service")
         self.auth_token_input = QLineEdit()
@@ -622,6 +708,15 @@ class OptionsDialog(QDialog):
             )
             minutes = int(self.polling_frequency_spinbox.value())
 
+            # Capture previous integration state to detect toggling Liberty on
+            try:
+                prev_dev = self.app_state.device_cfg.integration_settings or {}
+                prev_glob = self.app_state.global_cfg.integration_settings or {}
+                prev_enabled = ((prev_dev.get("enable_third_party") or prev_glob.get("enable_third_party") or "No").strip().lower() == "yes")
+                prev_sw = (prev_dev.get("integration_software") or prev_glob.get("integration_software") or "None").strip()
+            except Exception:
+                prev_enabled, prev_sw = False, "None"
+
             if not client_domain or not formatted_token:
                 QMessageBox.warning(
                     self,
@@ -709,6 +804,61 @@ class OptionsDialog(QDialog):
                 "Fax Options", "archive_duration", self.retention_input.currentText()
             )
 
+            # --- Integrations: LibertyRx persistence & validation ---
+            try:
+                enabled_integrations = self.integration_checkbox.isChecked()
+                selected_sw = self.integration_combo.currentText()
+            except Exception:
+                enabled_integrations = False
+                selected_sw = "None"
+            if enabled_integrations and selected_sw == "LibertyRx":
+                # On first enable of LibertyRx, ask if user wants to keep local copies
+                try:
+                    if not (prev_enabled and prev_sw == "LibertyRx"):
+                        resp = QMessageBox.question(
+                            self,
+                            "LibertyRx: Keep Local Copies?",
+                            (
+                                "LibertyRx integration is now enabled.\n\n"
+                                "Do you want to keep a local copy of received faxes on this computer after\n"
+                                "they are successfully delivered to LibertyRx?"
+                            ),
+                            QMessageBox.Yes | QMessageBox.No,
+                        )
+                        keep = (resp == QMessageBox.Yes)
+                        device_config.set("Integrations", "liberty_keep_local_copy", "Yes" if keep else "No")
+                    else:
+                        # Ensure a default exists
+                        cur = (device_config.get("Integrations", "liberty_keep_local_copy", "") or "").strip()
+                        if cur.lower() not in ("yes", "no"):
+                            device_config.set("Integrations", "liberty_keep_local_copy", "Yes")
+                except Exception:
+                    # Non-fatal prompt failure; default to keeping local copies
+                    try:
+                        device_config.set("Integrations", "liberty_keep_local_copy", "Yes")
+                    except Exception:
+                        pass
+
+                # Read inputs
+                npi = (self.liberty_npi_input.text() if hasattr(self, "liberty_npi_input") else "").strip()
+                api_key = (self.liberty_api_key_input.text() if hasattr(self, "liberty_api_key_input") else "").strip()
+                # Validate
+                if not (npi.isdigit() and len(npi) == 10):
+                    QMessageBox.warning(self, "Validation", "NPI must be 10 digits.")
+                    return
+                if not (api_key.isdigit() and len(api_key) == 7):
+                    QMessageBox.warning(self, "Validation", "API Key must be 7 digits.")
+                    return
+                # Persist (NPI plaintext; API key encrypted at rest)
+                device_config.set("Integrations", "liberty_npi", npi)
+                try:
+                    enc_key = secure_encrypt_for_machine(api_key)
+                except Exception:
+                    # If encryption fails, do not store plaintext; surface error
+                    QMessageBox.warning(self, "Encryption Error", "Failed to protect the API Key on this device.")
+                    return
+                device_config.set("Integrations", "liberty_api_key_enc", enc_key)
+
             global_config.save()
             device_config.save()
 
@@ -763,6 +913,30 @@ class OptionsDialog(QDialog):
                         f"Failed to retrieve bearer token: {bearer_result['error']}",
                     )
                     return
+
+            # --- LibertyRx: ensure vendor header via FRA when enabled ---
+            try:
+                if enabled_integrations and selected_sw == "LibertyRx":
+                    from integrations.libertyrx_client import fetch_and_cache_vendor_basic
+                    with BusyDialog(self, "Enabling LibertyRx…"):
+                        _res = fetch_and_cache_vendor_basic(self.app_state)
+                    if _res.get("error"):
+                        self.log.warning(f"LibertyRx enable/header fetch failed: {_res.get('error')}")
+                        QMessageBox.warning(
+                            self,
+                            "LibertyRx",
+                            "LibertyRx was enabled, but retrieving the vendor credentials failed.\n"
+                            "The Admin may need to configure vendor credentials for your reseller, or try again later.",
+                        )
+                    else:
+                        # Success path: vendor header cached
+                        try:
+                            self.log.info("LibertyRx: vendor header retrieved and cached.")
+                        except Exception:
+                            pass
+            except Exception:
+                # Non-fatal
+                pass
 
             # 5) Finalize persisted state
             global_config.set("Account", "validation_status", True)

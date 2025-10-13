@@ -18,9 +18,9 @@
       <excludeFolder url="file://$MODULE_DIR$/Testing Apps" />
       <excludeFolder url="file://$MODULE_DIR$/Testing Data" />
       <excludeFolder url="file://$MODULE_DIR$/shared" />
-      <excludeFolder url="file://$MODULE_DIR$/Admin" />
       <excludeFolder url="file://$MODULE_DIR$/build" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/Code Archive/licensing_server.old" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.11 (FaxRetriever) - 32bit" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

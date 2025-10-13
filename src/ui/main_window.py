@@ -106,7 +106,7 @@ class MainWindow(QMainWindow):
         self.options_dialog = OptionsDialog(self.base_dir, self.app_state)
         self.about_dialog = AboutDialog(self.base_dir)
         self.whats_new_dialog = WhatsNewDialog(self.base_dir)
-        self.log_dialog = LogViewer(self.base_dir)
+        self.log_dialog = LogViewer(self.base_dir, self.exe_dir)
         self.address_book_model = AddressBookManager(self.exe_dir)
 
         self._setup_ui()

@@ -274,12 +274,19 @@ class FaxHistoryPanel(QWidget):
             pass
 
     def _download_pdf(self, entry: dict):
+        # Backward-compatible wrapper for old callers
+        self._download_fax(entry, "PDF")
+
+    def _download_fax(self, entry: dict, fmt: str):
         try:
+            fmt = (fmt or "PDF").strip().upper()
             url = entry.get("pdf")
             if not url:
                 QMessageBox.information(self, "Download", "No PDF URL available.")
                 return
             from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
+            import tempfile
+            from utils.history_index import mark_downloaded
 
             if not hasattr(self, "_net_mgr_dw"):
                 self._net_mgr_dw = QNetworkAccessManager(self)
@@ -293,40 +300,124 @@ class FaxHistoryPanel(QWidget):
                 try:
                     if reply.error() == 0:
                         data = reply.readAll().data()
-                        # Ask user where to save the file
-                        fax_id = str(entry.get("id") or "fax")
-                        default_name = f"{fax_id}.pdf"
-                        path, _ = QFileDialog.getSaveFileName(
-                            self,
-                            "Save Fax PDF",
-                            default_name,
-                            "PDF Files (*.pdf);;All Files (*.*)",
-                        )
-                        if not path:
-                            # User canceled
-                            return
-                        # Ensure .pdf extension
-                        if not path.lower().endswith(".pdf"):
-                            path = f"{path}.pdf"
-                        # Write file
-                        try:
-                            os.makedirs(os.path.dirname(path), exist_ok=True)
-                        except Exception:
-                            pass
-                        with open(path, "wb") as f:
-                            f.write(data)
-                        # Mark as downloaded in local index
-                        try:
-                            from utils.history_index import mark_downloaded
-
-                            mark_downloaded(self.base_dir, fax_id)
-                        except Exception:
-                            pass
-                        QMessageBox.information(self, "Download", f"Saved to:\n{path}")
-                        try:
-                            self.request_refresh()
-                        except Exception:
-                            pass
+                        fax_id = str(entry.get("id") or entry.get("fax_id") or entry.get("uuid") or "fax")
+                        # Handle based on requested format
+                        if fmt == "PDF":
+                            default_name = f"{fax_id}.pdf"
+                            path, _ = QFileDialog.getSaveFileName(
+                                self,
+                                "Save Fax PDF",
+                                default_name,
+                                "PDF Files (*.pdf);;All Files (*.*)",
+                            )
+                            if not path:
+                                return
+                            if not path.lower().endswith(".pdf"):
+                                path = f"{path}.pdf"
+                            try:
+                                os.makedirs(os.path.dirname(path), exist_ok=True)
+                            except Exception:
+                                pass
+                            with open(path, "wb") as f:
+                                f.write(data)
+                            try:
+                                mark_downloaded(self.base_dir, fax_id)
+                            except Exception:
+                                pass
+                            QMessageBox.information(self, "Download", f"Saved to:\n{path}")
+                            try:
+                                self.request_refresh()
+                            except Exception:
+                                pass
+                        else:
+                            # Write to temporary PDF first, then convert
+                            tmp_dir = tempfile.mkdtemp(prefix="fr_dl_")
+                            tmp_pdf = os.path.join(tmp_dir, f"{fax_id}.pdf")
+                            with open(tmp_pdf, "wb") as f:
+                                f.write(data)
+                            if fmt == "JPG":
+                                # Ask user for a base filename (prefix), we will save as prefix-1.jpg, ...
+                                default_name = f"{fax_id}.jpg"
+                                prefix_path, _ = QFileDialog.getSaveFileName(
+                                    self,
+                                    "Save Fax as JPG(s)",
+                                    default_name,
+                                    "JPEG Images (*.jpg);;All Files (*.*)",
+                                )
+                                if not prefix_path:
+                                    return
+                                # Remove extension to get prefix
+                                if prefix_path.lower().endswith(".jpg") or prefix_path.lower().endswith(".jpeg"):
+                                    prefix_path = os.path.splitext(prefix_path)[0]
+                                out_dir = os.path.dirname(prefix_path) or os.getcwd()
+                                try:
+                                    os.makedirs(out_dir, exist_ok=True)
+                                except Exception:
+                                    pass
+                                # Lazy import to avoid heavy top-level import
+                                try:
+                                    from fax_io.receiver import convert_pdf_to_jpg
+                                except Exception:
+                                    convert_pdf_to_jpg = None
+                                if convert_pdf_to_jpg is None:
+                                    QMessageBox.warning(self, "Download", "JPG conversion not available.")
+                                    return
+                                jpgs = convert_pdf_to_jpg(tmp_pdf, prefix_path, self.base_dir)
+                                if not jpgs:
+                                    QMessageBox.warning(self, "Download", "Failed to create JPG images.")
+                                    return
+                                try:
+                                    mark_downloaded(self.base_dir, fax_id)
+                                except Exception:
+                                    pass
+                                QMessageBox.information(
+                                    self,
+                                    "Download",
+                                    f"Saved {len(jpgs)} JPG file(s).\nFirst file:\n{jpgs[0]}",
+                                )
+                                try:
+                                    self.request_refresh()
+                                except Exception:
+                                    pass
+                            elif fmt == "TIFF":
+                                # Ask user for a single TIFF file path
+                                default_name = f"{fax_id}.tiff"
+                                tiff_path, _ = QFileDialog.getSaveFileName(
+                                    self,
+                                    "Save Fax as TIFF",
+                                    default_name,
+                                    "TIFF Images (*.tiff *.tif);;All Files (*.*)",
+                                )
+                                if not tiff_path:
+                                    return
+                                if not (tiff_path.lower().endswith(".tiff") or tiff_path.lower().endswith(".tif")):
+                                    tiff_path = f"{tiff_path}.tiff"
+                                try:
+                                    os.makedirs(os.path.dirname(tiff_path), exist_ok=True)
+                                except Exception:
+                                    pass
+                                try:
+                                    from fax_io.receiver import convert_pdf_to_multipage_tiff
+                                except Exception:
+                                    convert_pdf_to_multipage_tiff = None
+                                if convert_pdf_to_multipage_tiff is None:
+                                    QMessageBox.warning(self, "Download", "TIFF conversion not available.")
+                                    return
+                                ok = convert_pdf_to_multipage_tiff(tmp_pdf, tiff_path, dpi=200)
+                                if not ok:
+                                    QMessageBox.warning(self, "Download", "Failed to create TIFF file.")
+                                    return
+                                try:
+                                    mark_downloaded(self.base_dir, fax_id)
+                                except Exception:
+                                    pass
+                                QMessageBox.information(self, "Download", f"Saved to:\n{tiff_path}")
+                                try:
+                                    self.request_refresh()
+                                except Exception:
+                                    pass
+                            else:
+                                QMessageBox.information(self, "Download", f"Unsupported format: {fmt}")
                     else:
                         QMessageBox.warning(
                             self, "Download", f"Failed with error: {reply.error()} "

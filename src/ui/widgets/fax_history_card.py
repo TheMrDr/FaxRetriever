@@ -2,7 +2,7 @@ import os
 from typing import Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QToolButton, QMenu
 
 from core.address_book import AddressBookManager
 from .pdf_viewer_dialog import open_pdf_viewer
@@ -193,11 +193,21 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     btn_view.clicked.connect(lambda _, ent=entry, p=pdf_path: open_pdf_viewer(panel, ent, p, panel.app_state, panel.base_dir, panel.exe_dir))
     actions_col.addWidget(btn_view)
 
-    btn_dl = QPushButton("Download PDF")
-    btn_dl.setEnabled(available)
-    btn_dl.setToolTip("Choose a location to save the fax PDF")
-    btn_dl.clicked.connect(lambda _, ent=entry: panel._download_pdf(ent))
-    actions_col.addWidget(btn_dl)
+    # Download dropdown
+    dl_btn = QToolButton()
+    dl_btn.setText("Download")
+    dl_btn.setEnabled(available)
+    dl_btn.setToolTip("Download fax in selected format")
+    menu = QMenu(dl_btn)
+    act_pdf = menu.addAction("PDF")
+    act_jpg = menu.addAction("JPG")
+    act_tiff = menu.addAction("TIFF")
+    act_pdf.triggered.connect(lambda _=False, ent=entry: panel._download_fax(ent, "PDF"))
+    act_jpg.triggered.connect(lambda _=False, ent=entry: panel._download_fax(ent, "JPG"))
+    act_tiff.triggered.connect(lambda _=False, ent=entry: panel._download_fax(ent, "TIFF"))
+    dl_btn.setMenu(menu)
+    dl_btn.setPopupMode(QToolButton.MenuButtonPopup)
+    actions_col.addWidget(dl_btn)
 
     if direction == "outbound" and entry.get("confirmation"):
         btn_conf_view = QPushButton("View Confirmation")

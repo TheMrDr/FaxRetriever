@@ -18,6 +18,8 @@ FRA_BASE_URL = os.environ.get(
 ASSIGNMENTS_LIST_URL = f"{FRA_BASE_URL}/assignments.list"
 ASSIGNMENTS_REQUEST_URL = f"{FRA_BASE_URL}/assignments.request"
 ASSIGNMENTS_UNREGISTER_URL = f"{FRA_BASE_URL}/assignments.unregister"
+# LibertyRx vendor basic endpoint (device-read)
+LIBERTY_VENDOR_BASIC_GET_URL = f"{FRA_BASE_URL}/integrations/libertyrx/vendor_basic.get"
 
 
 def _headers_with_jwt(jwt_token: str) -> Dict[str, str]:
@@ -93,4 +95,32 @@ def unregister_assignments(
         return resp.json()
     except Exception as e:
         log.exception("assignments.unregister failed")
+        return {"error": str(e)}
+
+
+
+def get_liberty_vendor_auth(jwt_token: str) -> Dict[str, Any]:
+    """Fetch LibertyRx vendor Basic header (base64) for this device's reseller.
+
+    Calls device endpoint /integrations/libertyrx/vendor_basic.get with the
+    provided JWT. Returns the server JSON (e.g., {"basic_b64": "...", "rotated_at": "..."})
+    or {"error": str, "status": int} on failure.
+    """
+    try:
+        resp = requests.get(
+            LIBERTY_VENDOR_BASIC_GET_URL, headers=_headers_with_jwt(jwt_token), timeout=10
+        )
+        if resp.status_code != 200:
+            try:
+                detail = resp.json().get("detail")
+            except Exception:
+                detail = None
+            return {"error": detail or f"HTTP {resp.status_code}", "status": resp.status_code}
+        data = resp.json() or {}
+        return data
+    except Exception as e:
+        try:
+            log.exception("libertyrx vendor_basic.get failed")
+        except Exception:
+            pass
         return {"error": str(e)}

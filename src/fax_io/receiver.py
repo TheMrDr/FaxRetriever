@@ -21,6 +21,10 @@ from PIL import Image
 from core.app_state import app_state
 from utils.history_index import is_downloaded
 from utils.logging_utils import get_logger
+from core.config_loader import device_config, global_config
+from utils.secure_store import secure_decrypt_for_machine
+from integrations.libertyrx_client import liberty_base_url, encode_customer, send_fax
+from utils.pdf_utils import split_pdf_pages
 import threading
 
 # Module-level lock to ensure only one receiver run at a time within the process
@@ -255,6 +259,13 @@ class FaxReceiver(QThread):
                 retention_days = 365
             cutoff_dt = datetime.now(timezone.utc) - timedelta(days=retention_days)
 
+            # Before processing new list, also process due LibertyRx queue jobs (bounded)
+            try:
+                from integrations.libertyrx_queue import process_due_jobs as _lz_process
+                _lz_process(max_jobs=5)
+            except Exception:
+                pass
+
             processed = 0
             for fax in all_faxes:
                 try:
@@ -310,9 +321,31 @@ class FaxReceiver(QThread):
                     need_pdf = ("PDF" in selected_formats) or should_print
                     need_jpg = ("JPG" in selected_formats)
                     need_tiff = ("TIFF" in selected_formats)
+
+                    # Hardened: if the PDF already exists locally, make sure the history ledger includes this FaxID
+                    # so we will never attempt to auto-download it in the future even if formats or settings change.
+                    if already_have_pdf:
+                        try:
+                            from utils.history_index import mark_downloaded
+                            mark_downloaded(self.base_dir, str(fax_id))
+                        except Exception:
+                            try:
+                                self.log.debug("Failed to mark downloaded for existing PDF", exc_info=True)
+                            except Exception:
+                                pass
+
+                    # If all requested outputs are already present, mark as downloaded and skip work.
                     if ((not need_pdf or already_have_pdf) and
                         (not need_jpg or existing_jpgs) and
                         (not need_tiff or os.path.exists(tiff_path))):
+                        try:
+                            from utils.history_index import mark_downloaded
+                            mark_downloaded(self.base_dir, str(fax_id))
+                        except Exception:
+                            try:
+                                self.log.debug("Failed to mark downloaded in skip path", exc_info=True)
+                            except Exception:
+                                pass
                         continue
 
                     # Download PDF if needed (conversion requires PDF)
@@ -333,15 +366,183 @@ class FaxReceiver(QThread):
                         except Exception:
                             pass
 
+                    # --- LibertyRx forwarding (if enabled) ---
+                    liberty_delivered_ok = False
+                    try:
+                        dev_settings = getattr(app_state.device_cfg, "integration_settings", {}) or {}
+                        glob_settings = getattr(app_state.global_cfg, "integration_settings", {}) or {}
+                        enabled = (
+                            (dev_settings.get("enable_third_party") or glob_settings.get("enable_third_party") or "No").strip().lower()
+                            == "yes"
+                        )
+                        software = (
+                            dev_settings.get("integration_software")
+                            or glob_settings.get("integration_software")
+                            or "None"
+                        ).strip()
+
+                        if enabled and software == "LibertyRx":
+                            npi = (device_config.get("Integrations", "liberty_npi", "") or "").strip()
+                            api_key_enc = device_config.get("Integrations", "liberty_api_key_enc", "") or ""
+                            vendor_b64_enc = global_config.get(
+                                "Integrations", "liberty_vendor_basic_b64_enc", ""
+                            ) or ""
+
+                            api_key = (
+                                secure_decrypt_for_machine(api_key_enc) if api_key_enc else None
+                            )
+                            vendor_basic_b64 = (
+                                secure_decrypt_for_machine(vendor_b64_enc) if vendor_b64_enc else None
+                            )
+
+                            if npi and api_key and vendor_basic_b64:
+                                # Read PDF into memory
+                                try:
+                                    with open(pdf_path, "rb") as _f:
+                                        _pdf_bytes = _f.read()
+                                except Exception:
+                                    _pdf_bytes = b""
+                                if _pdf_bytes:
+                                    _customer_b64 = encode_customer(npi, api_key)
+                                    _endpoint = liberty_base_url()
+                                    try:
+                                        _size_kb = int(len(_pdf_bytes) / 1024)
+                                        self.log.info(f"LibertyRx: attempting delivery for fax {fax_id} size_kb={_size_kb} from={caller_id or ''}")
+                                    except Exception:
+                                        pass
+                                    _res = send_fax(
+                                        _endpoint,
+                                        vendor_basic_b64,
+                                        _customer_b64,
+                                        caller_id or "",
+                                        _pdf_bytes,
+                                    )
+                                    if _res.get("ok"):
+                                        liberty_delivered_ok = True
+                                        try:
+                                            self.log.info("LibertyRx: delivered successfully.")
+                                        except Exception:
+                                            pass
+                                    else:
+                                        _status = _res.get("status")
+                                        try:
+                                            if _status:
+                                                self.log.warning(f"LibertyRx: initial delivery failed with status {_status}")
+                                            else:
+                                                self.log.warning("LibertyRx: initial delivery failed (no status)")
+                                        except Exception:
+                                            pass
+                                        if _status == 413:
+                                            # Split into single pages and resend each immediately
+                                            try:
+                                                self.log.info("LibertyRx: received 413 — attempting page-split delivery…")
+                                            except Exception:
+                                                pass
+                                            _parts = split_pdf_pages(_pdf_bytes)
+                                            if _parts:
+                                                _all_ok = True
+                                                _fail_idx = 0
+                                                _fail_status = None
+                                                for _i, _part in enumerate(_parts, start=1):
+                                                    _r2 = send_fax(
+                                                        _endpoint,
+                                                        vendor_basic_b64,
+                                                        _customer_b64,
+                                                        caller_id or "",
+                                                        _part,
+                                                    )
+                                                    if not _r2.get("ok"):
+                                                        _all_ok = False
+                                                        _fail_idx = _i
+                                                        _fail_status = _r2.get("status")
+                                                        break
+                                                if _all_ok:
+                                                    liberty_delivered_ok = True
+                                                    try:
+                                                        self.log.info(
+                                                            f"LibertyRx: delivered as {len(_parts)} parts due to size."
+                                                        )
+                                                    except Exception:
+                                                        pass
+                                                    # Operator toast (non-modal)
+                                                    try:
+                                                        notif_enabled = (
+                                                            str(getattr(app_state.device_cfg, "notifications_enabled", "Yes") or "Yes").strip().lower() == "yes"
+                                                        )
+                                                        if notif_enabled:
+                                                            self._notify_toast(1, f"Fax delivered to LibertyRx in {len(_parts)} parts.")
+                                                    except Exception:
+                                                        pass
+                                                else:
+                                                    # Enqueue for retry if split failed
+                                                    try:
+                                                        from integrations.libertyrx_queue import enqueue as _lz_enqueue
+                                                        _ = _lz_enqueue(str(fax_id), caller_id or "", _pdf_bytes, _endpoint)
+                                                    except Exception:
+                                                        pass
+                                                    try:
+                                                        self.log.warning(
+                                                            f"LibertyRx: split delivery failed on part {_fail_idx} with status {_fail_status} — queued for retry"
+                                                        )
+                                                    except Exception:
+                                                        pass
+                                            else:
+                                                # No parts created; queue original
+                                                try:
+                                                    from integrations.libertyrx_queue import enqueue as _lz_enqueue
+                                                    _ = _lz_enqueue(str(fax_id), caller_id or "", _pdf_bytes, _endpoint)
+                                                except Exception:
+                                                    pass
+                                                try:
+                                                    self.log.warning(
+                                                        "LibertyRx: 413 received and page splitting failed — queued for retry."
+                                                    )
+                                                except Exception:
+                                                    pass
+                                        else:
+                                            # For 400: stop and log; For 401/429/5xx: enqueue with backoff
+                                            try:
+                                                if _status == 400:
+                                                    self.log.warning("LibertyRx delivery failed with status 400 — not retrying.")
+                                                elif _status == 401:
+                                                    from integrations.libertyrx_queue import enqueue as _lz_enqueue
+                                                    _ = _lz_enqueue(str(fax_id), caller_id or "", _pdf_bytes, _endpoint)
+                                                    self.log.info("LibertyRx delivery failed with status 401 — queued for retry.")
+                                                    try:
+                                                        notif_enabled = (str(getattr(app_state.device_cfg, "notifications_enabled", "Yes") or "Yes").strip().lower() == "yes")
+                                                        if notif_enabled:
+                                                            self._notify_toast(1, "LibertyRx authentication failed. Check NPI/API key or contact support.")
+                                                    except Exception:
+                                                        pass
+                                                else:
+                                                    from integrations.libertyrx_queue import enqueue as _lz_enqueue
+                                                    _ = _lz_enqueue(str(fax_id), caller_id or "", _pdf_bytes, _endpoint)
+                                                    self.log.info(
+                                                        f"LibertyRx delivery failed with status {_status or 'n/a'} — queued for retry."
+                                                    )
+                                            except Exception:
+                                                pass
+                            else:
+                                # Missing NPI/API key or vendor header; log at debug level
+                                try:
+                                    self.log.debug("LibertyRx enabled but missing NPI/API key or vendor header — skipping delivery.")
+                                except Exception:
+                                    pass
+                    except Exception:
+                        try:
+                            self.log.debug("LibertyRx forwarding block failed", exc_info=True)
+                        except Exception:
+                            pass
+
                     # Convert as requested
                     if "JPG" in selected_formats:
                         jpgs = convert_pdf_to_jpg(pdf_path, jpg_prefix, self.base_dir)
                         if not jpgs:
-                            self.log.error(f"JPG conversion failed for {pdf_path}")
+                            self.log.error("JPG conversion failed for one fax PDF")
                     if "TIFF" in selected_formats:
                         tiff_ok = convert_pdf_to_multipage_tiff(pdf_path, tiff_path, dpi=200)
                         if not tiff_ok:
-                            self.log.error(f"TIFF conversion failed for {pdf_path}")
+                            self.log.error("TIFF conversion failed for one fax PDF")
 
                     # If PDF is not requested and not needed for printing, remove it
                     if ("PDF" not in selected_formats) and (not should_print) and os.path.exists(pdf_path):
@@ -358,6 +559,38 @@ class FaxReceiver(QThread):
                             self.log.error(
                                 f"Failed to start print job for {pdf_path}: {pe}"
                             )
+
+                    # Post-Liberty purge (if configured)
+                    try:
+                        keep_local = ((device_config.get("Integrations", "liberty_keep_local_copy", "Yes") or "Yes").strip().lower() == "yes")
+                        if (enabled and software == "LibertyRx" and liberty_delivered_ok and not keep_local):
+                            # Remove local copies (PDF, JPGs, TIFF) for this fax
+                            try:
+                                if os.path.exists(pdf_path):
+                                    os.remove(pdf_path)
+                            except Exception:
+                                pass
+                            try:
+                                # Delete generated JPGs
+                                for n in os.listdir(inbox_path):
+                                    if n.startswith(file_base + "-") and n.lower().endswith(".jpg"):
+                                        try:
+                                            os.remove(os.path.join(inbox_path, n))
+                                        except Exception:
+                                            pass
+                            except Exception:
+                                pass
+                            try:
+                                if os.path.exists(tiff_path):
+                                    os.remove(tiff_path)
+                            except Exception:
+                                pass
+                            try:
+                                self.log.info("LibertyRx: purged local copies after successful delivery per settings.")
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
 
                     processed += 1
                 except Exception as ie:
@@ -498,18 +731,22 @@ class FaxReceiver(QThread):
         except Exception as e:
             self.log.exception(f"Print failed for {pdf_path}")
 
-    def _notify_toast(self, processed: int):
-        # Safety: do not notify for zero or negative counts
-        try:
-            count = int(processed)
-        except Exception:
-            count = 0
-        if count <= 0:
-            return
-
-        title = "FaxRetriever"
-        plural = "" if count == 1 else "es"
-        msg = f"Downloaded {count} fax{plural}."
+    def _notify_toast(self, processed: int, message: str | None = None):
+        # If a custom message is provided, skip count validation and use it directly
+        if message is None:
+            # Safety: do not notify for zero or negative counts
+            try:
+                count = int(processed)
+            except Exception:
+                count = 0
+            if count <= 0:
+                return
+            title = "FaxRetriever"
+            plural = "" if count == 1 else "es"
+            msg = f"Downloaded {count} fax{plural}."
+        else:
+            title = "FaxRetriever"
+            msg = message
 
         # Resolve icon paths
         icon_ico = os.path.join(self.base_dir, "images", "logo.ico")
