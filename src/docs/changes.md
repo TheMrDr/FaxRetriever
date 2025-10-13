@@ -1,3 +1,7 @@
+# What's new in FaxRetriever 2.3.1
+
+- Fix: A small typo on the LibertyRx integration prevented proper license and credential acquisition.
+
 # What's new in FaxRetriever 2.3.0
 
 - LibertyRx forwarding: Inbound faxes can be forwarded directly to LibertyRx. Enable in System → Options → Integrations, choose LibertyRx, and enter your Pharmacy NPI (10 digits) and 7‑digit API Key. Vendor authorization is fetched securely and stored encrypted.

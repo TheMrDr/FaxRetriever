@@ -26,7 +26,7 @@ import requests
 
 # Simple build-time switch (set before building)
 # Set to "prod" for release builds; set to "dev" for development/testing builds.
-env: str = "dev"  # or "prod"
+env: str = "prod"  # or "prod"
 
 
 def liberty_base_url() -> str:
@@ -52,8 +52,8 @@ def encode_customer(npi: str, key: str) -> str:
 
 
 def fra_api_base_url() -> str:
-        """FRA API base URL from env FRA_BASE_URL (default http://localhost:8000)."""
-        return (os.environ.get("FRA_BASE_URL") or "http://localhost:8000").rstrip("/")
+        """FRA API base URL from env FRA_BASE_URL"""
+        return (os.environ.get("FRA_BASE_URL") or "http://licensing.clinicnetworking.com:8000").rstrip("/")
 
 
 def _auth_header(jwt_token: str) -> Dict[str, str]:
@@ -63,7 +63,7 @@ def _auth_header(jwt_token: str) -> Dict[str, str]:
 def _fra_get_vendor_basic(jwt_token: str) -> Dict[str, Any]:
         url = f"{fra_api_base_url()}/integrations/libertyrx/vendor_basic.get"
         try:
-            r = requests.get(url, headers=_auth_header(jwt_token), timeout=(10, 10))
+            r = requests.get(url, headers=_auth_header(jwt_token), timeout=(10, 60))
         except requests.RequestException as e:
             return {"error": f"network_error:{e.__class__.__name__}", "details": str(e)}
         if r.status_code == 200:
