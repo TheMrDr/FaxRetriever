@@ -176,6 +176,124 @@ def normalize_pdf(input_path):
         return input_path
 
 
+def generate_cover_pdf(attn: str, memo: str, *, base_dir: str | None = None) -> str | None:
+    """Generate a professional one-page cover PDF.
+
+    Returns temp filepath or None if ReportLab is unavailable or an error occurs.
+    """
+    if not REPORTLAB_AVAILABLE:
+        log.warning("ReportLab not available; cannot generate cover PDF.")
+        return None
+    try:
+        fd, path = tempfile.mkstemp(suffix=".pdf")
+        os.close(fd)
+        c = canvas.Canvas(path, pagesize=letter)
+        width, height = letter
+
+        # Header block (kept generic; UI has richer designer but this is a safe fallback)
+        top = height - 0.9 * inch
+        c.setFont("Helvetica-Bold", 20)
+        c.drawCentredString(width / 2.0, top, "FAX COVER SHEET")
+
+        c.setFont("Helvetica", 12)
+        center_y = height / 2.0
+        c.drawCentredString(width / 2.0, center_y + 0.2 * inch, f"To / Attn: {attn or ''}")
+        c.drawCentredString(width / 2.0, center_y - 0.1 * inch, f"Memo: {memo or ''}")
+
+        c.setFont("Helvetica-Oblique", 10)
+        c.drawCentredString(
+            width / 2.0, 0.75 * inch, "The remainder of this page is intentionally left blank."
+        )
+
+        c.showPage()
+        c.save()
+        return path
+    except Exception as e:
+        log.error(f"Failed to generate cover PDF: {e}")
+        return None
+
+
+def generate_cover_pdf_with_multipart_note(
+    attn: str,
+    memo: str,
+    *,
+    session_idx: int,
+    session_total: int,
+    base_dir: str | None = None,
+) -> str | None:
+    """Generate a cover PDF with an extra multi-part note line.
+
+    Example note: "Multi-part Fax — Session {i} of {N}".
+    """
+    if not REPORTLAB_AVAILABLE:
+        log.warning("ReportLab not available; cannot generate cover-with-note PDF.")
+        return None
+    try:
+        fd, path = tempfile.mkstemp(suffix=".pdf")
+        os.close(fd)
+        c = canvas.Canvas(path, pagesize=letter)
+        width, height = letter
+
+        top = height - 0.9 * inch
+        c.setFont("Helvetica-Bold", 20)
+        c.drawCentredString(width / 2.0, top, "FAX COVER SHEET")
+
+        c.setFont("Helvetica", 12)
+        center_y = height / 2.0
+        c.drawCentredString(width / 2.0, center_y + 0.25 * inch, f"To / Attn: {attn or ''}")
+        c.drawCentredString(width / 2.0, center_y - 0.05 * inch, f"Memo: {memo or ''}")
+
+        # Multi-part note just below Memo
+        c.setFont("Helvetica-Bold", 12)
+        c.drawCentredString(
+            width / 2.0,
+            center_y - 0.35 * inch,
+            f"Multi-part Fax — Session {max(1, int(session_idx))} of {max(1, int(session_total))}",
+        )
+
+        c.setFont("Helvetica-Oblique", 10)
+        c.drawCentredString(
+            width / 2.0, 0.75 * inch, "The remainder of this page is intentionally left blank."
+        )
+
+        c.showPage()
+        c.save()
+        return path
+    except Exception as e:
+        log.error(f"Failed to generate cover-with-note PDF: {e}")
+        return None
+
+
+def generate_continuation_pdf(*, session_idx: int, session_total: int, base_dir: str | None = None) -> str | None:
+    """Generate a compact 1-page continuation indicator PDF.
+
+    Text: "Continuation — Session {i} of {N}" (centered).
+    """
+    if not REPORTLAB_AVAILABLE:
+        log.warning("ReportLab not available; cannot generate continuation PDF.")
+        return None
+    try:
+        fd, path = tempfile.mkstemp(suffix=".pdf")
+        os.close(fd)
+        c = canvas.Canvas(path, pagesize=letter)
+        width, height = letter
+
+        c.setFont("Helvetica-Bold", 18)
+        c.drawCentredString(
+            width / 2.0,
+            height / 2.0,
+            f"Continuation — Session {max(1, int(session_idx))} of {max(1, int(session_total))}",
+        )
+        c.showPage()
+        c.save()
+        return path
+    except Exception as e:
+        log.error(f"Failed to generate continuation PDF: {e}")
+        return None
+
+
+# Deprecated shim retained for backward compatibility
+
 def generate_cover_sheet_pdf(recipient: str, user_fax: str, output_path: str):
     """
     Deprecated in v2: Cover sheets are now generated exclusively by the Cover Sheet designer (UI)

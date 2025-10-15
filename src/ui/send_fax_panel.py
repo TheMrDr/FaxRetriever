@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
                              QVBoxLayout, QWidget)
 
 from core.config_loader import device_config, global_config
-from fax_io.sender import FaxSender
+from fax_io.sender import FaxSender, MAX_FILE_BYTES, plan_sessions
 from utils.document_utils import normalize_document
 
 try:
@@ -28,6 +28,7 @@ except Exception:
 from ui.busy import BusyDialog
 from utils.logging_utils import get_logger
 from workers.scan_worker import ScanWorker
+from workers.send_worker import SendWorker
 
 
 class SendFaxPanel(QWidget):
@@ -889,6 +890,26 @@ class SendFaxPanel(QWidget):
             )
             return
 
+        # Preflight per-file size policy (reject >= 9.5 MiB)
+        try:
+            for p in list(self.attachments):
+                try:
+                    if p and os.path.exists(p):
+                        sz = os.path.getsize(p)
+                        if sz >= MAX_FILE_BYTES:
+                            QMessageBox.warning(
+                                self,
+                                "File Too Large",
+                                "Individual files must be 10MB or smaller.\n\n"
+                                "Consider splitting the PDF into multiple files or reducing its size (e.g., lower DPI or compress).",
+                            )
+                            return
+                except Exception:
+                    # If stat fails, let sender enforce policy later
+                    pass
+        except Exception:
+            pass
+
         # Caller ID selection persisted above; include cover choice and (optionally) To/Memo metadata
         include_cover = self.cover_checkbox.isChecked()
         # Optional: Persist To/Memo to device settings for convenience (non-breaking)
@@ -899,6 +920,28 @@ class SendFaxPanel(QWidget):
         except Exception:
             pass
 
+        # If this fax will be sent as multiple sessions, inform the user and allow cancel
+        try:
+            n_sessions = max(1, int(plan_sessions(self.base_dir, self.attachments, include_cover)))
+        except Exception:
+            n_sessions = 1
+        if n_sessions > 1:
+            self.log.info(f"Multi-part fax detected: {n_sessions} session(s). Prompting user to confirm.")
+            reply = QMessageBox.question(
+                self,
+                "Large Fax Detected",
+                (
+                    "The contents are too large to send in a single request.\n\n"
+                    f"This fax will be broken into {n_sessions} fax sessions.\n\n"
+                    "Do you want to proceed?"
+                ),
+                QMessageBox.Yes | QMessageBox.Cancel,
+                QMessageBox.Yes,
+            )
+            if reply != QMessageBox.Yes:
+                self.log.info("User canceled multi-part fax send.")
+                return
+
         # Capture the current attachment paths (and cover path if any) to schedule temp cleanup after send
         to_delete = list(self.attachments)
         try:
@@ -907,49 +950,61 @@ class SendFaxPanel(QWidget):
         except Exception:
             pass
 
-        with BusyDialog(self, "Sending fax..."):
-            success = FaxSender.send_fax(
-                self.base_dir, fax, self.attachments, include_cover
-            )
-
-        # Always schedule cleanup after attempt (both success and failure) with a 5-minute delay
+        # Offload sending to a background worker to keep UI responsive
+        self._pending_cleanup_paths = to_delete
         try:
-            self._schedule_temp_cleanup(to_delete, delay_ms=300000)
+            # Disable controls during send
+            self.send_button.setEnabled(False)
+            self.attach_button.setEnabled(False)
+            self.scan_button.setEnabled(False)
+            self.clear_button.setEnabled(False)
         except Exception:
             pass
 
-        if success:
-            QMessageBox.information(self, "Success", "Fax sent successfully.")
-            # Clear the panel per UX requirement
-            self._on_clear()
+        # Show a busy dialog (non-blocking) and update text via progress signals
+        try:
+            self._send_busy = BusyDialog(self, "Sending fax...", modal=True)
+            self._send_busy.show()
+        except Exception:
+            self._send_busy = None
+
+        # Start worker thread
+        try:
+            self.send_thread = QThread(self)
+            self.send_worker = SendWorker(self.base_dir, fax, list(self.attachments), include_cover)
+            self.send_worker.moveToThread(self.send_thread)
+
+            # Wire signals
+            self.send_thread.started.connect(self.send_worker.run)
+            self.send_worker.progress.connect(self._on_send_progress)
+            self.send_worker.success.connect(self._on_send_result)
+            self.send_worker.error.connect(self._on_send_error)
+            self.send_worker.finished.connect(self.send_thread.quit)
+            self.send_worker.finished.connect(self.send_worker.deleteLater)
+            self.send_thread.finished.connect(self._on_send_finished)
+            self.send_thread.finished.connect(self.send_thread.deleteLater)
+
+            self.send_thread.start()
+        except Exception as e:
+            # Fallback: if threading fails, inform the user
             try:
-                # Refresh History and trigger polling via MainWindow if available
-                mw = self.window()
-                if mw:
-                    if hasattr(mw, "fax_history_panel"):
-                        # Use consolidated refresh entry-point
-                        if hasattr(mw.fax_history_panel, "request_refresh"):
-                            mw.fax_history_panel.request_refresh()
-                        else:
-                            mw.fax_history_panel.refresh()
-                    # Trigger an immediate inbound poll so received faxes are up-to-date
-                    try:
-                        if hasattr(mw, "_manual_poll"):
-                            mw._manual_poll()
-                        elif hasattr(mw, "poll_bar") and getattr(mw, "poll_bar"):
-                            mw.poll_bar.retrieveFaxes()
-                    except Exception:
-                        pass
-                    # Restart the poll progress bar countdown if present
-                    try:
-                        if hasattr(mw, "poll_bar") and getattr(mw, "poll_bar"):
-                            mw.poll_bar.restart_progress()
-                    except Exception:
-                        pass
+                if self._send_busy:
+                    self._send_busy.close()
             except Exception:
                 pass
-        else:
-            QMessageBox.critical(self, "Failed", "Fax failed to send.")
+            QMessageBox.critical(self, "Send Error", f"Failed to start background send: {e}")
+            # Re-enable controls
+            try:
+                self.send_button.setEnabled(True)
+                self.attach_button.setEnabled(True)
+                self.scan_button.setEnabled(True)
+                self.clear_button.setEnabled(True)
+            except Exception:
+                pass
+            return
+
+        # Return immediately; results will be handled asynchronously
+        return
 
     def _on_clear(self):
         # Schedule deletion of any temp files from current attachments (including cover) after 5 minutes
@@ -1256,3 +1311,93 @@ class SendFaxPanel(QWidget):
             QTimer.singleShot(int(max(0, delay_ms)), _do_delete)
         except Exception:
             pass
+
+
+    def _on_send_progress(self, current: int, total: int):
+        try:
+            if total and current:
+                txt = f"Sending session {current} of {total}..."
+            elif total:
+                txt = f"Preparing to send ({total} session(s))..."
+            else:
+                txt = "Sending fax..."
+            if hasattr(self, "_send_busy") and self._send_busy:
+                try:
+                    self._send_busy.update_text(txt)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _on_send_result(self, ok: bool):
+        # Handle final result message and follow-up actions
+        self._last_send_success = bool(ok)
+        if ok:
+            try:
+                QMessageBox.information(self, "Success", "Fax sent successfully.")
+            except Exception:
+                pass
+            # Clear the panel per UX requirement
+            try:
+                self._on_clear()
+            except Exception:
+                pass
+            # Refresh history and poll like the original flow
+            try:
+                mw = self.window()
+                if mw:
+                    if hasattr(mw, "fax_history_panel"):
+                        if hasattr(mw.fax_history_panel, "request_refresh"):
+                            mw.fax_history_panel.request_refresh()
+                        else:
+                            mw.fax_history_panel.refresh()
+                    try:
+                        if hasattr(mw, "_manual_poll"):
+                            mw._manual_poll()
+                        elif hasattr(mw, "poll_bar") and getattr(mw, "poll_bar"):
+                            mw.poll_bar.retrieveFaxes()
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(mw, "poll_bar") and getattr(mw, "poll_bar"):
+                            mw.poll_bar.restart_progress()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        else:
+            try:
+                QMessageBox.critical(self, "Failed", "Fax failed to send.")
+            except Exception:
+                pass
+
+    def _on_send_error(self, message: str):
+        try:
+            self.log.error(f"Background send error: {message}")
+        except Exception:
+            pass
+        try:
+            QMessageBox.critical(self, "Send Error", "An unexpected error occurred while sending. See log for details.")
+        except Exception:
+            pass
+
+    def _on_send_finished(self):
+        # Close busy dialog and re-enable controls; schedule cleanup
+        try:
+            if hasattr(self, "_send_busy") and self._send_busy:
+                self._send_busy.close()
+        except Exception:
+            pass
+        try:
+            self.send_button.setEnabled(True)
+            self.attach_button.setEnabled(True)
+            self.scan_button.setEnabled(True)
+            self.clear_button.setEnabled(True)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_pending_cleanup_paths") and self._pending_cleanup_paths:
+                self._schedule_temp_cleanup(self._pending_cleanup_paths, delay_ms=300000)
+        except Exception:
+            pass
+        self._pending_cleanup_paths = []

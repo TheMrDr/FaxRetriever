@@ -17,6 +17,15 @@ class BusyDialog:
         self.modal = modal
         self._dlg = None
 
+    def update_text(self, text: str):
+        """Update the label text while shown."""
+        try:
+            self.text = text
+            if self._dlg is not None:
+                self._dlg.setLabelText(text)
+        except Exception:
+            pass
+
     def show(self):
         try:
             self._dlg = QProgressDialog(self.text, None, 0, 0, self.parent)

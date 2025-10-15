@@ -1,11 +1,22 @@
-# FaxRetriever 2.3 — User Guide & Quick Start
+# FaxRetriever 2.4 — User Guide & Quick Start
 
-Welcome to FaxRetriever 2.3 — a modern, Windows‑friendly desktop application for sending and receiving faxes. This guide helps you install, set up, and use the app with confidence.
+Welcome to FaxRetriever 2.4 — a modern, Windows‑friendly desktop application for sending and receiving faxes. This guide helps you install, set up, and use the app with confidence.
 
 If you ever get stuck, our support team is happy to help.
 - Phone: 405-300-0122
 - Email: info@clinicnetworking.com
 - Web: https://ClinicNetworking.com
+
+---
+
+## New in 2.4 — Multi‑session Outbound Sending
+FaxRetriever 2.4 automatically splits large outbound fax jobs into multiple sessions when the combined attachments would exceed the upstream 10 MiB cap. Individual files ≥ 9.5 MiB are rejected with guidance to split or compress.
+
+Highlights:
+- Automatic multi‑session send with per‑session target ≤ 9.9 MiB (overhead‑aware)
+- Professional indicators: Session 1 cover page labeled “Multi‑part Fax — Session 1 of N”; Sessions 2..N begin with a compact “Continuation — Session i of N” page (when ReportLab is available)
+- Pre‑send confirmation dialog lets you Cancel or Proceed when a split is required
+- Clear per‑session logging and robust cleanup of temporary files
 
 ---
 
@@ -228,4 +239,4 @@ If you have questions or need assistance:
 - Email: info@clinicnetworking.com
 - Web: https://ClinicNetworking.com
 
-Thank you for using FaxRetriever 2.3!
+Thank you for using FaxRetriever 2.4!

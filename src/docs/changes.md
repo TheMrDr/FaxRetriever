@@ -1,3 +1,13 @@
+# What's new in FaxRetriever 2.4.0
+
+- New: Automatic multi-session outbound sending when combined attachments exceed the upstream 10 MiB session cap. Sessions are sized conservatively (target ≤ 9.9 MiB including multipart overhead) and sent sequentially.
+- Policy: Enforce a per-file size rule — individual files ≥ 9.5 MiB are rejected up front with user guidance to split or compress.
+- Indicators: Session 1 includes a cover sheet annotated with “Multi-part Fax — Session 1 of N”. Sessions 2..N begin with a compact “Continuation — Session i of N” page (when ReportLab is available). If ReportLab is unavailable, the send proceeds without these pages.
+- Transparency: Before sending, if a fax will be split into multiple sessions, the UI informs the user and allows Cancel or Proceed.
+- Reliability: Clear per-session logging (attempts, successes/failures) and robust cleanup of temporary normalized and generated files.
+
+---
+
 # What's new in FaxRetriever 2.3.1
 
 - Fix: A small typo on the LibertyRx integration prevented proper license and credential acquisition.
