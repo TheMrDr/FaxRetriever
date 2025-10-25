@@ -73,7 +73,7 @@ async def initialize_client(req: InitRequest, request: Request):
 
     # JWT: TTL from config, scopes per v2.2 spec
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=JWT_TTL_SECONDS)
-    scopes = ["bearer.request", "assignments.list", "assignments.request"]
+    scopes = ["bearer.request", "assignments.list", "assignments.request", "history.sync"]
     # Grant LibertyRx basic.read scope if integration is enabled for this domain
     try:
         if is_libertyrx_enabled(domain_uuid):

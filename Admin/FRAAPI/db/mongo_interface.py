@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from auth.crypto_utils import CryptoError, decrypt_blob, encrypt_blob
 from config import (COL_BEARERS, COL_CLIENTS, COL_LOGS, COL_RESELLERS, DB_NAME,
-                    MONGO_URI, SYSTEM_ACTOR)
+                    MONGO_URI, SYSTEM_ACTOR, COL_DOWNLOAD_HISTORY)
 from pymongo import ASCENDING, DESCENDING, MongoClient, ReturnDocument
 from pymongo.collection import Collection
 
@@ -19,6 +19,7 @@ resellers: Collection = db[COL_RESELLERS]
 clients: Collection = db[COL_CLIENTS]
 bearers: Collection = db[COL_BEARERS]
 logs: Collection = db[COL_LOGS]
+downloads: Collection = db[COL_DOWNLOAD_HISTORY]
 
 BEARER_REFRESH_OFFSET = timedelta(hours=1)
 
@@ -82,7 +83,21 @@ def ensure_indexes() -> None:
         )
     except Exception:
         pass
-
+    try:
+        # Download history — Single history document per domain (doc_type="history") only
+        downloads.create_index(
+            [("domain_uuid", ASCENDING), ("doc_type", ASCENDING)],
+            name="downloads_history_single_per_domain",
+            unique=True,
+            partialFilterExpression={"doc_type": "history"},
+        )
+        downloads.create_index(
+            [("doc_type", ASCENDING), ("updated_at", DESCENDING)],
+            name="downloads_history_updated_desc",
+            partialFilterExpression={"doc_type": "history"},
+        )
+    except Exception:
+        pass
 
 # === Reseller Logic ===
 
@@ -690,3 +705,94 @@ def get_libertyrx_device_pubkey(domain_uuid: str, device_id: str) -> Optional[di
         return rec if isinstance(rec, dict) else None
     except Exception:
         return None
+
+
+# === Download history helpers ===
+
+def add_downloaded_ids(domain_uuid: str, ids: list[str]) -> dict:
+    """Idempotently record fax IDs as downloaded for a domain.
+
+    Stores IDs in a single document per domain (doc_type="history"). No legacy
+    per-fax fallback is performed.
+
+    Returns dict with counts: {"inserted": int, "total": int}
+    """
+    if not ids:
+        return {"inserted": 0, "total": 0}
+
+    # Normalize and de-duplicate input while preserving order
+    norm: list[str] = []
+    seen: set[str] = set()
+    for fid in ids:
+        s = (str(fid) or "").strip()
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        norm.append(s)
+
+    if not norm:
+        return {"inserted": 0, "total": 0}
+
+    now = datetime.now(timezone.utc)
+
+    # Single history document per domain
+    doc = downloads.find_one({"domain_uuid": domain_uuid, "doc_type": "history"}, {"ids": 1}) or {}
+    existing_list = doc.get("ids") if isinstance(doc, dict) else None
+    existing_set = set(existing_list or [])
+    to_add = [s for s in norm if s not in existing_set]
+    if to_add:
+        downloads.update_one(
+            {"domain_uuid": domain_uuid, "doc_type": "history"},
+            {
+                "$setOnInsert": {"domain_uuid": domain_uuid, "doc_type": "history", "created_at": now},
+                "$push": {"ids": {"$each": to_add}},
+                "$set": {"updated_at": now},
+            },
+            upsert=True,
+        )
+    else:
+        # Ensure the doc exists even if nothing to add (first-time call)
+        downloads.update_one(
+            {"domain_uuid": domain_uuid, "doc_type": "history"},
+            {"$setOnInsert": {"domain_uuid": domain_uuid, "doc_type": "history", "created_at": now}, "$set": {"updated_at": now}},
+            upsert=True,
+        )
+    return {"inserted": len(to_add), "total": len(norm)}
+
+
+def list_downloaded_ids(domain_uuid: str, skip: int = 0, limit: int = 500) -> list[str]:
+    """Return a page (list[str]) of fax IDs for the domain.
+
+    Uses the single history document (doc_type="history"). Paginates the
+    in-document array in reverse insertion order (most recent last appended).
+    No legacy fallback is performed.
+    """
+    if skip < 0:
+        skip = 0
+    if limit <= 0:
+        limit = 100
+    if limit > 500:
+        limit = 500
+    try:
+        doc = downloads.find_one({"domain_uuid": domain_uuid, "doc_type": "history"}, {"ids": 1})
+        if doc and isinstance(doc, dict) and isinstance(doc.get("ids"), list):
+            arr = list(doc.get("ids") or [])
+            arr.reverse()
+            return arr[int(skip): int(skip) + int(limit)]
+        return []
+    except Exception:
+        return []
+
+
+def count_downloaded_ids(domain_uuid: str) -> int:
+    """Return total count of downloaded fax IDs for the domain from the single history document.
+
+    No legacy fallback is performed.
+    """
+    try:
+        doc = downloads.find_one({"domain_uuid": domain_uuid, "doc_type": "history"}, {"ids": 1})
+        if doc and isinstance(doc, dict) and isinstance(doc.get("ids"), list):
+            return int(len(doc.get("ids") or []))
+        return 0
+    except Exception:
+        return 0

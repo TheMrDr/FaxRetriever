@@ -20,6 +20,7 @@ COL_CLIENTS = "clients"
 COL_BEARERS = "bearer_tokens"
 COL_LOGS = "access_logs"
 COL_AUDIT_LOGS = "audit_logs"
+COL_DOWNLOAD_HISTORY = "download_history"
 
 # === JWT (v2.2, RS256 with kid rotation) ===
 JWT_ISSUER = "https://licensing.clinicnetworking.com"
@@ -108,4 +109,4 @@ LIBERTY_ENDPOINT_PROD = "https://api.libertysoftware.com"
 LIBERTY_ENVELOPE_TTL_SECONDS = int(os.environ.get("LIBERTY_ENVELOPE_TTL", "600"))  # default 10 minutes
 
 # === Metadata ===
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"

@@ -17,7 +17,7 @@ Routers/endpoints
 - /admin/* (routes.admin_route) — Admin-only GUI helpers (never call MongoDB from the GUI)
 
 Health check
-- GET /health returns {"status": "ok", "service": "FaxRetrieverAdmin API", "version": "2.2"}
+- GET /health returns {"status": "ok", "service": "FaxRetrieverAdmin API", "version": "2.3"}
 """
 
 from fastapi import FastAPI
@@ -26,8 +26,9 @@ from routes.assignments_route import router as assignments_router
 from routes.bearer_route import router as bearer_router
 from routes.init_route import router as init_router
 from routes.libertyrx_route import router as libertyrx_router
+from routes.sync_route import router as sync_router
 
-app = FastAPI(title="FaxRetrieverAdmin", version="2.2")
+app = FastAPI(title="FaxRetrieverAdmin", version="2.3")
 
 # Route registrations
 app.include_router(init_router, prefix="/init")
@@ -37,12 +38,13 @@ app.include_router(
 )  # exposes /assignments.list, /assignments.request, /assignments.unregister
 app.include_router(admin_router, prefix="/admin")
 app.include_router(libertyrx_router, prefix="/integrations/libertyrx")
+app.include_router(sync_router, prefix="/sync")
 
 
 # Health endpoint for service readiness checks
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "FaxRetrieverAdmin API", "version": "2.2"}
+    return {"status": "ok", "service": "FaxRetrieverAdmin API", "version": "2.3"}
 
 
 # Startup initialization: schedule DB index creation in background (non-blocking)
