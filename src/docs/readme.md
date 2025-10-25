@@ -1,6 +1,6 @@
-# FaxRetriever 2.4 — User Guide & Quick Start
+# FaxRetriever 2.4.1 — User Guide & Quick Start
 
-Welcome to FaxRetriever 2.4 — a modern, Windows‑friendly desktop application for sending and receiving faxes. This guide helps you install, set up, and use the app with confidence.
+Welcome to FaxRetriever 2.4.1 — a modern, Windows‑friendly desktop application for sending and receiving faxes. This guide helps you install, set up, and use the app with confidence.
 
 If you ever get stuck, our support team is happy to help.
 - Phone: 405-300-0122
@@ -239,4 +239,4 @@ If you have questions or need assistance:
 - Email: info@clinicnetworking.com
 - Web: https://ClinicNetworking.com
 
-Thank you for using FaxRetriever 2.4!
+Thank you for using FaxRetriever 2.4.1!

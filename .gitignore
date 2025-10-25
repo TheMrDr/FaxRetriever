@@ -24,7 +24,7 @@
 /Admin/licensing_server/fraapi_host_settings.json
 /Admin/licensing_server.old/
 /Admin/FRAAPI/fraapi_host_settings.json
-/Admin/FRA/build
-/Admin/FRA/dist
-/Admin/FRAAPI/build
-/Admin/FRAAPI/dist
+/Admin/FRAAPI/build/
+/Admin/FRAAPI/dist/
+/Admin/FRA/build/
+/Admin/FRA/dist/

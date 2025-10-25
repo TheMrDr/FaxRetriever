@@ -20,6 +20,7 @@ from PIL import Image
 
 from core.app_state import app_state
 from utils.history_index import is_downloaded
+from core.history_sync import queue_post
 from utils.logging_utils import get_logger
 from core.config_loader import device_config, global_config
 from utils.secure_store import secure_decrypt_for_machine
@@ -225,6 +226,29 @@ class FaxReceiver(QThread):
                 self.finished.emit()
                 return
 
+            # Ensure remote history doc exists and is reconciled with local cache before processing
+            try:
+                from core.history_sync import pull_if_missing, reconcile, flush_queue
+                try:
+                    # If local history is empty, rebuild it from FRAAPI (no-op if already present)
+                    pull_if_missing(self.base_dir)
+                except Exception:
+                    pass
+                try:
+                    # Bidirectional reconcile: push local-only IDs to FRAAPI (creates remote doc if missing),
+                    # and pull any remote-only IDs into local cache
+                    reconcile(self.base_dir)
+                except Exception:
+                    pass
+                try:
+                    # Attempt to flush any queued history posts
+                    flush_queue(self.base_dir)
+                except Exception:
+                    pass
+            except Exception:
+                # Never block retrieval due to history sync routines
+                pass
+
             headers = {
                 "accept": "application/json",
                 "Authorization": f"Bearer {bearer}",
@@ -328,6 +352,10 @@ class FaxReceiver(QThread):
                         try:
                             from utils.history_index import mark_downloaded
                             mark_downloaded(self.base_dir, str(fax_id))
+                            try:
+                                queue_post(self.base_dir, str(fax_id))
+                            except Exception:
+                                pass
                         except Exception:
                             try:
                                 self.log.debug("Failed to mark downloaded for existing PDF", exc_info=True)
@@ -341,6 +369,10 @@ class FaxReceiver(QThread):
                         try:
                             from utils.history_index import mark_downloaded
                             mark_downloaded(self.base_dir, str(fax_id))
+                            try:
+                                queue_post(self.base_dir, str(fax_id))
+                            except Exception:
+                                pass
                         except Exception:
                             try:
                                 self.log.debug("Failed to mark downloaded in skip path", exc_info=True)
@@ -363,6 +395,10 @@ class FaxReceiver(QThread):
                             from utils.history_index import mark_downloaded
 
                             mark_downloaded(self.base_dir, str(fax_id))
+                            try:
+                                queue_post(self.base_dir, str(fax_id))
+                            except Exception:
+                                pass
                         except Exception:
                             pass
 

@@ -322,6 +322,11 @@ class FaxHistoryPanel(QWidget):
                                 f.write(data)
                             try:
                                 mark_downloaded(self.base_dir, fax_id)
+                                try:
+                                    from core.history_sync import queue_post
+                                    queue_post(self.base_dir, fax_id)
+                                except Exception:
+                                    pass
                             except Exception:
                                 pass
                             QMessageBox.information(self, "Download", f"Saved to:\n{path}")
@@ -368,6 +373,11 @@ class FaxHistoryPanel(QWidget):
                                     return
                                 try:
                                     mark_downloaded(self.base_dir, fax_id)
+                                    try:
+                                        from core.history_sync import queue_post
+                                        queue_post(self.base_dir, fax_id)
+                                    except Exception:
+                                        pass
                                 except Exception:
                                     pass
                                 QMessageBox.information(
@@ -409,6 +419,11 @@ class FaxHistoryPanel(QWidget):
                                     return
                                 try:
                                     mark_downloaded(self.base_dir, fax_id)
+                                    try:
+                                        from core.history_sync import queue_post
+                                        queue_post(self.base_dir, fax_id)
+                                    except Exception:
+                                        pass
                                 except Exception:
                                     pass
                                 QMessageBox.information(self, "Download", f"Saved to:\n{tiff_path}")

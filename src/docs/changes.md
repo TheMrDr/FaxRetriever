@@ -1,3 +1,13 @@
+# What's new in FaxRetriever 2.4.1
+
+- Reliability: Automatic history reconciliation on receiver startup ensures the server-side per-domain download history is recreated and synchronized from your existing local cache if it was ever lost. The app now:
+  - Rebuilds local history from the server when the local ledger is empty.
+  - Pushes local-only FaxIDs to the server to recreate the per-domain history document if it was dropped.
+  - Flushes any queued history posts after connectivity/auth issues.
+- Server alignment: FRAAPI now provides /sync/post and /sync/list with JWT scope history.sync and stores history in a single document per domain. Legacy per-fax documents are no longer used by the API.
+
+---
+
 # What's new in FaxRetriever 2.4.0
 
 - New: Automatic multi-session outbound sending when combined attachments exceed the upstream 10 MiB session cap. Sessions are sized conservatively (target ≤ 9.9 MiB including multipart overhead) and sent sequentially.
