@@ -24,7 +24,14 @@
 /Admin/licensing_server/fraapi_host_settings.json
 /Admin/licensing_server.old/
 /Admin/FRAAPI/fraapi_host_settings.json
+/Admin/FRAAPI/config.py
 /Admin/FRAAPI/build/
 /Admin/FRAAPI/dist/
 /Admin/FRA/build/
 /Admin/FRA/dist/
+/tests/test_libertyrx_client.py
+/tests/test_libertyrx_queue.py
+/tests/test_secure_store.py
+/address_book.json
+/shared/config/config.json
+/shared/history/downloaded_faxes.log
