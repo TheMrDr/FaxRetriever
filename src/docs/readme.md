@@ -1,6 +1,6 @@
-# FaxRetriever 2.4.1 — User Guide & Quick Start
+# FaxRetriever 2.4.2 — User Guide & Quick Start
 
-Welcome to FaxRetriever 2.4.1 — a modern, Windows‑friendly desktop application for sending and receiving faxes. This guide helps you install, set up, and use the app with confidence.
+Welcome to FaxRetriever 2.4.2 — a modern, Windows‑friendly desktop application for sending and receiving faxes. This guide helps you install, set up, and use the app with confidence.
 
 If you ever get stuck, our support team is happy to help.
 - Phone: 405-300-0122
@@ -239,4 +239,18 @@ If you have questions or need assistance:
 - Email: info@clinicnetworking.com
 - Web: https://ClinicNetworking.com
 
-Thank you for using FaxRetriever 2.4.1!
+Thank you for using FaxRetriever 2.4.2!
+
+---
+
+## Tools
+- Convert PDF to JPG...
+  - Access via Tools → Convert PDF to JPG...
+  - Select one or more PDFs and an output folder; the app creates a subfolder per PDF and saves one JPG per page.
+  - Default rendering is 200 DPI at JPEG quality 90. The app first tries PyMuPDF (no external tools), then falls back to pdf2image with Poppler. Bundled Poppler is auto‑detected when present.
+  - Output naming example: mydoc_p001.jpg, mydoc_p002.jpg, ...
+
+Troubleshooting (Convert PDF to JPG)
+- If you see “Unable to get page count. Is poppler installed and in PATH?”, it means pdf2image couldn’t find Poppler and PyMuPDF isn’t available. Options:
+  - Use the bundled Poppler at poppler\bin (next to the app). The app auto‑detects it when running from the packaged build.
+  - If running from source, install either PyMuPDF (`pip install pymupdf`) or Poppler and set the environment variable `POPPLER_PATH` to your Poppler bin directory.

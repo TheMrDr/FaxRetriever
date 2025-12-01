@@ -1,3 +1,18 @@
+# What's new in FaxRetriever 2.4.3 (2025-12-01)
+
+- UI: Improved small-screen support. The main window minimum height was reduced and the Send Fax panel now scrolls when vertical space is limited. This prevents controls from being cut off on displays shorter than 950px.
+
+---
+
+# What's new in FaxRetriever 2.4.2 (2025-11-03)
+
+- New tool: Tools → Convert PDF to JPG...
+  - Convert any selected PDF(s) into JPG pages, saved one image per page.
+  - Output naming: <pdf_basename>_p001.jpg, _p002.jpg, ... in a per-PDF subfolder under your chosen output folder.
+  - Uses bundled Poppler automatically when available; defaults to 200 DPI and JPEG quality 90 for a good balance of clarity and size.
+
+---
+
 # What's new in FaxRetriever 2.4.1
 
 - Reliability: Automatic history reconciliation on receiver startup ensures the server-side per-domain download history is recreated and synchronized from your existing local cache if it was ever lost. The app now:

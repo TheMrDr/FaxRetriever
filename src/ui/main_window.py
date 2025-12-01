@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QFileDialog, QGridLayout,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMenuBar,
                              QMessageBox, QPushButton, QSizePolicy, QSplitter,
-                             QStatusBar, QSystemTrayIcon, QVBoxLayout, QWidget)
+                             QStatusBar, QScrollArea, QSystemTrayIcon, QVBoxLayout, QWidget)
 
 from core.address_book import AddressBookManager
 from core.app_state import app_state
@@ -32,6 +32,7 @@ from ui.options_dialog import OptionsDialog
 from ui.send_fax_panel import SendFaxPanel
 from ui.status_panel import FaxPollTimerProgressBar, TokenLifespanProgressBar
 from utils.logging_utils import get_logger
+from utils.document_utils import convert_pdf_to_jpgs
 from version import __version__
 
 
@@ -58,7 +59,8 @@ class MainWindow(QMainWindow):
         self.log = get_logger("ui")
         self.setWindowTitle(f"FaxRetriever {__version__}")
         # Allow resizable window for single-pane layout
-        self.setMinimumSize(1100, 950)
+        # Lowered minimum height to support smaller displays while keeping width
+        self.setMinimumSize(1100, 600)
         # self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         self.setWindowFlags(self.windowFlags() | Qt.WindowMinimizeButtonHint)
         self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
@@ -202,6 +204,11 @@ class MainWindow(QMainWindow):
         manage_ab_action = QAction("Manage Address Book", self)
         manage_ab_action.triggered.connect(self.open_address_book_dialog)
         self.tools_menu.addAction(manage_ab_action)
+
+        convert_pdf_jpg_action = QAction("Convert PDF to JPG...", self)
+        convert_pdf_jpg_action.setToolTip("Convert one or more PDFs into JPG pages")
+        convert_pdf_jpg_action.triggered.connect(self._convert_pdf_to_jpg)
+        self.tools_menu.addAction(convert_pdf_jpg_action)
         # Per requirements, remove Fax Status and Send Fax from the menu bar.
 
         # Help Menu
@@ -265,6 +272,111 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
+    def _convert_pdf_to_jpg(self):
+        """Tool: Convert one or more PDFs to JPG pages.
+        - Prompts for PDF files.
+        - Prompts for an output folder (defaults to Save Location if set).
+        - Creates a subfolder per PDF and writes page images there.
+        """
+        try:
+            # Determine a reasonable starting directory
+            start_dir = self.app_state.device_cfg.save_path or device_config.get(
+                "Fax Options", "save_path", os.path.expanduser("~"))
+            if not start_dir or not os.path.isdir(start_dir):
+                start_dir = os.path.expanduser("~")
+
+            files, _ = QFileDialog.getOpenFileNames(
+                self,
+                "Select PDF(s) to convert",
+                start_dir,
+                "PDF Files (*.pdf)"
+            )
+            if not files:
+                return
+
+            # Choose output directory (defaults to Save Location)
+            default_out = self.app_state.device_cfg.save_path or start_dir
+            out_dir = QFileDialog.getExistingDirectory(
+                self,
+                "Select output folder for JPG pages",
+                default_out,
+                QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
+            )
+            if not out_dir:
+                return
+
+            # Resolve Poppler path similar to thumbnail renderer
+            try:
+                candidates = [
+                    os.path.join(self.base_dir, "poppler", "bin"),
+                    os.path.join(self.exe_dir or self.base_dir, "poppler", "bin"),
+                ]
+                poppler_bin = next((p for p in candidates if os.path.isdir(p)), None)
+            except Exception:
+                poppler_bin = None
+
+            # Convert each selected PDF
+            total_written = 0
+            failures: list[str] = []
+
+            # Show busy cursor during conversion
+            try:
+                QApplication.setOverrideCursor(Qt.WaitCursor)
+            except Exception:
+                pass
+
+            from utils.document_utils import convert_pdf_to_jpgs  # local import safety
+
+            for pdf in files:
+                try:
+                    if not pdf or not os.path.isfile(pdf):
+                        failures.append(f"Missing file: {pdf}")
+                        continue
+                    base = os.path.splitext(os.path.basename(pdf))[0]
+                    pdf_out_dir = os.path.join(out_dir, base)
+                    os.makedirs(pdf_out_dir, exist_ok=True)
+                    result = convert_pdf_to_jpgs(pdf, pdf_out_dir, dpi=200, quality=90, poppler_path=poppler_bin)
+                    if isinstance(result, dict) and result.get("error"):
+                        failures.append(f"{os.path.basename(pdf)}: {result['error']}")
+                        continue
+                    total_written += len(result or [])
+                except Exception as e:
+                    failures.append(f"{os.path.basename(pdf)}: {e}")
+                    try:
+                        self.log.exception(f"Convert to JPG failed for {pdf}: {e}")
+                    except Exception:
+                        pass
+            try:
+                QApplication.restoreOverrideCursor()
+            except Exception:
+                pass
+
+            # Build summary message
+            if failures:
+                msg = (
+                    f"Conversion completed with issues.\n\n"
+                    f"Files converted: {len(files) - len(failures)} of {len(files)}\n"
+                    f"Total pages written: {total_written}\n\n"
+                    f"Problems:\n- " + "\n- ".join(failures)
+                )
+            else:
+                msg = (
+                    f"Conversion completed successfully.\n\n"
+                    f"Files converted: {len(files)}\n"
+                    f"Total pages written: {total_written}\n\n"
+                    f"Output folder:\n{out_dir}"
+                )
+            try:
+                QMessageBox.information(self, "Convert PDF to JPG", msg)
+            except Exception:
+                pass
+        except Exception as e:
+            try:
+                self.log.exception(f"Unexpected error in Convert PDF to JPG tool: {e}")
+                QMessageBox.warning(self, "Convert PDF to JPG", f"Unexpected error: {e}")
+            except Exception:
+                pass
+
     def _show_options_dialog(self):
         dialog = OptionsDialog(
             base_dir=self.base_dir, app_state=self.app_state, main_window=self
@@ -311,12 +423,23 @@ class MainWindow(QMainWindow):
         # Left side remains focused on Send Fax; retrieval controls moved to right panel
         # (Save location moved to right Retrieval section)
 
-        # Embedded send fax panel
+        # Embedded send fax panel (wrapped in scroll area for small screens)
         self.send_fax_panel = SendFaxPanel(
             self.base_dir, self.exe_dir, self.app_state, self.address_book_model, self
         )
-        self.send_fax_panel.setMinimumHeight(560)
-        left_v.addWidget(self.send_fax_panel, 1)
+        # Allow panel to shrink vertically; scroll area will preserve access to controls
+        try:
+            self.send_fax_panel.setMinimumHeight(0)
+        except Exception:
+            pass
+        send_scroll = QScrollArea()
+        send_scroll.setWidgetResizable(True)
+        try:
+            send_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        except Exception:
+            pass
+        send_scroll.setWidget(self.send_fax_panel)
+        left_v.addWidget(send_scroll, 1)
 
         # Right side: Fax History (bottom area). Retrieval controls move to a full-width top header.
         self.fax_history_panel = FaxHistoryPanel(
