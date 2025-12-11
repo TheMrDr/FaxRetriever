@@ -3,10 +3,15 @@ utils/logging_utils.py
 
 Provides centralized, rotating file logging for FaxRetriever.
 Supports multiple named loggers and structured level output.
+Also provides crash/exit handlers to capture unhandled exceptions and app shutdowns.
 """
 
 import logging
 import os
+import sys
+import atexit
+import threading
+import traceback
 from logging.handlers import RotatingFileHandler
 from typing import Dict
 
@@ -33,6 +38,10 @@ _LEVEL_MAP = {
     "ERROR": logging.ERROR,
     "CRITICAL": logging.CRITICAL,
 }
+
+# Crash/exit state
+_crash_handlers_installed = False
+_last_unhandled: str | None = None
 
 
 def _resolve_level(level_name: str | int | None) -> int:
@@ -81,9 +90,13 @@ def get_logger(name: str) -> logging.Logger:
         return _logger_cache[name]
 
     logger = logging.getLogger(name)
-    # Default to DEBUG; can be lowered later via set_global_logging_level
+    # Default new loggers to current root level so they inherit the selected verbosity
     if logger.level == logging.NOTSET:
-        logger.setLevel(logging.DEBUG)
+        try:
+            root_level = logging.getLogger().level
+            logger.setLevel(root_level)
+        except Exception:
+            logger.setLevel(logging.INFO)
 
     formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s")
 
@@ -93,7 +106,10 @@ def get_logger(name: str) -> logging.Logger:
             LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT
         )
         _shared_file_handler.setFormatter(formatter)
-        _shared_file_handler.setLevel(logger.level)
+        try:
+            _shared_file_handler.setLevel(logging.getLogger().level)
+        except Exception:
+            _shared_file_handler.setLevel(logger.level)
 
     # Avoid duplicate handlers if reloaded
     if _shared_file_handler not in logger.handlers:
@@ -101,3 +117,64 @@ def get_logger(name: str) -> logging.Logger:
 
     _logger_cache[name] = logger
     return logger
+
+
+def _log_unhandled(exc_type, exc, tb) -> None:
+    """Default unhandled exception logger used for sys.excepthook and threading.excepthook."""
+    global _last_unhandled
+    try:
+        log = get_logger("crash")
+        tb_str = "".join(traceback.format_exception(exc_type, exc, tb))
+        _last_unhandled = tb_str
+        log.critical(
+            f"Unhandled exception: {exc_type.__name__}: {exc}\n{tb_str}".rstrip()
+        )
+    except Exception:
+        try:
+            # Fallback to stderr
+            print(f"Unhandled exception: {exc}", file=sys.stderr)
+        except Exception:
+            pass
+
+
+def _on_process_exit() -> None:
+    """atexit hook that logs process shutdown. Includes last crash info marker if present."""
+    try:
+        log = get_logger("lifecycle")
+        if _last_unhandled:
+            log.error("Application exiting after unhandled exception (see above).")
+        else:
+            log.info("Application exiting.")
+    except Exception:
+        pass
+
+
+def install_crash_handlers() -> None:
+    """Install global hooks to log crashes and exits.
+
+    - sys.excepthook to capture main-thread unhandled exceptions
+    - threading.excepthook (Py 3.8+) to capture thread exceptions
+    - atexit hook to record application shutdown
+    """
+    global _crash_handlers_installed
+    if _crash_handlers_installed:
+        return
+    try:
+        sys.excepthook = _log_unhandled  # type: ignore[assignment]
+    except Exception:
+        pass
+    try:
+        # Python 3.8+
+        def _threading_hook(args):
+            try:
+                _log_unhandled(args.exc_type, args.exc_value, args.exc_traceback)
+            except Exception:
+                pass
+        threading.excepthook = _threading_hook  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    try:
+        atexit.register(_on_process_exit)
+    except Exception:
+        pass
+    _crash_handlers_installed = True

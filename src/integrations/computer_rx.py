@@ -325,29 +325,156 @@ class CRxIntegration2(QThread):
                     self.log.warning(f"Computer-Rx: Missing fax file for record {record_id}: {full_file_path}")
                     status = btrieve.BTRCALL(self.B_GET_NEXT, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
                     continue
-                # Send fax
+                # Send fax with up to 3 attempts; special handling for blocked numbers
                 url = f"https://telco-api.skyswitch.com/users/{fax_user}/faxes/send"
                 headers = {"Authorization": f"Bearer {bearer}"}
-                files = {"filename": (os.path.basename(full_file_path), open(full_file_path, 'rb'), 'application/pdf')}
                 data = {"caller_id": caller_id, "destination": dest}
-                try:
-                    resp = requests.post(url, files=files, data=data, headers=headers, timeout=60)
-                    if resp.status_code == 200:
-                        self.log.info(f"Computer-Rx: Fax sent (record {record_id}) to {dest}; removing record and file.")
-                        del_status = btrieve.BTRCALL(self.B_DELETE, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
-                        if del_status != 0:
-                            self.log.warning(f"Computer-Rx: Failed to remove record {record_id} from Btrieve. Status {del_status}")
-                        try:
-                            os.remove(full_file_path)
-                        except Exception as de:
-                            self.log.warning(f"Computer-Rx: Failed to delete file {full_file_path}: {de}")
-                    else:
-                        self.log.error(f"Computer-Rx: Send failed for record {record_id} -> {dest}; HTTP {resp.status_code} {resp.text}")
-                except Exception as se:
-                    self.log.error(f"Computer-Rx: Error sending record {record_id}: {se}")
-                finally:
+                attempts = 0
+                sent_ok = False
+                blocked_number = False
+                last_status = None
+                last_text = None
+                while attempts < 3 and not sent_ok and not blocked_number:
+                    attempts += 1
+                    files = {"filename": (os.path.basename(full_file_path), open(full_file_path, 'rb'), 'application/pdf')}
                     try:
-                        files["filename"][1].close()
+                        resp = requests.post(url, files=files, data=data, headers=headers, timeout=60)
+                        last_status = resp.status_code
+                        try:
+                            last_text = resp.text
+                        except Exception:
+                            last_text = None
+                        if resp.status_code == 200:
+                            sent_ok = True
+                            try:
+                                from utils.crx_outbound_ledger import new_pending, sha1_file
+                            except Exception:
+                                new_pending = None
+                                sha1_file = None
+                            # On API 200 (queued), do NOT delete the Btrieve record or file yet.
+                            # Append a pending ledger entry for delivery tracking.
+                            size_bytes = None
+                            try:
+                                size_bytes = os.path.getsize(full_file_path)
+                            except Exception:
+                                pass
+                            file_hash = None
+                            try:
+                                if sha1_file:
+                                    file_hash = sha1_file(full_file_path)
+                            except Exception:
+                                file_hash = None
+                            if new_pending:
+                                try:
+                                    new_pending(
+                                        record_id=record_id,
+                                        dest_e164=dest,
+                                        caller_id=caller_id,
+                                        file_path=full_file_path,
+                                        attempt_no=attempts,
+                                        size_bytes=size_bytes,
+                                        pages_estimate=None,
+                                        file_hash=file_hash,
+                                        submit_time_iso=None,
+                                        extra={}
+                                    )
+                                    self.log.info(f"Computer-Rx: Fax queued (record {record_id}) to {dest} on attempt {attempts}; awaiting delivery status.")
+                                except Exception as le:
+                                    self.log.warning(f"Computer-Rx: Failed to append ledger entry for record {record_id}: {le}")
+                            else:
+                                self.log.info(f"Computer-Rx: Fax queued (record {record_id}) to {dest} on attempt {attempts}; ledger unavailable, will rely on queue state.")
+                        else:
+                            # Check for blocked number message (HTTP 400 with specific message)
+                            msg_body = ""
+                            try:
+                                j = resp.json()
+                                msg_body = (j.get("message") or "") if isinstance(j, dict) else ""
+                            except Exception:
+                                # Fallback to text
+                                msg_body = (resp.text or "")
+                            combined = f"{msg_body} {resp.text if hasattr(resp, 'text') else ''}".lower()
+                            if resp.status_code == 400 and ("number is blocked" in combined or "blocked" in combined and "many attempts" in combined):
+                                blocked_number = True
+                                self.log.error(f"Computer-Rx: Send failed for record {record_id} -> {dest}; HTTP {resp.status_code} {resp.text}")
+                                # Inform user and remove records/files to prevent infinite retries
+                                try:
+                                    QMessageBox.warning(None,
+                                        "Computer-Rx: Number Blocked",
+                                        (
+                                            "The destination fax number appears to be blocked by the upstream carrier due to repeated failures.\n\n"
+                                            "Action required: Investigate this fax number in WinRx.\n\n"
+                                            "These faxes have NOT been sent. The related pending records will be removed from FaxControl.btr to stop further attempts."
+                                        ))
+                                except Exception:
+                                    pass
+                                # Delete current record now
+                                del_status = btrieve.BTRCALL(self.B_DELETE, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
+                                if del_status != 0:
+                                    self.log.warning(f"Computer-Rx: Failed to remove record {record_id} after block detection. Status {del_status}")
+                                # Try to delete the associated file
+                                try:
+                                    if os.path.exists(full_file_path):
+                                        os.remove(full_file_path)
+                                except Exception as de:
+                                    self.log.warning(f"Computer-Rx: Failed to delete file {full_file_path}: {de}")
+                                # Sweep remaining records for this destination and remove them to stop future attempts
+                                try:
+                                    P2 = ctypes.create_string_buffer(128)
+                                    D2 = ctypes.create_string_buffer(self.BUFFER_LENGTH)
+                                    K2 = ctypes.create_string_buffer(4)
+                                    L2 = ctypes.c_ushort(4)
+                                    N2 = ctypes.c_ushort(0)
+                                    DL2 = ctypes.c_ushort(self.BUFFER_LENGTH)
+                                    s2 = btrieve.BTRCALL(self.B_GET_FIRST, P2, D2, ctypes.byref(DL2), K2, L2, None)
+                                    removed_count = 0
+                                    while s2 == 0:
+                                        try:
+                                            raw2 = D2.raw[:DL2.value]
+                                            rec2_id = int.from_bytes(raw2[0:4], 'little', signed=False)
+                                            pn2 = raw2[4:18].decode('ascii', errors='ignore').replace('\x00', '').strip()
+                                            fn2 = raw2[27:80].decode('ascii', errors='ignore').replace('\x00', '').strip()
+                                        except Exception:
+                                            rec2_id = -1
+                                            pn2 = ""
+                                            fn2 = ""
+                                        dest2 = self._format_phone_number(pn2, caller_id)
+                                        if dest2 == dest:
+                                            # delete this record
+                                            ds2 = btrieve.BTRCALL(self.B_DELETE, P2, D2, ctypes.byref(DL2), K2, N2, None)
+                                            if ds2 != 0:
+                                                self.log.warning(f"Computer-Rx: Sweep delete failed for record {rec2_id}; status {ds2}")
+                                            else:
+                                                removed_count += 1
+                                                # remove file
+                                                fp2 = os.path.join(winrx_path, fn2) if fn2 else ""
+                                                try:
+                                                    if fp2 and os.path.exists(fp2):
+                                                        os.remove(fp2)
+                                                except Exception as de2:
+                                                    self.log.warning(f"Computer-Rx: Sweep failed to delete file {fp2}: {de2}")
+                                            # After delete, do not call GET_NEXT immediately; current position should now be at prior; call GET_NEXT to continue
+                                            s2 = btrieve.BTRCALL(self.B_GET_NEXT, P2, D2, ctypes.byref(DL2), K2, N2, None)
+                                        else:
+                                            s2 = btrieve.BTRCALL(self.B_GET_NEXT, P2, D2, ctypes.byref(DL2), K2, N2, None)
+                                    if removed_count:
+                                        self.log.info(f"Computer-Rx: Removed {removed_count} additional pending record(s) for blocked number {dest}.")
+                                except Exception as swe:
+                                    self.log.warning(f"Computer-Rx: Sweep removal error for blocked number {dest}: {swe}")
+                            else:
+                                self.log.error(f"Computer-Rx: Send failed for record {record_id} -> {dest}; HTTP {resp.status_code} {resp.text}")
+                    except Exception as se:
+                        self.log.error(f"Computer-Rx: Error sending record {record_id} (attempt {attempts}): {se}")
+                    finally:
+                        try:
+                            files["filename"][1].close()
+                        except Exception:
+                            pass
+                # If not sent and not blocked after 3 attempts, notify user
+                if (not sent_ok) and (not blocked_number) and attempts >= 3:
+                    try:
+                        QMessageBox.information(None,
+                                                "Computer-Rx: Fax Failed",
+                                                f"Fax to {dest} failed after 3 attempts. It will remain in the queue. Please verify the number and try again.")
                     except Exception:
                         pass
                 # Next

@@ -21,13 +21,19 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 
 from ui.main_window import MainWindow
-from utils.logging_utils import get_logger, set_global_logging_level
+from utils.logging_utils import get_logger, set_global_logging_level, install_crash_handlers
 from core.config_loader import global_config
 
 def main():
+    # Install crash/exit handlers as early as possible
+    try:
+        install_crash_handlers()
+    except Exception:
+        pass
+
     # Apply persisted logging level as early as possible
     try:
-        lvl = global_config.get("UserSettings", "logging_level", "Debug") or "Debug"
+        lvl = global_config.get("UserSettings", "logging_level", "Info") or "Info"
         set_global_logging_level(lvl)
     except Exception:
         # Proceed with defaults if config not ready
@@ -39,10 +45,21 @@ def main():
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
 
+    try:
+        # Log graceful application quit via Qt signal in addition to atexit
+        app.aboutToQuit.connect(lambda: get_logger("lifecycle").info("Application quitting (Qt aboutToQuit)."))
+    except Exception:
+        pass
+
     window = MainWindow(base_dir=BASE_DIR, exe_dir=EXE_DIR)
     window.show()
 
-    sys.exit(app.exec_())
+    exit_code = app.exec_()
+    try:
+        get_logger("lifecycle").info(f"Application main loop exited with code {exit_code}.")
+    except Exception:
+        pass
+    sys.exit(exit_code)
 
 if __name__ == '__main__':
     try:

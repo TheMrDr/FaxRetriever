@@ -1,6 +1,30 @@
+# What's new in FaxRetriever 2.4.4 (2025-12-10)
+
+- Computer-Rx delivery tracking and anti-blacklisting:
+  - Deferred deletion on HTTP 200 (queued). The app now records each CRx outbound attempt in a durable, device-scoped ledger and waits for a confirmed delivery outcome from outbound history before removing the WinRx queue item.
+  - Background poller correlates outbound history and updates outcomes. On delivery failure, it retries automatically; after 3 failed deliveries, it notifies the user and removes the Btrieve record and associated file.
+  - Immediate blocked-number handling: If SkySwitch reports the destination is blocked (e.g., due to many failed attempts), the app warns the user to investigate in WinRx and removes pending records to prevent repeated attempts.
+  - Settings (optional): `enable_crx_delivery_tracking` (Yes), `crx_poll_interval_sec` (60), `crx_max_attempts` (3). The poller starts when CRx is enabled and stops on app exit.
+  - Transparent logs for attempts, correlations, outcomes, and cleanup.
+
+- Logging and crash visibility:
+  - Centralized crash/exit handlers capture unhandled exceptions from the main thread and background threads with full tracebacks in `log/ClinicFax.log`.
+  - Process shutdown is recorded via an `atexit` hook, and Qt lifecycle is logged (`QApplication.aboutToQuit`).
+  - The application now logs the main loop exit code after the UI closes.
+  - User-driven closures are clearly annotated: normal window close, Close to Tray, Receiver-mode prompt choices (Minimize to Tray / Close Anyway / Cancel), and Quit via tray menu. This helps distinguish intentional exits from crashes during support.
+
+---
+
 # What's new in FaxRetriever 2.4.3 (2025-12-01)
 
 - UI: Improved small-screen support. The main window minimum height was reduced and the Send Fax panel now scrolls when vertical space is limited. This prevents controls from being cut off on displays shorter than 950px.
+
+---
+
+# What's new in FaxRetriever 2.4.3 (2025-12-10)
+
+- Log level control: System → Options → Logging now lets you choose the minimum level written to the rotating log file. When you pick a level (Info, Warning, etc.), only messages at that level and above are persisted. This reduces clutter in Help → View Log.
+- Immediate effect: Changing the selection applies at runtime without restart. The choice is also saved and re-applied on next launch.
 
 ---
 
@@ -14,7 +38,7 @@
 ---
 
 # What's new in FaxRetriever 2.4.1
-
+We need to
 - Reliability: Automatic history reconciliation on receiver startup ensures the server-side per-domain download history is recreated and synchronized from your existing local cache if it was ever lost. The app now:
   - Rebuilds local history from the server when the local ledger is empty.
   - Pushes local-only FaxIDs to the server to recreate the per-domain history document if it was dropped.

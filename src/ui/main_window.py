@@ -24,6 +24,7 @@ from core.config_loader import device_config, global_config
 from core.license_client import retrieve_skyswitch_token
 from fax_io.receiver import FaxReceiver
 from integrations.computer_rx import CRxIntegration2
+from ui.threads.crx_delivery_poller import CrxDeliveryPoller
 from ui.about_dialog import AboutDialog
 from ui.address_book_dialog import AddressBookDialog
 from ui.dialogs import LogViewer, MarkdownViewer, WhatsNewDialog
@@ -575,6 +576,10 @@ class MainWindow(QMainWindow):
 
     def _quit_via_tray(self):
         try:
+            try:
+                self.log.info("User requested Quit via system tray menu.")
+            except Exception:
+                pass
             self._force_exit = True
             try:
                 if hasattr(self, "tray_icon") and self.tray_icon:
@@ -583,6 +588,10 @@ class MainWindow(QMainWindow):
                 pass
             self.close()
         except Exception:
+            try:
+                self.log.exception("Error during tray quit flow")
+            except Exception:
+                pass
             self.close()
 
     def _manual_poll(self):
@@ -1427,6 +1436,33 @@ class MainWindow(QMainWindow):
                 return
             self.crx_thread = CRxIntegration2(self.base_dir)
 
+            # Start delivery poller if enabled
+            try:
+                poll_enabled = True
+                try:
+                    cfg = device_config.get("Integrations", "integration_settings", {}) or {}
+                    v = str(cfg.get("enable_crx_delivery_tracking", "Yes") or "Yes").strip().lower()
+                    poll_enabled = (v == "yes")
+                except Exception:
+                    poll_enabled = True
+                if poll_enabled:
+                    interval = 60
+                    max_attempts = 3
+                    try:
+                        interval = int(cfg.get("crx_poll_interval_sec", 60))
+                    except Exception:
+                        pass
+                    try:
+                        max_attempts = int(cfg.get("crx_max_attempts", 3))
+                    except Exception:
+                        pass
+                    # Avoid duplicate poller
+                    if getattr(self, "crx_poller", None) is None or not self.crx_poller.isRunning():
+                        self.crx_poller = CrxDeliveryPoller(self, interval_sec=interval, max_attempts=max_attempts)
+                        self.crx_poller.start()
+            except Exception:
+                pass
+
             def _on_done():
                 try:
                     self.crx_thread = None
@@ -1447,6 +1483,21 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         try:
             if getattr(self, "_force_exit", False):
+                try:
+                    self.log.info("Application closing (forced exit requested).")
+                except Exception:
+                    pass
+                # Stop CRx delivery poller if running
+                try:
+                    if getattr(self, "crx_poller", None):
+                        self.crx_poller.stop()
+                        try:
+                            self.crx_poller.wait(2000)
+                        except Exception:
+                            pass
+                        self.crx_poller = None
+                except Exception:
+                    pass
                 event.accept()
                 return
             close_to_tray = (
@@ -1463,6 +1514,10 @@ class MainWindow(QMainWindow):
             )
             if close_to_tray:
                 try:
+                    self.log.info("Close requested; honoring 'Close to Tray' setting and minimizing to tray.")
+                except Exception:
+                    pass
+                try:
                     if hasattr(self, "tray_icon") and self.tray_icon:
                         self.tray_icon.showMessage(
                             "FaxRetriever",
@@ -1477,6 +1532,10 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
             if is_receiver:
+                try:
+                    self.log.info("Close requested while in Receiver mode; prompting user for action.")
+                except Exception:
+                    pass
                 box = QMessageBox(self)
                 box.setWindowTitle("Close FaxRetriever")
                 box.setIcon(QMessageBox.Warning)
@@ -1489,15 +1548,31 @@ class MainWindow(QMainWindow):
                 box.exec_()
                 clicked = box.clickedButton()
                 if clicked == minimize_btn:
+                    try:
+                        self.log.info("User chose: Minimize to Tray.")
+                    except Exception:
+                        pass
                     self.hide()
                     event.ignore()
                     return
                 elif clicked == close_btn:
+                    try:
+                        self.log.info("User chose: Close Anyway. Application window will close.")
+                    except Exception:
+                        pass
                     event.accept()
                     return
                 else:
+                    try:
+                        self.log.info("User canceled close.")
+                    except Exception:
+                        pass
                     event.ignore()
                     return
+            try:
+                self.log.info("Application window closed by user.")
+            except Exception:
+                pass
             event.accept()
         except Exception:
             event.accept()
