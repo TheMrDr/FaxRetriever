@@ -4,6 +4,7 @@ import re
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox
+from ui.safe_notifier import get_notifier
 
 from core.app_state import app_state
 from core.config_loader import device_config, global_config
@@ -398,13 +399,10 @@ class CRxIntegration2(QThread):
                                 self.log.error(f"Computer-Rx: Send failed for record {record_id} -> {dest}; HTTP {resp.status_code} {resp.text}")
                                 # Inform user and remove records/files to prevent infinite retries
                                 try:
-                                    QMessageBox.warning(None,
+                                    get_notifier().warning(
                                         "Computer-Rx: Number Blocked",
-                                        (
-                                            "The destination fax number appears to be blocked by the upstream carrier due to repeated failures.\n\n"
-                                            "Action required: Investigate this fax number in WinRx.\n\n"
-                                            "These faxes have NOT been sent. The related pending records will be removed from FaxControl.btr to stop further attempts."
-                                        ))
+                                        f"Number has been blocked for too many failures.\n\nPlease investigate {dest} in WinRx.\n\nFaxes were not sent; pending records were removed."
+                                    )
                                 except Exception:
                                     pass
                                 # Delete current record now
@@ -472,9 +470,10 @@ class CRxIntegration2(QThread):
                 # If not sent and not blocked after 3 attempts, notify user
                 if (not sent_ok) and (not blocked_number) and attempts >= 3:
                     try:
-                        QMessageBox.information(None,
-                                                "Computer-Rx: Fax Failed",
-                                                f"Fax to {dest} failed after 3 attempts. It will remain in the queue. Please verify the number and try again.")
+                        get_notifier().info(
+                            "Computer-Rx: Fax Failed",
+                            f"Fax to {dest} failed after 3 attempts. It will remain in the queue. Please verify the number and try again.",
+                        )
                     except Exception:
                         pass
                 # Next

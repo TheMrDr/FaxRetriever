@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox
+from ui.safe_notifier import get_notifier
 
 from core.app_state import app_state
 from core.config_loader import device_config
@@ -187,7 +188,7 @@ class CrxDeliveryPoller(QThread):
         # Delete from Btrieve and remove file
         self._delete_btrieve_and_file(record_id)
         try:
-            QMessageBox.information(None, "Computer-Rx", f"Fax to {dest} delivered.")
+            get_notifier().info("Computer-Rx", f"Fax to {dest} delivered.")
         except Exception:
             pass
 
@@ -198,7 +199,7 @@ class CrxDeliveryPoller(QThread):
             pass
         self._delete_btrieve_and_file(record_id)
         try:
-            QMessageBox.information(None, "Computer-Rx: Fax Failed", f"Fax to {dest} failed after {self.max_attempts} attempts and was removed from the queue.")
+            get_notifier().info("Computer-Rx: Fax Failed", f"Fax to {dest} failed after {self.max_attempts} attempts and was removed from the queue.")
         except Exception:
             pass
 
@@ -209,7 +210,10 @@ class CrxDeliveryPoller(QThread):
             pass
         self._delete_btrieve_and_file(record_id)
         try:
-            QMessageBox.warning(None, "Computer-Rx: Number Blocked", "The destination fax appears blocked by the carrier. Investigate in WinRx. Pending records were removed.")
+            get_notifier().warning(
+                "Computer-Rx: Number Blocked",
+                f"Number has been blocked for too many failures.\n\nPlease investigate {dest} in WinRx.\n\nFaxes were not sent; pending records were removed."
+            )
         except Exception:
             pass
 

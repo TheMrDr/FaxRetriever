@@ -95,6 +95,10 @@ class FaxPollTimerProgressBar(QProgressBar):
     """
     Progress bar for visualizing polling interval countdown.
     Intended to be reset every successful poll cycle.
+
+    Also provides a hook `refresh_bearer_cb` to proactively refresh the bearer
+    token once when it enters the 1-hour-to-expiration window. This avoids
+    relying on any separate token UI component.
     """
 
     def __init__(self, parent=None):
@@ -116,6 +120,8 @@ class FaxPollTimerProgressBar(QProgressBar):
             )
 
         self.elapsed = 0
+        # Ensure we don't spam bearer refresh requests; refresh once per token cycle
+        self._refresh_requested = False
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
@@ -138,6 +144,7 @@ class FaxPollTimerProgressBar(QProgressBar):
             return
 
         self.elapsed = 0
+        self._refresh_requested = False
         self.timer.start(1000)
         self._update_display()
 
@@ -165,10 +172,17 @@ class FaxPollTimerProgressBar(QProgressBar):
 
         # If we’re inside the 1‑hour window and a hook exists, request refresh before the poll
         remaining = self._remaining_token_seconds()
-        if self.refresh_bearer_cb and remaining != -1 and remaining <= 3600:
+        if (
+            self.refresh_bearer_cb
+            and remaining != -1
+            and remaining <= 3600
+            and not self._refresh_requested
+        ):
             try:
+                self._refresh_requested = True
                 self.refresh_bearer_cb()
             except Exception as e:
+                self._refresh_requested = False  # allow retry on failure
                 self.log.warning(f"Bearer refresh hook failed: {e}")
 
         self.elapsed += 1

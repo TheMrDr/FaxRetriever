@@ -1,3 +1,13 @@
+# What's new in FaxRetriever 2.4.5 (2025-12-10)
+
+- Stability: Fixed a startup crash that could occur when SkySwitch returned HTTP 400 indicating a blocked destination number during initialization.
+  - Introduced a thread-safe UI notifier that marshals background-thread notifications to the main UI thread.
+  - Notifications raised by the Computer-Rx integration (blocked number, delivered, failed-after-3) are now shown safely without cross-thread UI access.
+  - If the UI isn’t ready yet, messages are queued and shown once the main window is displayed; events are always logged.
+  - Defensive defaults were added around integration settings to avoid missing-key errors at startup.
+
+---
+
 # What's new in FaxRetriever 2.4.4 (2025-12-10)
 
 - Computer-Rx delivery tracking and anti-blacklisting:
