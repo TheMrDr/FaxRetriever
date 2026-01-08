@@ -1,133 +1,159 @@
-# FaxRetriever Changelog (What’s New)
+# FaxRetriever — What’s New (for everyone)
 
-This page summarizes changes in each version in simple, user‑friendly language. For detailed how‑to steps, see Help → Read Me (User Guide).
-
-Tip: If an item mentions a menu path, it’s something you can change yourself in the app.
+This changelog explains updates in simple, user‑friendly terms. For step‑by‑step how‑tos, see the User Guide (Help → Read Me) or `src/docs/readme.md`.
 
 ---
 
-## 2.4.5 — 2025-12-10
-- Fixed a rare startup crash that could happen if the destination number was blocked by the provider.
-- Messages from the Computer‑Rx integration (for example, delivery updates or blocked destinations) are shown reliably even if they happen right as the app starts.
-- Startup is more forgiving if some integration settings are missing.
+## 2.5.0 — Clear delivery status and the Outbox (2026‑01‑07)
+What’s new
+- New Outbox tab shows everything you’ve sent and where it stands: Accepted (in‑flight), Delivered, Failed Delivery, Invalid Number, Quarantined, or Delivery Unknown (no final result after a day).
+- You’ll get a small pop‑up when a fax is accepted for sending and another when a final result is known.
+- If a number from Computer‑Rx/WinRx is missing/ambiguous, we stop it safely, move the PDF to `WinRx\FaxRetriever\Failed`, and show a friendly correction window so you can fix the number and resend.
+- Failed sends try again a few times and then move to Quarantined so you can decide what to do next.
+- Cover Sheet: Replaced the “Add a little…” footers with a new, more business-appropriate, “Configure Custom Footer” with a text area; when off or empty, the default footer “The remainder of this page is intentionally left blank.” is used.
+
+Why it matters
+- You can see at a glance what happened to each fax and quickly retry if needed.
+- Fewer surprises and easier recovery when a number is wrong or a delivery fails.
+- Simpler by default with optional customization of the cover sheet footer — no more randomized/silly messages.
+
+How to use it
+- Open the Outbox tab in the main window.
+- Use the row actions: View PDF, Open Folder, Retry/Send (enabled when the original PDF is available), or Remove.
+- To customize the cover footer: in Send Fax → Configure Cover Sheet, check “Configure Custom Footer” and enter your text; leave it off to use the default footer.
 
 ---
 
-## 2.4.4 — 2025-12-10
-Computer‑Rx delivery tracking and safer retries
-- FaxRetriever now tracks each Computer‑Rx outbound attempt and waits for a confirmed outcome before removing items from the WinRx queue. This helps avoid premature deletions and repeated sends.
-- If a number becomes blocked after many failed attempts, you’ll see a clear warning and pending items are removed to prevent repeated attempts.
-- Automatic retries happen up to 3 times by default; you can adjust this in Options if needed.
+## 2.4.3 — Two small improvements (2025‑12‑10 and 2025‑12‑01)
+- Logging control (Dec 10): System → Options → Logging lets you choose how much detail goes to the rotating log file. Your choice applies immediately and is remembered.
+- Small‑screen support (Dec 1): The main window fits better on short displays; the Send Fax panel scrolls so controls don’t get cut off.
 
-Logging and shutdown clarity
-- Crashes and exits are recorded more clearly in `log\ClinicFax.log` so support can tell the difference between a normal close and an unexpected exit.
+Why it matters
+- Easier troubleshooting when needed, and a better fit on smaller monitors.
 
 ---
 
-## 2.4.3 — 2025-12-10 and 2025-12-01
-- New: System → Options → Logging lets you choose the minimum log level written to the log file. This reduces clutter in Help → View Log. Changes apply immediately and persist across restarts.
-- Better small‑screen support: the main window fits on shorter displays and the Send Fax panel scrolls when space is tight.
+## 2.4.2 — Convert PDF to JPG tool (2025‑11‑03)
+What’s new
+- Tools → Convert PDF to JPG… turns any PDF into one JPG per page and saves them in a subfolder (e.g., `mydoc_p001.jpg`).
+
+Why it matters
+- Quickly create page images for systems that prefer JPGs.
+
+Tip
+- Packaged builds include everything you need. If you’re running from source and see a message about Poppler/page counts, install PyMuPDF (`pip install pymupdf`) or set `POPPLER_PATH`.
 
 ---
 
-## 2.4.2 — 2025-11-03
-Tools → Convert PDF to JPG…
-- Convert any selected PDF into JPG pages (one image per page), saved to a folder you choose. Good defaults are used for clarity and file size.
+## 2.4.1 — Keeps your download history in sync
+What’s new
+- If server history is ever lost, the app rebuilds it from your local records and re‑posts anything missing.
+
+Why it matters
+- The app won’t accidentally re‑download old faxes. Your “already handled” list stays intact.
 
 ---
 
-## 2.4.1
-- Receiver startup now double‑checks your history with the server and fills in anything missing from previous sessions so already‑processed faxes aren’t downloaded again.
+## 2.4.0 — Large faxes send in parts automatically
+What’s new
+- When attachments are too large to send in one go, the app splits them into multiple sessions for you. Oversize individual files are detected up front with clear guidance.
+- The first session can include a cover note indicating it’s a multi‑part fax.
+
+Why it matters
+- Big faxes go through reliably without you having to split files manually.
 
 ---
 
-## 2.4.0
-Multi‑part sending for large faxes
-- When your attachments are too large for a single send, FaxRetriever automatically splits them into multiple parts and asks you to confirm before sending. Very large individual files may need to be split or compressed first.
+## 2.3.1 — LibertyRx credentials fix
+- Fixed an issue that could block LibertyRx setup for some users.
 
 ---
 
-## 2.3.1
-- Fixed an issue that prevented LibertyRx licensing/credentials from being acquired in some cases.
+## 2.3.0 — LibertyRx forwarding
+What’s new
+- Inbound faxes can be forwarded securely to LibertyRx. Turn it on in System → Options → Integrations and enter your Pharmacy NPI (10 digits) and 7‑digit API Key.
+- Optional “drop‑to‑send” folder lets you place PDFs at `%LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\libertyrx_queue` for the next poll.
+- Very large faxes are split into pages if needed. You can choose to keep or purge local copies after a successful hand‑off.
 
-## 2.3.0
-LibertyRx integration (optional)
-- Forward inbound faxes directly to LibertyRx. Enable in System → Options → Integrations, choose LibertyRx, and enter your Pharmacy NPI (10 digits) and 7‑digit API Key.
-- Drop‑to‑send: Place PDFs in `%LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\libertyrx_queue` to forward them on the next poll.
-- If a fax is too large, it is automatically split into single pages for delivery. You can choose whether to keep a local copy after a successful delivery.
-- Help → View Log now opens your live log file from `log\ClinicFax.log`.
-
----
-
-## 2.2.0
-- Stronger protection against duplicates: once a fax is downloaded, it won’t be automatically re‑downloaded again. The app keeps a durable history so you don’t get duplicates across restarts or devices.
-- History is stored in two safe places (shared and per‑user) and merged automatically.
-- Fax History: The Download button now lets you pick PDF, JPG, or TIFF. Manual downloads are still allowed and recorded in history.
+Why it matters
+- Saves time by moving faxes straight into your pharmacy workflow.
 
 ---
 
-## 2.1.0
-- Choose any combination of download formats (PDF, JPG, TIFF) in Options → Fax Retrieval.
-- New: Save to multi‑page TIFF.
-- The receiver skips a fax only if all the formats you selected already exist.
-- Saving settings no longer switches you back to Sender‑only.
+## 2.2.0 — Never auto re‑download the same fax twice
+What’s new
+- A durable “downloaded” ledger records faxes you’ve already pulled, stored in two safe places on disk.
+- History → Download now offers PDF, JPG (one per page), or multi‑page TIFF.
+
+Why it matters
+- Reliability. Once handled, a fax won’t be pulled again automatically, even across restarts.
 
 ---
 
-## 2.0.9
-- The app only retrieves faxes when this device is Allowed for at least one number and is set to Sender/Receiver. When not allowed, retrieval controls are disabled to avoid mistakes.
-- Easier scanner selection: you’ll see friendly device names when picking a scanner.
+## 2.1.0 — More download formats and smarter receiving
+What’s new
+- Choose any combination of PDF, JPG, and TIFF in Options.
+- The receiver skips a fax only when all your selected outputs already exist.
+
+Why it matters
+- You get exactly the files you need without duplicates.
 
 ---
 
-## 2.0.8
-- Improved scanning reliability and better file sizes.
-- Temporary files are cleaned up automatically after a short delay.
+## 2.0.9 — Clear authorization for receiving
+- The app only retrieves when this device is set to Sender/Receiver and is allowed for at least one number. Controls are disabled when not authorized so it’s obvious what’s happening.
+
+Why it matters
+- Prevents accidental duplicate downloads and confusion over who’s retrieving.
 
 ---
 
-## 2.0.7
-- You can launch FaxRetriever from a network share more reliably; the app will relocate itself to a safe local cache automatically while still using the shared configuration.
-- Address Book works well for shared/network launches and saves safely when multiple users are involved.
+## 2.0.8 — Better scanner compatibility
+- Switched to a more compatible scanning method and improved image quality/size. Temporary files are cleaned up automatically.
 
 ---
 
-## 2.0.6
-- Default download format now falls back to PDF if nothing is selected, preventing a startup crash on fresh installs.
+## 2.0.7 — Reliable when launched from a network share
+- If you run the app from a network drive, it transparently runs from a safe local cache but keeps using the shared configuration and address book so all users stay in sync.
 
 ---
 
-## 2.0.5
-- Scanning chooses JPG when available, otherwise uses PDF. This removes the need for hard‑coded formats.
+## 2.0.6 — Safe default download format
+- If no download format was set previously, the app safely defaults to PDF.
 
 ---
 
-## 2.0.4
-- Download history is saved consistently so previously downloaded faxes aren’t pulled again even after inbox cleanup.
-- If you have only one scanner, it’s selected automatically; otherwise, you can choose from any installed device.
+## 2.0.5 — Smarter scanner file type
+- Scans use JPG when available, otherwise PDF.
 
 ---
 
-## 2.0.3
-- Scan multiple pages in one go without clicking Scan for each page.
-- The app now relaunches itself after completing an update.
+## 2.0.4 — Stable history and easier scanner selection
+- History is saved in a stable place so already‑downloaded faxes aren’t pulled again.
+- If only one scanner is installed, it’s selected automatically; otherwise you can pick from a friendly list.
 
 ---
 
-## 2.0.2
-- Updates are more reliable and happen at startup when a new version is available. Downloads are robust and won’t leave partial files.
+## 2.0.3 — Scan multiple pages at once
+- You can now scan several pages in one go. The auto‑update process was also improved so the app restarts cleanly after updates.
 
 ---
 
-## 2.0.1
-- Replaced a PDF tool to reduce extra dependencies. No other changes.
+## 2.0.2 — More reliable updates
+- Startup checks for new versions and a safer download/install process.
 
 ---
 
-## 2.0.0
-A major update focused on reliability, ease of use, and a cleaner interface.
-- Simpler sign‑in (tokens refresh automatically; your credentials are not stored)
-- Clearer UI with at‑a‑glance status and manual Check for New Faxes
-- One active retriever per number to avoid duplicates
-- Better logging and built‑in troubleshooting cues
-- Optional Computer‑Rx/WinRx integration
+## 2.0.1 — Fewer dependencies
+- Switched to a built‑in PDF renderer, reducing reliance on external tools.
+
+---
+
+## 2.0 — Big refresh focused on reliability and ease of use
+Highlights
+- Clearer interface with at‑a‑glance status.
+- Better protection against duplicate downloads.
+- Streamlined Send Fax with previews and optional cover page.
+- Automatic sign‑in handling behind the scenes.
+
+See the User Guide (Help → Read Me) for a full walkthrough.

@@ -1,14 +1,29 @@
 import ctypes
 import os
 import re
+import time
+import shutil
+import tempfile
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QMessageBox
-from ui.safe_notifier import get_notifier
 
 from core.app_state import app_state
 from core.config_loader import device_config, global_config
 from utils.logging_utils import get_logger
+from core.outbox_ledger import (
+    make_key_crx,
+    get_job,
+    upsert_job,
+    should_backoff,
+    record_failure,
+    mark_quarantined,
+    mark_invalid_number,
+    mark_accepted,
+    update_metadata,
+)
 
 
 class CRxIntegration2(QThread):
@@ -18,6 +33,7 @@ class CRxIntegration2(QThread):
     Only runs when 3rd party integrations are enabled and Computer-Rx is selected.
     """
     finished = pyqtSignal()
+    invalid_number_detected = pyqtSignal(dict)
 
     def __init__(self, base_dir: str, parent=None):
         super().__init__(parent)
@@ -40,6 +56,7 @@ class CRxIntegration2(QThread):
         self.KEY_LENGTH = ctypes.c_ushort(4)
         self.KEY_NUMBER = ctypes.c_ushort(0)
         self._should_run = self._check_enabled()
+        self._http_session = None
 
     def _check_enabled(self) -> bool:
         try:
@@ -78,20 +95,32 @@ class CRxIntegration2(QThread):
 
     @staticmethod
     def _format_phone_number(phone_number: str, caller_id: str) -> str:
-        phone_number = re.sub(r"\D", "", phone_number or "")
-        caller_id = re.sub(r"\D", "", caller_id or "")
-        # Try to extract area code from caller_id if 11 digits
-        if len(caller_id) == 11:
-            area_code = caller_id[1:4]
-        else:
-            area_code = "000"
-        if len(phone_number) == 7:
-            phone_number = "1" + area_code + phone_number
-        elif len(phone_number) == 10:
-            phone_number = "1" + phone_number
-        elif len(phone_number) != 11:
-            return ""
-        return phone_number
+        """
+        Normalize destination to NANP E.164 using the sender's caller ID area code by default.
+        Rules:
+        - Strip non-digits
+        - 7-digit local -> prepend area from caller_id (if available)
+        - 12-digit starting with '11' -> drop one leading '1'
+        - 10-digit -> prepend leading '1'
+        - Accept only if final form is 11 digits starting with '1'
+        """
+        digits = re.sub(r"\D", "", phone_number or "")
+        cid = re.sub(r"\D", "", caller_id or "")
+        area = None
+        if len(cid) == 11 and cid.startswith("1"):
+            area = cid[1:4]
+        elif len(cid) == 10:
+            area = cid[0:3]
+        # Local 7-digit -> use sender area if present
+        if len(digits) == 7 and area:
+            digits = area + digits
+        # Double leading '1' case (e.g., '11XXXXXXXXXX')
+        if len(digits) == 12 and digits.startswith("11"):
+            digits = digits[1:]
+        # 10-digit -> add leading 1
+        if len(digits) == 10:
+            digits = "1" + digits
+        return digits if (len(digits) == 11 and digits.startswith("1")) else ""
 
     def _resolve_btrieve_file(self, winrx_path: str) -> str | None:
         try:
@@ -101,6 +130,71 @@ class CRxIntegration2(QThread):
         except Exception:
             return None
         return None
+
+    def _get_session(self) -> requests.Session:
+        try:
+            if self._http_session is None:
+                s = requests.Session()
+                retry = Retry(
+                    total=3,
+                    connect=3,
+                    read=3,
+                    backoff_factor=1.5,
+                    status_forcelist=[429, 500, 502, 503, 504],
+                    allowed_methods=["POST", "GET"],
+                    raise_on_status=False,
+                )
+                adapter = HTTPAdapter(max_retries=retry)
+                s.mount("https://", adapter)
+                s.mount("http://", adapter)
+                self._http_session = s
+            return self._http_session
+        except Exception:
+            # Fallback to plain requests
+            return requests.Session()
+
+    def _is_file_stable(self, path: str, min_age_sec: float = 1.5) -> bool:
+        try:
+            s1 = os.stat(path)
+            time.sleep(0.5)
+            s2 = os.stat(path)
+            return (s1.st_size == s2.st_size) and ((time.time() - s2.st_mtime) >= min_age_sec)
+        except Exception:
+            return False
+
+    def _notify_toast(self, message: str) -> None:
+        try:
+            icon_ico = os.path.join(self.base_dir, "images", "logo.ico")
+            icon_png = os.path.join(self.base_dir, "images", "logo.png")
+            has_ico = os.path.exists(icon_ico)
+            has_png = os.path.exists(icon_png)
+            try:
+                from winotify import Notification
+                toast = Notification(
+                    app_id="FaxRetriever",
+                    title="FaxRetriever",
+                    msg=message,
+                    icon=(icon_png if has_png else (icon_ico if has_ico else None)),
+                )
+                toast.show()
+                return
+            except Exception:
+                pass
+            try:
+                from win10toast import ToastNotifier
+                notifier = ToastNotifier()
+                notifier.show_toast(
+                    "FaxRetriever",
+                    message,
+                    icon_path=(icon_ico if has_ico else None),
+                    duration=5,
+                    threaded=True,
+                )
+                return
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     @staticmethod
     def run_initial_cleanup_if_needed(parent=None):
@@ -319,161 +413,176 @@ class CRxIntegration2(QThread):
                 full_file_path = os.path.join(winrx_path, file_name) if file_name else ""
                 dest = self._format_phone_number(phone_number, caller_id)
                 if len(dest) != 11:
-                    self.log.warning(f"Computer-Rx: Invalid destination number for record {record_id}; skipping.")
+                    try:
+                        self.log.warning(f"Computer-Rx: Invalid/ambiguous destination for record {record_id}; removing record and parking file.")
+                    except Exception:
+                        pass
+                    # Remove BTR record to avoid infinite retries
+                    try:
+                        _ = btrieve.BTRCALL(self.B_DELETE, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
+                    except Exception:
+                        pass
+                    # Move file to WinRx\\FaxRetriever\\Failed for operator retry
+                    failed_full = ""
+                    try:
+                        if full_file_path and os.path.exists(full_file_path):
+                            failed_dir = os.path.join(winrx_path, "FaxRetriever", "Failed")
+                            os.makedirs(failed_dir, exist_ok=True)
+                            safe_name = f"invalid_{record_id}_" + os.path.basename(full_file_path)
+                            failed_full = os.path.join(failed_dir, safe_name)
+                            os.replace(full_file_path, failed_full)
+                    except Exception:
+                        pass
+                    # Ledger note
+                    try:
+                        key = make_key_crx(record_id, file_name)
+                        mark_invalid_number(self.base_dir, key, phone_number or "")
+                        update_metadata(self.base_dir, key, type="crx", record_id=record_id, file=failed_full or full_file_path, dest="", caller=caller_id)
+                    except Exception:
+                        pass
+                    # Emit non-blocking UI event to prompt correction
+                    try:
+                        payload = {
+                            "source": "crx",
+                            "record_id": record_id,
+                            "original_number": phone_number or "",
+                            "file_path": failed_full or (os.path.join(winrx_path, "FaxRetriever", "Failed", f"invalid_{record_id}_" + os.path.basename(full_file_path)) if (full_file_path and os.path.basename(full_file_path)) else ""),
+                            "suggested": "",
+                        }
+                        self.invalid_number_detected.emit(payload)
+                    except Exception:
+                        pass
                     status = btrieve.BTRCALL(self.B_GET_NEXT, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
                     continue
                 if not (full_file_path and os.path.exists(full_file_path)):
                     self.log.warning(f"Computer-Rx: Missing fax file for record {record_id}: {full_file_path}")
                     status = btrieve.BTRCALL(self.B_GET_NEXT, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
                     continue
-                # Send fax with up to 3 attempts; special handling for blocked numbers
+                # Ledger metadata & backoff check
+                key = make_key_crx(record_id, file_name)
+                try:
+                    upsert_job(self.base_dir, key, initializer={
+                        "type": "crx",
+                        "record_id": record_id,
+                        "file": full_file_path,
+                        "dest": dest,
+                        "caller": caller_id,
+                    })
+                except Exception:
+                    pass
+                try:
+                    job = get_job(self.base_dir, key)
+                    if should_backoff(job):
+                        try:
+                            self.log.info(f"Computer-Rx: Backing off record {record_id}; next eligible later.")
+                        except Exception:
+                            pass
+                        status = btrieve.BTRCALL(self.B_GET_NEXT, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
+                        continue
+                except Exception:
+                    pass
+
+                # Ensure file is stable; stage to temp before sending
+                if not self._is_file_stable(full_file_path):
+                    try:
+                        self.log.info(f"Computer-Rx: File not stable yet for record {record_id}; will retry next pass.")
+                    except Exception:
+                        pass
+                    status = btrieve.BTRCALL(self.B_GET_NEXT, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
+                    continue
+                try:
+                    staged = shutil.copy(full_file_path, os.path.join(tempfile.gettempdir(), f"crx_{record_id}_" + os.path.basename(full_file_path)))
+                except Exception:
+                    staged = full_file_path
+
+                # Send fax
                 url = f"https://telco-api.skyswitch.com/users/{fax_user}/faxes/send"
                 headers = {"Authorization": f"Bearer {bearer}"}
                 data = {"caller_id": caller_id, "destination": dest}
-                attempts = 0
-                sent_ok = False
-                blocked_number = False
-                last_status = None
-                last_text = None
-                while attempts < 3 and not sent_ok and not blocked_number:
-                    attempts += 1
-                    files = {"filename": (os.path.basename(full_file_path), open(full_file_path, 'rb'), 'application/pdf')}
-                    try:
-                        resp = requests.post(url, files=files, data=data, headers=headers, timeout=60)
-                        last_status = resp.status_code
+                session = self._get_session()
+                resp = None
+                try:
+                    with open(staged, 'rb') as fh:
+                        files = {"filename": (os.path.basename(staged), fh, 'application/pdf')}
+                        resp = session.post(url, files=files, data=data, headers=headers, timeout=60)
+                    code = getattr(resp, 'status_code', 0)
+                    if code == 429:
+                        self.log.warning("Computer-Rx: Throttled by provider (429). Deferring remaining records to next run.")
+                        break
+                    if 200 <= code < 300:
                         try:
-                            last_text = resp.text
+                            size_bytes = os.path.getsize(staged) if os.path.exists(staged) else None
                         except Exception:
-                            last_text = None
-                        if resp.status_code == 200:
-                            sent_ok = True
-                            try:
-                                from utils.crx_outbound_ledger import new_pending, sha1_file
-                            except Exception:
-                                new_pending = None
-                                sha1_file = None
-                            # On API 200 (queued), do NOT delete the Btrieve record or file yet.
-                            # Append a pending ledger entry for delivery tracking.
                             size_bytes = None
-                            try:
-                                size_bytes = os.path.getsize(full_file_path)
-                            except Exception:
-                                pass
-                            file_hash = None
-                            try:
-                                if sha1_file:
-                                    file_hash = sha1_file(full_file_path)
-                            except Exception:
-                                file_hash = None
-                            if new_pending:
-                                try:
-                                    new_pending(
-                                        record_id=record_id,
-                                        dest_e164=dest,
-                                        caller_id=caller_id,
-                                        file_path=full_file_path,
-                                        attempt_no=attempts,
-                                        size_bytes=size_bytes,
-                                        pages_estimate=None,
-                                        file_hash=file_hash,
-                                        submit_time_iso=None,
-                                        extra={}
-                                    )
-                                    self.log.info(f"Computer-Rx: Fax queued (record {record_id}) to {dest} on attempt {attempts}; awaiting delivery status.")
-                                except Exception as le:
-                                    self.log.warning(f"Computer-Rx: Failed to append ledger entry for record {record_id}: {le}")
-                            else:
-                                self.log.info(f"Computer-Rx: Fax queued (record {record_id}) to {dest} on attempt {attempts}; ledger unavailable, will rely on queue state.")
-                        else:
-                            # Check for blocked number message (HTTP 400 with specific message)
-                            msg_body = ""
-                            try:
-                                j = resp.json()
-                                msg_body = (j.get("message") or "") if isinstance(j, dict) else ""
-                            except Exception:
-                                # Fallback to text
-                                msg_body = (resp.text or "")
-                            combined = f"{msg_body} {resp.text if hasattr(resp, 'text') else ''}".lower()
-                            if resp.status_code == 400 and ("number is blocked" in combined or "blocked" in combined and "many attempts" in combined):
-                                blocked_number = True
-                                self.log.error(f"Computer-Rx: Send failed for record {record_id} -> {dest}; HTTP {resp.status_code} {resp.text}")
-                                # Inform user and remove records/files to prevent infinite retries
-                                try:
-                                    get_notifier().warning(
-                                        "Computer-Rx: Number Blocked",
-                                        f"Number has been blocked for too many failures.\n\nPlease investigate {dest} in WinRx.\n\nFaxes were not sent; pending records were removed."
-                                    )
-                                except Exception:
-                                    pass
-                                # Delete current record now
-                                del_status = btrieve.BTRCALL(self.B_DELETE, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
-                                if del_status != 0:
-                                    self.log.warning(f"Computer-Rx: Failed to remove record {record_id} after block detection. Status {del_status}")
-                                # Try to delete the associated file
-                                try:
-                                    if os.path.exists(full_file_path):
-                                        os.remove(full_file_path)
-                                except Exception as de:
-                                    self.log.warning(f"Computer-Rx: Failed to delete file {full_file_path}: {de}")
-                                # Sweep remaining records for this destination and remove them to stop future attempts
-                                try:
-                                    P2 = ctypes.create_string_buffer(128)
-                                    D2 = ctypes.create_string_buffer(self.BUFFER_LENGTH)
-                                    K2 = ctypes.create_string_buffer(4)
-                                    L2 = ctypes.c_ushort(4)
-                                    N2 = ctypes.c_ushort(0)
-                                    DL2 = ctypes.c_ushort(self.BUFFER_LENGTH)
-                                    s2 = btrieve.BTRCALL(self.B_GET_FIRST, P2, D2, ctypes.byref(DL2), K2, L2, None)
-                                    removed_count = 0
-                                    while s2 == 0:
-                                        try:
-                                            raw2 = D2.raw[:DL2.value]
-                                            rec2_id = int.from_bytes(raw2[0:4], 'little', signed=False)
-                                            pn2 = raw2[4:18].decode('ascii', errors='ignore').replace('\x00', '').strip()
-                                            fn2 = raw2[27:80].decode('ascii', errors='ignore').replace('\x00', '').strip()
-                                        except Exception:
-                                            rec2_id = -1
-                                            pn2 = ""
-                                            fn2 = ""
-                                        dest2 = self._format_phone_number(pn2, caller_id)
-                                        if dest2 == dest:
-                                            # delete this record
-                                            ds2 = btrieve.BTRCALL(self.B_DELETE, P2, D2, ctypes.byref(DL2), K2, N2, None)
-                                            if ds2 != 0:
-                                                self.log.warning(f"Computer-Rx: Sweep delete failed for record {rec2_id}; status {ds2}")
-                                            else:
-                                                removed_count += 1
-                                                # remove file
-                                                fp2 = os.path.join(winrx_path, fn2) if fn2 else ""
-                                                try:
-                                                    if fp2 and os.path.exists(fp2):
-                                                        os.remove(fp2)
-                                                except Exception as de2:
-                                                    self.log.warning(f"Computer-Rx: Sweep failed to delete file {fp2}: {de2}")
-                                            # After delete, do not call GET_NEXT immediately; current position should now be at prior; call GET_NEXT to continue
-                                            s2 = btrieve.BTRCALL(self.B_GET_NEXT, P2, D2, ctypes.byref(DL2), K2, N2, None)
-                                        else:
-                                            s2 = btrieve.BTRCALL(self.B_GET_NEXT, P2, D2, ctypes.byref(DL2), K2, N2, None)
-                                    if removed_count:
-                                        self.log.info(f"Computer-Rx: Removed {removed_count} additional pending record(s) for blocked number {dest}.")
-                                except Exception as swe:
-                                    self.log.warning(f"Computer-Rx: Sweep removal error for blocked number {dest}: {swe}")
-                            else:
-                                self.log.error(f"Computer-Rx: Send failed for record {record_id} -> {dest}; HTTP {resp.status_code} {resp.text}")
-                    except Exception as se:
-                        self.log.error(f"Computer-Rx: Error sending record {record_id} (attempt {attempts}): {se}")
-                    finally:
                         try:
-                            files["filename"][1].close()
+                            mark_accepted(self.base_dir, key, dest=dest, caller=caller_id, bytes_total=size_bytes)
                         except Exception:
                             pass
-                # If not sent and not blocked after 3 attempts, notify user
-                if (not sent_ok) and (not blocked_number) and attempts >= 3:
+                        # Immediate operator feedback: upstream acceptance
+                        try:
+                            self._notify_toast(f"Fax accepted by carrier for {dest}.")
+                        except Exception:
+                            pass
+                        self.log.info(f"Computer-Rx: Fax accepted (record {record_id}) to {dest}; removing record and file.")
+                        del_status = btrieve.BTRCALL(self.B_DELETE, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
+                        if del_status != 0:
+                            self.log.warning(f"Computer-Rx: Failed to remove record {record_id} from Btrieve. Status {del_status}")
+                        try:
+                            if full_file_path != staged and os.path.exists(staged):
+                                os.remove(staged)
+                        except Exception:
+                            pass
+                        try:
+                            if os.path.exists(full_file_path):
+                                os.remove(full_file_path)
+                        except Exception as de:
+                            self.log.warning(f"Computer-Rx: Failed to delete file {full_file_path}: {de}")
+                    else:
+                        msg = None
+                        try:
+                            msg = resp.text[:500]
+                        except Exception:
+                            msg = ""
+                        self.log.error(f"Computer-Rx: Send failed for record {record_id} -> {dest}; HTTP {code} {msg}")
+                        # Record failure and possibly quarantine
+                        try:
+                            job = record_failure(self.base_dir, key, f"HTTP {code}")
+                            attempts = int(job.get('attempts', 0))
+                            if attempts >= 3:
+                                # Delete BTR record and move file to Failed
+                                _ = btrieve.BTRCALL(self.B_DELETE, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
+                                try:
+                                    if full_file_path and os.path.exists(full_file_path):
+                                        failed_dir = os.path.join(winrx_path, "FaxRetriever", "Failed")
+                                        os.makedirs(failed_dir, exist_ok=True)
+                                        safe_name = f"failed_{record_id}_" + os.path.basename(full_file_path)
+                                        os.replace(full_file_path, os.path.join(failed_dir, safe_name))
+                                except Exception:
+                                    pass
+                                mark_quarantined(self.base_dir, key, reason=f"HTTP {code}")
+                                self._notify_toast(f"Fax failed after 3 attempts to {dest}.")
+                        except Exception:
+                            pass
+                except Exception as se:
                     try:
-                        get_notifier().info(
-                            "Computer-Rx: Fax Failed",
-                            f"Fax to {dest} failed after 3 attempts. It will remain in the queue. Please verify the number and try again.",
-                        )
+                        self.log.error(f"Computer-Rx: Error sending record {record_id}: {se}")
+                    except Exception:
+                        pass
+                    try:
+                        job = record_failure(self.base_dir, key, f"EXC: {se}")
+                        attempts = int(job.get('attempts', 0))
+                        if attempts >= 3:
+                            _ = btrieve.BTRCALL(self.B_DELETE, self.POSITION_BLOCK, self.DATA_BUFFER, ctypes.byref(data_length), self.KEY_BUFFER, self.KEY_NUMBER, None)
+                            try:
+                                if full_file_path and os.path.exists(full_file_path):
+                                    failed_dir = os.path.join(winrx_path, "FaxRetriever", "Failed")
+                                    os.makedirs(failed_dir, exist_ok=True)
+                                    safe_name = f"failed_{record_id}_" + os.path.basename(full_file_path)
+                                    os.replace(full_file_path, os.path.join(failed_dir, safe_name))
+                            except Exception:
+                                pass
+                            mark_quarantined(self.base_dir, key, reason="exception")
+                            self._notify_toast(f"Fax failed after 3 attempts to {dest}.")
                     except Exception:
                         pass
                 # Next

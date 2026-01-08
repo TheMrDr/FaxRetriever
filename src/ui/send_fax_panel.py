@@ -9,7 +9,7 @@ from PyQt5.QtGui import QIcon, QImage, QMovie, QPixmap
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
                              QGraphicsScene, QGraphicsView, QGridLayout,
                              QGroupBox, QHBoxLayout, QInputDialog, QLabel,
-                             QLineEdit, QListWidget, QListWidgetItem, QMenu,
+                             QLineEdit, QTextEdit, QListWidget, QListWidgetItem, QMenu,
                              QMessageBox, QPushButton, QSizePolicy,
                              QVBoxLayout, QWidget)
 
@@ -178,7 +178,7 @@ class SendFaxPanel(QWidget):
         # Add Configure Cover Sheet button next to the checkbox
         self.configure_cover_btn = QPushButton("Configure Cover Sheet")
         self.configure_cover_btn.setToolTip(
-            "Set header details and footer options for the cover sheet"
+            "Set header details and optional custom footer text for the cover sheet"
         )
         self.configure_cover_btn.clicked.connect(self._open_cover_config)
         recipient_layout.addWidget(self.cover_checkbox, row, 0, 1, 3)
@@ -415,7 +415,7 @@ class SendFaxPanel(QWidget):
 
     def _open_cover_config(self):
         from PyQt5.QtWidgets import (QDialog, QDialogButtonBox, QFormLayout,
-                                     QHBoxLayout, QLabel, QVBoxLayout)
+                                     QLabel, QVBoxLayout)
 
         dlg = QDialog(self)
         dlg.setWindowTitle("Configure Cover Sheet")
@@ -436,84 +436,40 @@ class SendFaxPanel(QWidget):
         except Exception:
             pass
 
-        # Footer enable + category + info (spoiler)
-        footer_chk = QCheckBox("Add a little… to your cover page")
-        footer_chk.setChecked(
-            (device_config.get("Cover Sheet", "footer_enabled", "No") or "No").lower()
+        # Custom footer enable + editor
+        custom_footer_chk = QCheckBox("Configure Custom Footer")
+        custom_footer_chk.setToolTip("Enable and edit a custom footer to replace the default footer text.")
+        custom_footer_chk.setChecked(
+            (device_config.get("Cover Sheet", "custom_footer_enabled", "No") or "No").lower()
             == "yes"
         )
-
-        # Load categories dynamically from shared/cover_messages.json (normalized to lowercase)
+        default_footer = "The remainder of this page is intentionally left blank."
+        custom_footer_text = QTextEdit()
+        custom_footer_text.setPlaceholderText(default_footer)
         try:
-            from utils.cover_messages import load_message_pool
-
-            pool = load_message_pool(self.base_dir)
+            # Load previous text; fall back to default footer as a starting point
+            prev_text = device_config.get("Cover Sheet", "custom_footer_text", "")
         except Exception:
-            pool = {
-                "classic": ["The remainder of this page is intentionally left blank."]
-            }
-        categories = (
-            sorted(list(pool.keys())) if isinstance(pool, dict) else ["classic"]
-        )
+            prev_text = ""
+        custom_footer_text.setPlainText(prev_text.strip() or default_footer)
+        custom_footer_text.setToolTip("This text will appear at the bottom of the cover page when enabled.")
+        custom_footer_text.setEnabled(custom_footer_chk.isChecked())
 
-        footer_combo = QComboBox()
-        for key in categories:
-            display = key.title()
-            footer_combo.addItem(display, key)
-        cur_cat = (
-            (
-                device_config.get("Cover Sheet", "footer_category", "classic")
-                or "classic"
-            )
-            .strip()
-            .lower()
-        )
-        idx = max(0, footer_combo.findData(cur_cat))
-        footer_combo.setCurrentIndex(idx)
+        def _toggle_custom_footer(state):
+            custom_footer_text.setEnabled(state == Qt.Checked)
 
-        # Info icon (ℹ) to preview messages of selected category when enabled
-        info_lbl = QLabel("\u2139")  # ℹ
-        info_lbl.setToolTip("")
-        info_lbl.setFixedWidth(18)
-        info_lbl.setAlignment(Qt.AlignCenter)
-        info_lbl.setStyleSheet(
-            "QLabel { border: 1px solid #999; border-radius: 9px; color: #555; font-weight: bold; }"
-        )
-
-        def _update_info_tooltip():
-            key = footer_combo.currentData() or "classic"
-            msgs = pool.get(key) if isinstance(pool, dict) else []
-            if not msgs:
-                tip = "No sample messages available."
-            else:
-                # Build a compact tooltip with up to ~10 messages
-                sample = msgs[:10]
-                tip = "\n".join(f"• {m}" for m in sample)
-            info_lbl.setToolTip(tip)
-            info_lbl.setVisible(footer_chk.isChecked())
-
-        footer_combo.currentIndexChanged.connect(_update_info_tooltip)
-        footer_chk.toggled.connect(_update_info_tooltip)
-
-        # Row widget for footer controls
-        footer_row = QHBoxLayout()
-        footer_row.addWidget(footer_chk)
-        footer_row.addWidget(footer_combo)
-        footer_row.addWidget(info_lbl)
-        footer_row.addStretch()
+        try:
+            custom_footer_chk.stateChanged.connect(_toggle_custom_footer)
+        except Exception:
+            pass
 
         form.addRow("Company Name", company)
         form.addRow("Address", address)
         form.addRow("Phone", phone)
         form.addRow("Email", email)
-        # Add composed footer row
-        row_container = QWidget()
-        row_container.setLayout(footer_row)
-        form.addRow(row_container)
+        form.addRow(custom_footer_chk)
+        form.addRow("Custom Footer Text", custom_footer_text)
         v.addLayout(form)
-
-        # Initialize the info tooltip visibility/content
-        _update_info_tooltip()
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         v.addWidget(buttons)
@@ -526,14 +482,12 @@ class SendFaxPanel(QWidget):
                 device_config.set("Cover Sheet", "email", email.text().strip())
                 device_config.set(
                     "Cover Sheet",
-                    "footer_enabled",
-                    "Yes" if footer_chk.isChecked() else "No",
+                    "custom_footer_enabled",
+                    "Yes" if custom_footer_chk.isChecked() else "No",
                 )
-                selected_key = (
-                    footer_combo.currentData()
-                    or (footer_combo.currentText() or "classic").strip().lower()
-                )
-                device_config.set("Cover Sheet", "footer_category", selected_key)
+                # Persist custom text only if enabled; otherwise keep the last value but it's ignored
+                txt = (custom_footer_text.toPlainText() or "").strip()
+                device_config.set("Cover Sheet", "custom_footer_text", txt)
                 device_config.save()
             except Exception:
                 pass
@@ -1113,29 +1067,23 @@ class SendFaxPanel(QWidget):
 
     # ----- Cover Sheet Generation and Management -----
     def _generate_cover_pdf(self) -> str | None:
-        """Generate a one-page cover PDF using configured header/footer + To/Memo. Returns temp file path or None."""
+        """Generate a one-page cover PDF using configured header and footer + To/Memo. Returns temp file path or None."""
         if not REPORTLAB_AVAILABLE:
             return None
-        try:
-            from utils.cover_messages import random_footer
-        except Exception:
-            random_footer = None
         try:
             # Load saved cover config
             company = device_config.get("Cover Sheet", "company", "")
             address = device_config.get("Cover Sheet", "address", "")
             phone = device_config.get("Cover Sheet", "phone", "")
             email = device_config.get("Cover Sheet", "email", "")
-            footer_enabled = (
-                device_config.get("Cover Sheet", "footer_enabled", "No") or "No"
+            custom_footer_enabled = (
+                device_config.get("Cover Sheet", "custom_footer_enabled", "No") or "No"
             ).lower() == "yes"
-            footer_category = device_config.get(
-                "Cover Sheet", "footer_category", "classic"
-            )
+            custom_footer_text = device_config.get("Cover Sheet", "custom_footer_text", "")
         except Exception:
             company = address = phone = email = ""
-            footer_enabled = False
-            footer_category = "classic"
+            custom_footer_enabled = False
+            custom_footer_text = ""
         try:
             fd, path = mkstemp(suffix=".pdf")
             os.close(fd)
@@ -1173,11 +1121,13 @@ class SendFaxPanel(QWidget):
             )
             c.drawCentredString(width / 2.0, center_y - 0.35 * inch, f"Memo: {memo}")
 
-            # Footer: either random from pool or classic default
+            # Footer: default or custom if enabled
             footer_text = "The remainder of this page is intentionally left blank."
             try:
-                if footer_enabled and random_footer is not None:
-                    footer_text = random_footer(self.base_dir, footer_category)
+                if custom_footer_enabled:
+                    candidate = (custom_footer_text or "").strip()
+                    if candidate:
+                        footer_text = candidate
             except Exception:
                 pass
             c.setFont("Helvetica-Oblique", 10)

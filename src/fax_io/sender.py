@@ -8,9 +8,19 @@ import tempfile
 from typing import List, Dict, Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from core.app_state import app_state
 from core.config_loader import device_config
+from core.outbox_ledger import (
+    make_key_manual,
+    upsert_job,
+    record_failure,
+    mark_quarantined,
+    mark_accepted,
+    update_metadata,
+)
 from utils.document_utils import (
     normalize_pdf,
     generate_cover_pdf_with_multipart_note,
@@ -393,6 +403,75 @@ class FaxSender:
             endpoint = f"https://telco-api.skyswitch.com/users/{fax_user}/faxes/send"
             headers = {"Authorization": f"Bearer {app_state.global_cfg.bearer_token}"}
 
+            # Prepare retrying session
+            def _get_session() -> requests.Session:
+                try:
+                    s = requests.Session()
+                    retry = Retry(
+                        total=3,
+                        connect=3,
+                        read=3,
+                        backoff_factor=1.5,
+                        status_forcelist=[429, 500, 502, 503, 504],
+                        allowed_methods=["POST", "GET"],
+                        raise_on_status=False,
+                    )
+                    adapter = HTTPAdapter(max_retries=retry)
+                    s.mount("https://", adapter)
+                    s.mount("http://", adapter)
+                    return s
+                except Exception:
+                    return requests.Session()
+
+            # Simple toast (best‑effort, UI independent)
+            def _notify_toast(message: str) -> None:
+                try:
+                    icon_ico = os.path.join(base_dir, "images", "logo.ico")
+                    icon_png = os.path.join(base_dir, "images", "logo.png")
+                    has_ico = os.path.exists(icon_ico)
+                    has_png = os.path.exists(icon_png)
+                    try:
+                        from winotify import Notification
+                        toast = Notification(
+                            app_id="FaxRetriever",
+                            title="FaxRetriever",
+                            msg=message,
+                            icon=(icon_png if has_png else (icon_ico if has_ico else None)),
+                        )
+                        toast.show()
+                        return
+                    except Exception:
+                        pass
+                    try:
+                        from win10toast import ToastNotifier
+                        notifier = ToastNotifier()
+                        notifier.show_toast(
+                            "FaxRetriever",
+                            message,
+                            icon_path=(icon_ico if has_ico else None),
+                            duration=5,
+                            threaded=True,
+                        )
+                        return
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+            # Ledger: create manual job (based on first attachment)
+            first_path = attachments[0] if attachments else None
+            key = None
+            try:
+                key = make_key_manual(first_path or "", dest_digits)
+                upsert_job(base_dir, key, initializer={
+                    "type": "manual",
+                    "file": first_path or "",
+                    "dest": dest_digits,
+                    "caller": caller_digits,
+                })
+            except Exception:
+                key = None
+
             # Report planned total sessions via callback if provided
             try:
                 if progress_callback:
@@ -400,6 +479,8 @@ class FaxSender:
             except Exception:
                 pass
 
+            session_client = _get_session()
+            total_bytes_sent = 0
             for i, part in enumerate(sessions, start=1):
                 # Notify progress (current session index, total)
                 try:
@@ -428,17 +509,41 @@ class FaxSender:
                     log.info(
                         f"Sending session {i}/{len(sessions)} with {len(part)} attachment(s); est bytes ≈ {est_bytes}"
                     )
-                    resp = requests.post(
+                    resp = session_client.post(
                         endpoint, data=data, files=files, headers=headers, timeout=60
                     )
-
-                    if resp.status_code != 200:
-                        log.error(
-                            f"Session {i}/{len(sessions)} failed: {resp.status_code} {resp.text}"
-                        )
+                    code = getattr(resp, "status_code", 0)
+                    if code == 429:
+                        log.warning("Manual send throttled by provider (429). Aborting remaining sessions.")
+                        # Record failure/backoff
+                        if key:
+                            job = record_failure(base_dir, key, "HTTP 429")
+                            attempts = int(job.get("attempts", 0))
+                            if attempts >= 3:
+                                mark_quarantined(base_dir, key, reason="HTTP 429")
+                                _notify_toast(f"Fax failed after 3 attempts to {dest_digits}.")
+                        return False
+                    if not (200 <= code < 300):
+                        body = None
+                        try:
+                            body = resp.text[:300]
+                        except Exception:
+                            body = ""
+                        log.error(f"Session {i}/{len(sessions)} failed: {code} {body}")
+                        if key:
+                            job = record_failure(base_dir, key, f"HTTP {code}")
+                            attempts = int(job.get("attempts", 0))
+                            if attempts >= 3:
+                                mark_quarantined(base_dir, key, reason=f"HTTP {code}")
+                                _notify_toast(f"Fax failed after 3 attempts to {dest_digits}.")
                         return False
                     else:
                         log.info(f"Session {i}/{len(sessions)} sent successfully.")
+                        # Accumulate bytes
+                        try:
+                            total_bytes_sent += est_bytes
+                        except Exception:
+                            pass
                 finally:
                     # Close per-session handles
                     for fh in handles_this:
@@ -446,6 +551,31 @@ class FaxSender:
                             fh.close()
                         except Exception:
                             log.debug("Failed to close file handle after session", exc_info=True)
+
+            # All sessions sent OK → mark accepted & toast
+            try:
+                if key:
+                    # Optionally compute short hash of first file for correlation
+                    short_hash = None
+                    try:
+                        import hashlib
+                        if first_path and os.path.exists(first_path):
+                            with open(first_path, "rb") as _f:
+                                short_hash = hashlib.sha256(_f.read()).hexdigest()[:12]
+                    except Exception:
+                        short_hash = None
+                    mark_accepted(base_dir, key, dest=dest_digits, caller=caller_digits, bytes_total=total_bytes_sent)
+                    if short_hash:
+                        update_metadata(base_dir, key, file_hash=short_hash)
+                # Toast (respect device setting if available via app_state)
+                try:
+                    notif_enabled = (str(getattr(app_state.device_cfg, "notifications_enabled", "Yes") or "Yes").strip().lower() == "yes")
+                except Exception:
+                    notif_enabled = True
+                if notif_enabled:
+                    _notify_toast(f"Fax accepted by carrier for {dest_digits}.")
+            except Exception:
+                pass
 
             return True
 

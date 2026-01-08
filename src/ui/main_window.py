@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QFileDialog, QGridLayout,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMenuBar,
                              QMessageBox, QPushButton, QSizePolicy, QSplitter,
-                             QStatusBar, QScrollArea, QSystemTrayIcon, QVBoxLayout, QWidget)
+                             QStatusBar, QScrollArea, QSystemTrayIcon, QVBoxLayout, QWidget, QTabWidget)
 
 from core.address_book import AddressBookManager
 from core.app_state import app_state
@@ -24,15 +24,15 @@ from core.config_loader import device_config, global_config
 from core.license_client import retrieve_skyswitch_token
 from fax_io.receiver import FaxReceiver
 from integrations.computer_rx import CRxIntegration2
-from ui.threads.crx_delivery_poller import CrxDeliveryPoller
-from ui.safe_notifier import get_notifier
 from ui.about_dialog import AboutDialog
 from ui.address_book_dialog import AddressBookDialog
 from ui.dialogs import LogViewer, MarkdownViewer, WhatsNewDialog
 from ui.fax_history_panel import FaxHistoryPanel
 from ui.options_dialog import OptionsDialog
 from ui.send_fax_panel import SendFaxPanel
-from ui.status_panel import FaxPollTimerProgressBar
+from ui.status_panel import FaxPollTimerProgressBar, TokenLifespanProgressBar
+from ui.outbox_panel import OutboxPanel
+from ui.number_correction_dialog import NumberCorrectionDialog
 from utils.logging_utils import get_logger
 from utils.document_utils import convert_pdf_to_jpgs
 from version import __version__
@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"FaxRetriever {__version__}")
         # Allow resizable window for single-pane layout
         # Lowered minimum height to support smaller displays while keeping width
-        self.setMinimumSize(1100, 700)
+        self.setMinimumSize(1100, 600)
         # self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         self.setWindowFlags(self.windowFlags() | Qt.WindowMinimizeButtonHint)
         self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
@@ -83,6 +83,7 @@ class MainWindow(QMainWindow):
         self.select_folder_button = QPushButton("Select Save Location")
         self.send_fax_button = QPushButton("Send Fax")
         self.poll_button = QPushButton("Check for New Faxes")
+        self.token_bar = TokenLifespanProgressBar()
         self.poll_bar = FaxPollTimerProgressBar()
 
         # Cache banner pixmap once to avoid repeated disk reads and rescaling
@@ -100,8 +101,9 @@ class MainWindow(QMainWindow):
         except Exception:
             self._splash_pixmap_orig = QPixmap()
 
-        # Proactive bearer refresh handled by poll bar when within 60 minutes of expiry
-        self.poll_bar.refresh_bearer_cb = self._retrieve_token
+        self.token_bar.warning_threshold_sec = 3600
+        self.token_bar.token_expiring_soon.connect(self._retrieve_token)
+
         self.poll_bar.retrieveFaxes = self._on_poll_timer
 
         # Dialogs
@@ -385,42 +387,24 @@ class MainWindow(QMainWindow):
         self._show_overlay(dialog)
 
     def _build_banner(self):
-        """Prepare the logo; it will scale to the header's height dynamically."""
+        """Prepare a small logo pixmap; it will be embedded in the left pane header instead of a full-width row."""
         try:
-            # Ensure we have an original pixmap cached
-            if not hasattr(self, "_banner_pixmap_orig") or self._banner_pixmap_orig.isNull():
-                self._banner_pixmap_orig = QPixmap(
-                    os.path.join(self.base_dir, "images", "corner_logo.png")
+            if (
+                hasattr(self, "_banner_pixmap_orig")
+                and not self._banner_pixmap_orig.isNull()
+            ):
+                pixmap = self._banner_pixmap_orig.scaledToWidth(
+                    160, Qt.SmoothTransformation
                 )
-            # Set a temporary pixmap; actual scaling happens in _scale_banner_to_header()
-            if not self._banner_pixmap_orig.isNull():
-                self.banner.setPixmap(self._banner_pixmap_orig)
+            else:
+                pixmap = QPixmap(
+                    os.path.join(self.base_dir, "images", "corner_logo.png")
+                ).scaledToWidth(160, Qt.SmoothTransformation)
+            self.banner.setPixmap(pixmap)
         except Exception:
             pass
-        self.banner.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        # Let layout control width; keep height constrained by header's max height
+        self.banner.setAlignment(Qt.AlignLeft)
         self.banner.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        try:
-            self._scale_banner_to_header()
-        except Exception:
-            pass
-
-    def _scale_banner_to_header(self):
-        """Scale the logo pixmap to fit within the header height while preserving aspect ratio."""
-        try:
-            if not hasattr(self, "header_widget") or self.header_widget is None:
-                return
-            pix = getattr(self, "_banner_pixmap_orig", QPixmap())
-            if pix.isNull():
-                return
-            # Determine target height: header's height minus vertical margins
-            header_h = max(self.header_widget.height(), 1)
-            # Account for layout top/bottom margins (~16 total from 8,8,8,8 earlier)
-            target_h = max(min(header_h - 10, 200), 24)
-            scaled = pix.scaledToHeight(target_h, Qt.SmoothTransformation)
-            self.banner.setPixmap(scaled)
-        except Exception:
-            pass
 
     def _build_main_controls(self):
         """Main content: left control pane + embedded Send Fax + right history panel in a splitter."""
@@ -499,15 +483,18 @@ class MainWindow(QMainWindow):
         top_row.addWidget(self.stop_retrieval_button)
         rb_v.addLayout(top_row)
 
-        # Row 2: Poll progress bar (fills the available width)
+        # Row 2: stack the progress bars vertically for legibility and width
         try:
+            self.token_bar.setFixedHeight(18)
             self.poll_bar.setFixedHeight(18)
         except Exception:
             pass
         bars_v = QVBoxLayout()
         bars_v.setContentsMargins(0, 0, 0, 0)
         bars_v.setSpacing(4)
+        self.token_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.poll_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        bars_v.addWidget(self.token_bar)
         bars_v.addWidget(self.poll_bar)
         rb_v.addLayout(bars_v)
 
@@ -518,7 +505,20 @@ class MainWindow(QMainWindow):
         right_v = QVBoxLayout(right_container)
         right_v.setContentsMargins(0, 0, 0, 0)
         right_v.setSpacing(6)
-        right_v.addWidget(self.fax_history_panel, 1)
+        # Outbox tab: dedicated panel for outbound jobs
+        try:
+            self.outbox_panel = OutboxPanel(self.base_dir, self.app_state, self)
+            try:
+                self.outbox_panel.request_correction.connect(self._open_number_correction)
+            except Exception:
+                pass
+            self.tabs = QTabWidget()
+            self.tabs.addTab(self.fax_history_panel, "History")
+            self.tabs.addTab(self.outbox_panel, "Outbox")
+            right_v.addWidget(self.tabs, 1)
+        except Exception:
+            # Fallback: if OutboxPanel fails to initialize, keep history only
+            right_v.addWidget(self.fax_history_panel, 1)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(left_container)
@@ -590,10 +590,6 @@ class MainWindow(QMainWindow):
 
     def _quit_via_tray(self):
         try:
-            try:
-                self.log.info("User requested Quit via system tray menu.")
-            except Exception:
-                pass
             self._force_exit = True
             try:
                 if hasattr(self, "tray_icon") and self.tray_icon:
@@ -602,10 +598,6 @@ class MainWindow(QMainWindow):
                 pass
             self.close()
         except Exception:
-            try:
-                self.log.exception("Error during tray quit flow")
-            except Exception:
-                pass
             self.close()
 
     def _manual_poll(self):
@@ -677,6 +669,10 @@ class MainWindow(QMainWindow):
         # Stop timers/polling
         try:
             self.poll_bar.timer.stop()
+        except Exception:
+            pass
+        try:
+            self.token_bar.timer.stop()
         except Exception:
             pass
         # Apply new UI state
@@ -954,6 +950,7 @@ class MainWindow(QMainWindow):
             timezone.utc
         ).isoformat()
 
+        self.token_bar.restart_progress()
         self.poll_bar.restart_progress()
         self.status_bar.showMessage("Bearer refreshed.", 2000)
 
@@ -1003,6 +1000,7 @@ class MainWindow(QMainWindow):
             return False
 
     def _start_token_refresh(self):
+        self.token_bar.token_expiring_soon.connect(self._retrieve_token)
 
         self.token_thread = RetrieveToken()
         self.token_thread.token_retrieved.connect(self._start_services)
@@ -1059,6 +1057,7 @@ class MainWindow(QMainWindow):
             self._maybe_run_integrations()
         except Exception:
             pass
+        self.token_bar.restart_progress()
         self.poll_bar.restart_progress()
         self.status_bar.showMessage("Fax engine ready.", 3000)
 
@@ -1201,7 +1200,9 @@ class MainWindow(QMainWindow):
                 self.fax_history_panel.setVisible(False)
             if hasattr(self, "send_fax_panel"):
                 self.send_fax_panel.setVisible(False)
+            self.token_bar.setValue(0)
             try:
+                self.token_bar.timer.stop()
                 self.poll_bar.timer.stop()
             except Exception:
                 pass
@@ -1222,10 +1223,12 @@ class MainWindow(QMainWindow):
         self.limited_logo_label.setVisible(False)
 
         self.tools_menu.menuAction().setVisible(True)
+        self.token_bar.setVisible(True)
         if hasattr(self, "fax_history_panel"):
             self.fax_history_panel.setVisible(True)
         if hasattr(self, "send_fax_panel"):
             self.send_fax_panel.setVisible(True)
+        self.token_bar.restart_progress()
 
         # Default visibility for retrieval header controls
         show_configure = True
@@ -1389,6 +1392,7 @@ class MainWindow(QMainWindow):
                 self.save_location_input,
                 self.select_folder_button,
                 self.poll_button,
+                self.token_bar,
                 self.poll_bar,
             ]:
                 try:
@@ -1438,33 +1442,6 @@ class MainWindow(QMainWindow):
                 return
             self.crx_thread = CRxIntegration2(self.base_dir)
 
-            # Start delivery poller if enabled
-            try:
-                poll_enabled = True
-                try:
-                    cfg = device_config.get("Integrations", "integration_settings", {}) or {}
-                    v = str(cfg.get("enable_crx_delivery_tracking", "Yes") or "Yes").strip().lower()
-                    poll_enabled = (v == "yes")
-                except Exception:
-                    poll_enabled = True
-                if poll_enabled:
-                    interval = 60
-                    max_attempts = 3
-                    try:
-                        interval = int(cfg.get("crx_poll_interval_sec", 60))
-                    except Exception:
-                        pass
-                    try:
-                        max_attempts = int(cfg.get("crx_max_attempts", 3))
-                    except Exception:
-                        pass
-                    # Avoid duplicate poller
-                    if getattr(self, "crx_poller", None) is None or not self.crx_poller.isRunning():
-                        self.crx_poller = CrxDeliveryPoller(self, interval_sec=interval, max_attempts=max_attempts)
-                        self.crx_poller.start()
-            except Exception:
-                pass
-
             def _on_done():
                 try:
                     self.crx_thread = None
@@ -1475,6 +1452,10 @@ class MainWindow(QMainWindow):
                 self.crx_thread.finished.connect(_on_done)
             except Exception:
                 pass
+            try:
+                self.crx_thread.invalid_number_detected.connect(self._open_number_correction)
+            except Exception:
+                pass
             self.crx_thread.start()
         except Exception as e:
             try:
@@ -1482,24 +1463,39 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
+    def _open_number_correction(self, payload: dict):
+        try:
+            # Instantiate a modeless dialog; do not block UI thread
+            dlg = NumberCorrectionDialog(self.base_dir, payload, self)
+            try:
+                dlg.send_completed.connect(lambda _ok: self._refresh_outbox())
+            except Exception:
+                pass
+            # Keep a reference until closed to avoid premature GC
+            if not hasattr(self, "_open_dialogs"):
+                self._open_dialogs = []
+            self._open_dialogs.append(dlg)
+            try:
+                dlg.destroyed.connect(lambda _=None, d=dlg: self._open_dialogs.remove(d) if d in self._open_dialogs else None)
+            except Exception:
+                pass
+            dlg.show()
+        except Exception:
+            try:
+                self.log.debug("Failed to open number correction dialog", exc_info=True)
+            except Exception:
+                pass
+
+    def _refresh_outbox(self):
+        try:
+            if hasattr(self, "outbox_panel") and self.outbox_panel:
+                self.outbox_panel.refresh()
+        except Exception:
+            pass
+
     def closeEvent(self, event):
         try:
             if getattr(self, "_force_exit", False):
-                try:
-                    self.log.info("Application closing (forced exit requested).")
-                except Exception:
-                    pass
-                # Stop CRx delivery poller if running
-                try:
-                    if getattr(self, "crx_poller", None):
-                        self.crx_poller.stop()
-                        try:
-                            self.crx_poller.wait(2000)
-                        except Exception:
-                            pass
-                        self.crx_poller = None
-                except Exception:
-                    pass
                 event.accept()
                 return
             close_to_tray = (
@@ -1516,10 +1512,6 @@ class MainWindow(QMainWindow):
             )
             if close_to_tray:
                 try:
-                    self.log.info("Close requested; honoring 'Close to Tray' setting and minimizing to tray.")
-                except Exception:
-                    pass
-                try:
                     if hasattr(self, "tray_icon") and self.tray_icon:
                         self.tray_icon.showMessage(
                             "FaxRetriever",
@@ -1534,10 +1526,6 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
             if is_receiver:
-                try:
-                    self.log.info("Close requested while in Receiver mode; prompting user for action.")
-                except Exception:
-                    pass
                 box = QMessageBox(self)
                 box.setWindowTitle("Close FaxRetriever")
                 box.setIcon(QMessageBox.Warning)
@@ -1550,41 +1538,18 @@ class MainWindow(QMainWindow):
                 box.exec_()
                 clicked = box.clickedButton()
                 if clicked == minimize_btn:
-                    try:
-                        self.log.info("User chose: Minimize to Tray.")
-                    except Exception:
-                        pass
                     self.hide()
                     event.ignore()
                     return
                 elif clicked == close_btn:
-                    try:
-                        self.log.info("User chose: Close Anyway. Application window will close.")
-                    except Exception:
-                        pass
                     event.accept()
                     return
                 else:
-                    try:
-                        self.log.info("User canceled close.")
-                    except Exception:
-                        pass
                     event.ignore()
                     return
-            try:
-                self.log.info("Application window closed by user.")
-            except Exception:
-                pass
             event.accept()
         except Exception:
             event.accept()
-
-    def showEvent(self, event):
-        try:
-            get_notifier().set_ready(self)
-        except Exception:
-            pass
-        return super().showEvent(event)
 
     def resizeEvent(self, event):
         try:
@@ -1592,11 +1557,6 @@ class MainWindow(QMainWindow):
                 # Cap header to a reasonable height; allow up to ~25% but not overly large
                 cap = int(min(max(120, self.height() * 0.25), 240))
                 self.retrieval_section.setMaximumHeight(cap)
-            # After capping header height, scale the banner to fit the header area
-            try:
-                self._scale_banner_to_header()
-            except Exception:
-                pass
             # Rescale limited-mode splash to fill window while preserving aspect
             if (
                 hasattr(self, "limited_logo_label")

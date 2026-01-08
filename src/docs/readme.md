@@ -1,210 +1,196 @@
-# FaxRetriever — User Guide
+# FaxRetriever 2.5.0 — User Guide
 
-Welcome to FaxRetriever, a Windows desktop app for sending and receiving faxes. This guide walks you through setup, everyday use, and answers to common questions.
+Welcome to FaxRetriever — a simple, Windows‑friendly desktop app for sending and receiving faxes. This guide explains how to install, set up, and use the app day‑to‑day. 
 
-If you ever get stuck, we’re happy to help:
+If you ever need help, we’re here:
 - Phone: 405-300-0122
 - Email: info@clinicnetworking.com
 - Web: https://ClinicNetworking.com
 
+Tip: For a summary of recent updates, open Help → What’s New or see src/docs/changes.md.
+
 ---
 
 ## What FaxRetriever does
-- Send faxes from documents on your PC (PDF and images)
-- Receive faxes automatically and save them to a folder you choose
-- Keep things organized with archiving, optional printing, and a searchable history
-- Connect to optional integrations (LibertyRx or Computer‑Rx/WinRx)
-
-Behind the scenes, FaxRetriever handles sign‑in tokens for you so you don’t have to manage passwords or sessions.
+- Send faxes from PDFs and images on your computer.
+- Receive faxes automatically on a schedule and save them where you choose.
+- Keep things organized with history, optional printing, and archiving.
+- Integrate with LibertyRx (forward inbound faxes) or Computer‑Rx/WinRx (automate outbound sends). Only one integration may be active at a time.
 
 ---
 
-## System requirements
+## Before you start
 - Windows 10 or later (64‑bit recommended)
 - Internet connection
-- PDF preview support is included (no extra install needed)
 
-Developers (optional):
-- Python 3.10+ if running from source
-- From the project root: `python main.py`
+Optional for IT/developers: The app can run from source with Python 3.10+ (`python main.py`), but typical users install and run the packaged app.
 
 ---
 
-## Key ideas
-- Device mode
-  - Sender — Send only
-  - Sender/Receiver — Send and automatically retrieve inbound faxes
-- Save Location — The folder where received faxes are stored
-- Assignments — To prevent duplicates, only one active “retriever” device per fax number at a time
-- Download history — Once a fax is downloaded, FaxRetriever records its ID in an append‑only log so it is not downloaded again automatically. Manual, user‑initiated downloads are always allowed.
-- Tokens — Authentication is automatic and refreshed before it expires
+## Quick start (2–3 minutes)
+1) Launch FaxRetriever.
+2) Go to System → Options.
+3) Enter the Fax User and Authentication Token provided by Clinic Networking. Click Save.
+4) In the main window, click Configure Fax Retrieval to choose which number(s) this device should retrieve (optional if you only send faxes).
+5) Click Select Save Location and choose the folder where received faxes should be stored.
+6) You’re ready to go. The app will check for new faxes automatically.
+
+You can check immediately at any time with Check for New Faxes.
 
 ---
 
-## Quick start (about 2 minutes)
-1) Launch FaxRetriever
-2) Go to `System` → `Options`
-3) Enter the `Fax User` and `Authentication Token` provided by Clinic Networking, then click `Save`
-4) In the main window, click `Configure Fax Retrieval` to select the number(s) this device should retrieve (optional if send‑only)
-5) Click `Select Save Location` and choose a folder for received faxes
-6) You’re set! In Sender/Receiver mode, FaxRetriever checks for new faxes automatically. You can click `Check for New Faxes` any time.
+## Everyday use
 
----
-
-## Sending faxes
-1) Open the Send Fax panel (left side)
-2) Add recipients and attach your documents
-3) Optionally add a cover page (Attention, Memo, etc.)
-4) Review your attachments with the built‑in preview
-5) Click `Send`
+### Send a fax
+1) Use the Send Fax panel on the left.
+2) Enter the destination fax number and add your documents (PDFs and common image types).
+3) Optional: add a cover sheet (Attention, Memo, etc.).
+4) Review the built‑in preview.
+5) Click Send.
 
 Notes
-- Phone numbers are normalized automatically (digits only)
-- Multi‑page PDFs and images are supported
-- Large outbound jobs are split into multiple sessions automatically when needed to stay under provider limits; you’ll be asked to confirm before sending a multi‑part fax
+- The app cleans up phone numbers automatically (digits only).
+- Multi‑page PDFs and images are supported.
+
+### Receive faxes automatically
+1) Make sure the app is running and you’ve selected a Save Location.
+2) Click Configure Fax Retrieval to select one or more numbers for this device.
+3) FaxRetriever will retrieve faxes only when this device is allowed as the retriever for a number and the mode is Sender/Receiver. When not authorized, manual and scheduled polling are disabled by design.
+4) Received faxes are saved to your chosen folder. You can also enable automatic printing in Options.
+
+Top‑bar indicators
+- Token Lifespan: time remaining before the app refreshes your sign‑in token automatically.
+- Next Poll: countdown to the next check for new faxes (click to poll now).
+
+### Track outgoing faxes with Outbox
+The Outbox shows what you’ve sent and what happened next.
+- Statuses: Accepted (in‑flight), Delivered, Failed Delivery, Invalid Number, Quarantined, Delivery Unknown (no final result after one day).
+- Refresh: updates automatically while the app is open and after you take actions.
+- Actions per item: View PDF, Open Folder, Retry/Send (enabled when the original PDF exists), Remove (for finished items).
+- Notifications: you’ll see a short notification when a fax is accepted for sending and another when a final delivery result is known.
+
+Invalid number (Computer‑Rx/WinRx)
+- If a number from WinRx is missing or unclear, the job is stopped so it doesn’t loop.
+- The original PDF is moved to WinRx\FaxRetriever\Failed.
+- You’ll see an easy correction window to view the PDF, fix the number, and resend.
+
+### Find and save received faxes (History)
+- Use the History panel to see thumbnails and open a full preview.
+- Filter between Inbound and Outbound and search by number, name (Address Book), or status.
+- Click Download to save as PDF, JPG (one per page), or TIFF (single multi‑page file).
+
+Important: Once a fax is downloaded by the receiver, it’s recorded in an internal ledger. Faxes in that ledger are never downloaded again automatically, even after restarts. You can still download them manually from the History panel whenever you like.
+
+### Address Book
+- Save frequent contacts and reuse them when sending.
+- Import or export entries for sharing/backup (Tools → Manage Address Book).
 
 ---
 
-## Receiving faxes
-1) Make sure FaxRetriever is running and authenticated
-2) Click `Configure Fax Retrieval`, choose your retrieval number(s), and select a `Save Location`
-3) FaxRetriever retrieves faxes only when this device is authorized as the retriever (Sender/Receiver mode AND Allowed status). When not authorized, polling and manual checks are disabled.
-4) Faxes are saved into your folder on a schedule; you can click the poll timer to retrieve now
+## Options you may want to set
+Open System → Options.
 
-Helpful options (System → Options)
-- Archive retention (e.g., 30, 60, 90, 120, 365 days)
-- Print received faxes automatically
+- Polling Frequency: specifies how frequently (in minutes) FaxRetriever checks for new faxes.
+- Download Format: specifies which file format you would like your faxes saved in. Choose from PDF, JPG, and TIFF.
+- File Naming: Specifies the saved file name format. Choose from Fax ID or CID-DDMM-HHMM where the date and time stamp reflect the original receipt time of the fax.
+- Print Faxes: prints received faxes automatically upon download.
+- Enable Notifications: enables or disables Windows desktop notifications on issues or new fax.
+- Close to Tray: when closed, FaxRetriever will continue running in the system tray. It will continue to retrieve faxes if it's setup to retrieve faxes.
+- Start with System: starts FaxRetriever with Windows.
+- Archive retention: how long to keep local copies of all inbound faxes (e.g., 30–365 days).
+- Logging: choose how much detail is written to the rotating log file (applies immediately and is saved for next time).
+- Enable 3rd Party Integrations: choose LibertyRx or Computer‑Rx/WinRx (only one can be active at once).
 
-Status indicators (top header)
-- Token Lifespan — Time remaining until auto‑refresh
-- Next Poll — Countdown to the next retrieval (click to retrieve now)
-
----
-
-## Fax History
-- Browse thumbnails for inbound faxes and open a full preview
-- Filter with the Inbound/Outbound toggles and search by number, name (if in Address Book), or status
-- Click `Download` on a fax card to choose a format:
-  - PDF — single PDF file
-  - JPG — one JPG per page (prefix-1.jpg, -2.jpg, ...)
-  - TIFF — single multi‑page .tiff file
-
-Notes
-- Manual downloads are recorded in the download history and won’t be auto re‑downloaded by the receiver
-- If a local PDF already exists, FaxRetriever reuses it for conversions when possible
-
----
-
-## Address Book
-- Save and reuse contacts
-- Import or export entries for backup and sharing
-- Open from `Tools → Manage Address Book`
+Behind the scenes
+- Tokens are handled automatically and refreshed before they expire.
+- Only one active retriever device per fax number is allowed to prevent duplicates.
 
 ---
 
 ## Integrations (optional)
-FaxRetriever supports one of the following at a time: LibertyRx or Computer‑Rx/WinRx.
+You can enable exactly one integration at a time in System → Options → Integrations.
 
-LibertyRx (forward inbound faxes)
-- Setup
-  - In `System → Options → Integrations`, choose LibertyRx
-  - Enter your Pharmacy NPI (10 digits) and 7‑digit API Key
-  - Where to find your LibertyRx API Key: In Liberty RXQ/PharmacyOne → System → Settings → Utilities → API Keys, click Add to generate a random key. Use this key for Clinic Networking Faxing.
-- How it works
-  - Inbound faxes are posted to Liberty over HTTPS; success shows as delivered
-  - If a fax is too large, FaxRetriever splits it into single pages and delivers them one by one
-  - Automatic retries with backoff; credentials are stored encrypted using Windows DPAPI
-- Drop‑to‑send folder (optional)
-  - Drop PDFs into: %LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\libertyrx_queue
-  - Files are forwarded on the next poll and removed after a successful delivery
-- Caller ID from filename (optional)
-  - If the PDF name starts with 11‑digit caller ID using CID‑DDMM‑HHMM (or CID‑DDMMYY‑HHMMSS), that ID is used as FromNumber
-- Keep local copies (optional)
-  - When enabling LibertyRx, you can choose whether to keep local copies after a successful delivery
+LibertyRx — forward inbound faxes
+- Enter your Pharmacy NPI (10 digits) and 7‑digit API Key.
+- When enabled, new inbound faxes are forwarded securely to LibertyRx. Very large faxes may be split into single pages for reliable delivery.
+- You can choose whether to keep or remove local copies after a successful hand‑off.
+- Tip: Your LibertyRx API Key can be created in Liberty RXQ/PharmacyOne → System → Settings → Utilities → API Keys (click Add).
 
-Computer‑Rx/WinRx
-- Select the WinRx folder (contains `FaxControl.btr`) and follow prompts
-- FaxRetriever reads `FaxControl.btr` and sends documents using your selected caller ID
-
----
-
-## Where settings are stored
-- Global (all users on this machine)
-  - `shared\config\config.json`
-- Device/user (per Windows user)
-  - `%LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\config.json`
-- Downloaded fax history (append‑only; prevents auto re‑downloads)
-  - `shared\history\downloaded_faxes.log`
-  - `%LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\history\downloaded_faxes.log`
-
-Notes
-- The history is merged from both locations; do not edit these files
-- Use Options in the app to make changes
-
----
-
-## Logs and help
-- Logs: `log\ClinicFax.log` (rotating log; useful for support)
-- Help → Read Me — opens this guide in a window
-- Help → What’s New — opens the changelog
-
----
-
-## Troubleshooting
-Can’t send faxes
-- Check `System → Options` for your Fax User and Authentication Token
-- Make sure you have a valid caller ID (assigned by Clinic Networking)
-- Open `log\ClinicFax.log` for details
-
-Not receiving faxes
-- Confirm this device is Allowed as the retriever for at least one number (one active retriever per number)
-- Verify `Sender/Receiver` mode is selected
-- Click `Configure Fax Retrieval` to check the selected numbers
-- Ensure a Save Location is set and accessible
-- When not authorized, manual and scheduled polling are disabled by design
-- Check your internet connection and firewall
-
-Token expired or authentication errors
-- FaxRetriever refreshes tokens automatically
-- If needed, close and reopen FaxRetriever, re‑initialize in Options, or contact support
-
-Scanner issues (sending from paper)
-- If multiple scanners are present, select the correct device when prompted
-- Ensure drivers are installed; try unplug/replug or let Windows re‑detect
-
----
-
-## Privacy & security
-- FaxRetriever never stores your provider username/password
-- Authentication tokens are handled automatically and refreshed before they expire
-- Local configuration stores device and app settings only
-
----
-
-## FAQ
-- Can multiple devices retrieve the same number?
-  - No. To prevent duplicates, only one active retriever per number is allowed. Any number of devices can send.
-- Can I retrieve faxes from multiple numbers?
-  - Yes. Use the `Configure Fax Retrieval` button in the top header.
-- Can I change where faxes are saved?
-  - Yes. Use the `Select Save Location` button in the top header.
-- Can I open received faxes automatically?
-  - Faxes do not auto‑open, but you can enable printing, or open them from your save folder.
+Computer‑Rx/WinRx — automate outbound sends
+- Select your WinRx folder and follow the prompts.
+- FaxRetriever reads new items and sends them using your selected caller ID.
+- If a number is invalid, you’ll be prompted to correct and resend.
 
 ---
 
 ## Tools
 Convert PDF to JPG…
-- Open `Tools → Convert PDF to JPG…`
-- Select one or more PDFs and an output folder; the app creates a subfolder per PDF and saves one JPG per page
-- Default rendering is 200 DPI at JPEG quality 90. The app tries PyMuPDF first, then uses pdf2image with Poppler when needed
-- Output naming example: `mydoc_p001.jpg`, `mydoc_p002.jpg`, …
+- Open Tools → Convert PDF to JPG…
+- Pick one or more PDFs and an output folder.
+- The app creates a subfolder per PDF and saves one JPG per page (e.g., mydoc_p001.jpg).
+
+IT/Developers: If you see a message about Poppler or page counts while running from source, install PyMuPDF (`pip install pymupdf`) or set the `POPPLER_PATH` environment variable. Packaged builds include what’s needed.
 
 ---
 
-## Getting more help
+## Where things are saved
+- Global settings (all users on this PC):
+  - shared\config\config.json
+- Device/user settings (this Windows user):
+  - %LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\config.json
+- Download history ledger (prevents automatic re‑downloads):
+  - shared\history\downloaded_faxes.log
+  - %LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\history\downloaded_faxes.log
+- Logs
+  - log\ClinicFax.log (rotating)
+
+Please don’t edit these files directly. Use the app’s Options instead.
+
+---
+
+## Troubleshooting
+Can’t send
+- Open Options and confirm Fax User and Authentication Token.
+- Make sure a valid caller ID is assigned to you.
+- See Help → View Log for details.
+
+Not receiving
+- Confirm the app is in Sender/Receiver mode.
+- Click Configure Fax Retrieval and make sure this device is allowed for the number(s) you expect.
+- Verify a Save Location is set and the drive/folder is available.
+- Internet access and firewall rules can also block retrieval.
+
+Tokens or sign‑in
+- Tokens refresh automatically. If needed, close and reopen the app and re‑save Options.
+
+Scanner issues (sending from paper)
+- If you have more than one scanner, pick the correct one when prompted.
+- Update or reinstall the scanner’s driver; unplug/replug to let Windows re‑detect.
+
+---
+
+## Privacy & security
+- FaxRetriever never stores your provider username or password.
+- Authentication tokens are managed automatically and refreshed as needed.
+- Local configuration stores only device and app settings.
+
+---
+
+## FAQ
+- Can multiple devices retrieve the same number?
+  - No. To prevent duplicates, only one device can retrieve a number at a time. Any number of devices can send.
+- Can I retrieve from multiple numbers?
+  - Yes. Use Configure Fax Retrieval to select more than one.
+- Can I change where faxes are saved?
+  - Yes. Click Select Save Location at the top of the main window.
+- Can faxes open automatically when received?
+  - They don’t open automatically. You can enable printing or open them from your folder or History.
+
+---
+
+## Need more help?
 - Phone: 405-300-0122
 - Email: info@clinicnetworking.com
 - Web: https://ClinicNetworking.com
 
-Thank you for using FaxRetriever! 
+Thank you for using FaxRetriever!

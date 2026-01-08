@@ -26,6 +26,14 @@ from core.config_loader import device_config, global_config
 from utils.secure_store import secure_decrypt_for_machine
 from integrations.libertyrx_client import liberty_base_url, encode_customer, send_fax
 from utils.pdf_utils import split_pdf_pages
+from core.outbox_ledger import (
+    all_jobs,
+    mark_delivered,
+    mark_failed_delivery,
+    mark_delivery_unknown,
+    update_metadata,
+    prune_old,
+)
 import threading
 
 # Module-level lock to ensure only one receiver run at a time within the process
@@ -643,6 +651,12 @@ class FaxReceiver(QThread):
             except Exception as le:
                 self.log.exception("Local inbox cleanup encountered an error")
 
+            # Outbound reconciliation (Stage 2): correlate accepted jobs and notify
+            try:
+                self._reconcile_outbound_status(base_url, fax_user, headers)
+            except Exception:
+                self.log.exception("Outbound reconciliation encountered an error")
+
             self.log.info(f"Receiver pass complete. Processed {processed} item(s).")
             try:
                 notif_enabled = (
@@ -873,6 +887,154 @@ class FaxReceiver(QThread):
         self.log.debug(
             "Toast notification could not be shown (no supported library found)."
         )
+
+    def _reconcile_outbound_status(self, base_url: str, fax_user: str, headers: dict):
+        """
+        Correlate accepted outbound jobs in the outbox ledger with SkySwitch outbound list
+        and mark them delivered/failed/unknown. Sends operator toasts when transitioning
+        from accepted -> delivered/failed/unknown (only once per job).
+        """
+        try:
+            # List outbound faxes with pagination
+            list_url = f"{base_url}/users/{fax_user}/faxes/outbound"
+            next_url = list_url
+            outbound = []
+            while next_url:
+                resp = requests.get(next_url, headers=headers, timeout=30)
+                if resp.status_code != 200:
+                    self.log.error(
+                        f"Outbound reconciliation: list failed HTTP {resp.status_code} {resp.text}"
+                    )
+                    break
+                payload = resp.json() or {}
+                items = payload.get("data", []) or []
+                for item in items:
+                    try:
+                        # Extract basic fields with fallbacks
+                        created_at = item.get("created_at")
+                        # Try status/state fields that provider might expose
+                        status_text = (
+                            item.get("status")
+                            or item.get("state")
+                            or item.get("delivery_status")
+                            or ""
+                        )
+                        # Destination field candidates
+                        dest_raw = (
+                            item.get("destination")
+                            or item.get("to")
+                            or item.get("recipient")
+                            or ""
+                        )
+                        # Normalize digits
+                        dest_digits = "".join(ch for ch in str(dest_raw) if ch.isdigit())
+                        # Parse timestamp
+                        if created_at:
+                            if "." in created_at:
+                                ts = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+                            else:
+                                ts = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                        else:
+                            ts = datetime.now(timezone.utc)
+                        outbound.append({
+                            "created_at": ts,
+                            "dest": dest_digits,
+                            "status": str(status_text or "").lower(),
+                        })
+                    except Exception:
+                        self.log.debug("Outbound reconciliation: failed to parse one outbound item", exc_info=True)
+                        continue
+                links = payload.get("links", {}) or {}
+                nxt = links.get("next")
+                next_url = (list_url + nxt) if (nxt and not nxt.startswith("http")) else nxt
+
+            if not outbound:
+                return
+
+            # Index by last-10 digits to tolerate presence/absence of leading '1'
+            by_last10 = {}
+            for it in outbound:
+                d = it.get("dest") or ""
+                last10 = d[-10:] if len(d) >= 10 else d
+                by_last10.setdefault(last10, []).append(it)
+
+            # Correlate accepted jobs
+            jobs = all_jobs(self.base_dir)
+            now = datetime.now(timezone.utc)
+            for key, job in (jobs or {}).items():
+                try:
+                    if str(job.get("status")) != "accepted":
+                        continue
+                    dest = str(job.get("dest") or "")
+                    last10 = ("".join(ch for ch in dest if ch.isdigit()))[-10:]
+                    if not last10:
+                        continue
+                    acc_iso = job.get("accepted_at")
+                    if not acc_iso:
+                        continue
+                    try:
+                        if "." in acc_iso:
+                            acc_ts = datetime.strptime(acc_iso, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+                        else:
+                            acc_ts = datetime.strptime(acc_iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                    except Exception:
+                        acc_ts = now
+
+                    cands = by_last10.get(last10) or []
+                    if cands:
+                        # Choose nearest by time within ±2 minutes window
+                        best = None
+                        best_dt = None
+                        for it in cands:
+                            dt = abs((it["created_at"] - acc_ts).total_seconds())
+                            if best is None or dt < best_dt:
+                                best = it
+                                best_dt = dt
+                        if best is not None and best_dt is not None and best_dt <= 120:
+                            st = best.get("status", "")
+                            notified = bool(job.get("notified"))
+                            if st:
+                                if ("deliver" in st and "un" not in st and "fail" not in st):
+                                    mark_delivered(self.base_dir, key)
+                                    if not notified:
+                                        try:
+                                            self._notify_toast(1, f"Fax delivered to {dest}.")
+                                        except Exception:
+                                            pass
+                                    update_metadata(self.base_dir, key, notified=True)
+                                elif ("fail" in st) or ("undeliver" in st) or st in {"failed", "error"}:
+                                    mark_failed_delivery(self.base_dir, key, reason=st)
+                                    if not notified:
+                                        try:
+                                            self._notify_toast(1, f"Fax delivery failed to {dest}.")
+                                        except Exception:
+                                            pass
+                                    update_metadata(self.base_dir, key, notified=True)
+                                else:
+                                    # unknown status; keep waiting
+                                    pass
+                            continue
+                    # If we reach here: no candidates matched. If older than 24h, mark unknown (only once).
+                    if (now - acc_ts).total_seconds() > 24 * 3600:
+                        if str(job.get("status")) == "accepted":
+                            mark_delivery_unknown(self.base_dir, key)
+                            if not bool(job.get("notified")):
+                                try:
+                                    self._notify_toast(1, f"Fax delivery status unknown for {dest}.")
+                                except Exception:
+                                    pass
+                            update_metadata(self.base_dir, key, notified=True)
+                except Exception:
+                    self.log.debug("Outbound reconciliation: job correlation failure", exc_info=True)
+                    continue
+
+            # Prune old ledger entries occasionally
+            try:
+                prune_old(self.base_dir, max_age_days=60)
+            except Exception:
+                pass
+        except Exception:
+            self.log.exception("Outbound reconciliation fatal error")
 
     def _delete_server_fax(
         self, base_url: str, fax_user: str, fax_id: str, headers: dict
