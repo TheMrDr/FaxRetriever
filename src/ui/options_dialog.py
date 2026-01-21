@@ -384,10 +384,45 @@ class OptionsDialog(QDialog):
             _note = "Endpoint selection is automatic for this build."
         self.liberty_note_label = QLabel(_note)
         self.liberty_note_label.setObjectName("hint")
+        # Liberty Local Listener enable + port
+        self.liberty_enable_checkbox = QCheckBox("Enable Sending from LibertyRx (Local Listener)")
+        enabled_local = (device_config.get("Integrations", "libertyrx_enabled", "No") or "No").strip().lower() == "yes"
+        self.liberty_enable_checkbox.setChecked(enabled_local)
+        self.liberty_port_spin = QSpinBox()
+        self.liberty_port_spin.setRange(80, 65535)
+        self.liberty_port_spin.setValue(int(device_config.get("Integrations", "libertyrx_port", 18761) or 18761))
         lib_form.addRow("Pharmacy NPI:", self.liberty_npi_input)
         lib_form.addRow("Pharmacy API Key:", self.liberty_api_key_input)
+        lib_form.addRow("LibertyRx Local Listener:", self.liberty_enable_checkbox)
+        lib_form.addRow("Listener Port:", self.liberty_port_spin)
+
+        # Helper URL label
+        self.liberty_url_label = QLineEdit("")
+        self.liberty_url_label.setReadOnly(True)
+        self.liberty_url_label.setStyleSheet("background-color: #f0f0f0; border: 1px solid #ccc;")
+        lib_form.addRow("Endpoint URL:", self.liberty_url_label)
+        self.liberty_url_hint = QLabel("Copy this exact URL into Liberty's Fax Settings (POST Endpoint).")
+        self.liberty_url_hint.setObjectName("hint")
+        lib_form.addRow("", self.liberty_url_hint)
+
         lib_form.addRow(self.liberty_note_label)
         layout.addWidget(self.liberty_container)
+
+        def update_url_label():
+            import socket
+            try:
+                hostname = socket.gethostname()
+                ip = socket.gethostbyname(hostname)
+            except Exception:
+                ip = "<this-PC-IP>"
+            port = self.liberty_port_spin.value()
+            if port == 80:
+                self.liberty_url_label.setText(f"http://{ip}/liberty/fax")
+            else:
+                self.liberty_url_label.setText(f"http://{ip}:{port}/liberty/fax")
+
+        self.liberty_port_spin.valueChanged.connect(lambda _: update_url_label())
+        update_url_label()
 
         def toggle_visibility():
             enabled = self.integration_checkbox.isChecked()
@@ -755,6 +790,21 @@ class OptionsDialog(QDialog):
                 winrx_path = ""
             device_config.set("Integrations", "winrx_path", winrx_path)
             # Do not change retriever mode when saving options; preserve current setting.
+
+            # Persist LibertyRx Local Listener toggles (device-level)
+            try:
+                lib_enabled = (
+                    self.liberty_enable_checkbox.isChecked() if hasattr(self, "liberty_enable_checkbox") else False
+                )
+                lib_port = (
+                    int(self.liberty_port_spin.value()) if hasattr(self, "liberty_port_spin") else 18761
+                )
+            except Exception:
+                lib_enabled, lib_port = False, 18761
+            device_config.set(
+                "Integrations", "libertyrx_enabled", "Yes" if lib_enabled else "No"
+            )
+            device_config.set("Integrations", "libertyrx_port", int(lib_port))
 
             # Persist selected download formats (multi-select)
             selected_formats = []

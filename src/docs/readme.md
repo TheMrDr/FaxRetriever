@@ -1,4 +1,4 @@
-# FaxRetriever 2.5.0 — User Guide
+# FaxRetriever 2.6.8 — User Guide
 
 Welcome to FaxRetriever — a simple, Windows‑friendly desktop app for sending and receiving faxes. This guide explains how to install, set up, and use the app day‑to‑day. 
 
@@ -15,7 +15,7 @@ Tip: For a summary of recent updates, open Help → What’s New or see src/docs
 - Send faxes from PDFs and images on your computer.
 - Receive faxes automatically on a schedule and save them where you choose.
 - Keep things organized with history, optional printing, and archiving.
-- Integrate with LibertyRx (forward inbound faxes) or Computer‑Rx/WinRx (automate outbound sends). Only one integration may be active at a time.
+- Integrate with LibertyRx (forward inbound faxes and accept outbound posts over LAN) or Computer‑Rx/WinRx (automate outbound sends). Only one integration may be active at a time.
 
 ---
 
@@ -116,6 +116,17 @@ LibertyRx — forward inbound faxes
 - You can choose whether to keep or remove local copies after a successful hand‑off.
 - Tip: Your LibertyRx API Key can be created in Liberty RXQ/PharmacyOne → System → Settings → Utilities → API Keys (click Add).
 
+LibertyRx — send from Liberty (Local Listener)
+- New in 2.6: FaxRetriever can accept Liberty’s outbound fax POST over your LAN and send it using your selected caller ID.
+- Enable in Options → Integrations → LibertyRx: check "Enable Sending from LibertyRx (Local Listener)" and choose the port (default 18761).
+- Endpoints (on this workstation):
+  - POST `http://<this-PC>:<port>/liberty/fax` with JSON `{ "faxNumber": "8174882861", "contentType": "application/pdf", "fileData": "<base64>" }` → returns `{ "id": "<uuid>" }`.
+  - GET  `http://<this-PC>:<port>/liberty/faxstatus/<id>` (or `?id=<id>`) → returns `{ "status": "pending|success|error", "message?": "..." }`.
+- Inbound Faxes (to Liberty): Set the "Save Location" in the main window to the network share monitored by your Liberty server. Faxes will be saved there as PDFs.
+- Access control: access is open to any device on the network that can reach this port (default 18761). A Windows Firewall rule is created/requested when you enable the listener.
+- Windows Firewall: the app will prompt for administrator approval to add an inbound rule allowing the chosen port from Any IP.
+- Outbox & recovery: each posted PDF is saved to an Outbox for recovery at `{exe_dir}\LibertyRx\Outbox` or (fallback) `%LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\LibertyRx\Outbox`. Files are deleted automatically when a fax succeeds; failed items are purged after the retention window (default 72 hours).
+
 Computer‑Rx/WinRx — automate outbound sends
 - Select your WinRx folder and follow the prompts.
 - FaxRetriever reads new items and sends them using your selected caller ID.
@@ -141,6 +152,9 @@ IT/Developers: If you see a message about Poppler or page counts while running f
 - Download history ledger (prevents automatic re‑downloads):
   - shared\history\downloaded_faxes.log
   - %LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\2.0\history\downloaded_faxes.log
+- LibertyRx Outbox (for Liberty outbound posts, if enabled):
+  - {exe_dir}\LibertyRx\Outbox (preferred)
+  - %LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\LibertyRx\Outbox (fallback)
 - Logs
   - log\ClinicFax.log (rotating)
 
@@ -166,6 +180,26 @@ Tokens or sign‑in
 Scanner issues (sending from paper)
 - If you have more than one scanner, pick the correct one when prompted.
 - Update or reinstall the scanner’s driver; unplug/replug to let Windows re‑detect.
+
+LibertyRx Local Listener
+- URI Format: Ensure the Liberty POST Endpoint is configured as a full URL starting with `http://` and using forward slashes (e.g., `http://192.168.1.10:18761/liberty/fax` or `http://192.168.1.10/liberty/fax`). Missing the `http://` or using backslashes `\` will cause a `System.UriFormatException` in Liberty.
+- Can’t reach endpoint from Liberty server:
+  - Verify the listener is enabled in Options → Integrations → LibertyRx.
+  - Check the port (default 18761) and that a Windows Firewall rule exists; approve the elevation prompt when asked.
+  - Port 80: If you choose port 80, you must run FaxRetriever as Administrator to allow the app to bind to a privileged port.
+  - Ensure Liberty posts to `http://<this-PC>:<port>/liberty/fax`. Access is open to any device on the network that can reach this port (Windows Firewall rule is created on enable).
+- 403 Forbidden:
+  - This error should no longer occur as the IP allowlist has been removed. Check if the listener is truly active.
+- 415 Unsupported Media Type:
+  - `contentType` must be `application/pdf`.
+- 400 Invalid payload/base64:
+  - Ensure the JSON matches the spec and `fileData` is base64 for the PDF.
+- 413 Payload too large:
+  - Default maximum is 25 MB (configurable in Options). Send a smaller file or adjust the limit.
+- Status stays pending:
+  - For 2.6, `success` is reported once the telco accepts the fax; final delivery confirmation is not tracked yet.
+- Files accumulating in Outbox:
+  - Failed or unsent items are purged automatically after the retention window (default 72 hours). You can also resend manually using the saved PDFs.
 
 ---
 

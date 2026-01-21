@@ -354,40 +354,6 @@ class FaxReceiver(QThread):
                     need_jpg = ("JPG" in selected_formats)
                     need_tiff = ("TIFF" in selected_formats)
 
-                    # Hardened: if the PDF already exists locally, make sure the history ledger includes this FaxID
-                    # so we will never attempt to auto-download it in the future even if formats or settings change.
-                    if already_have_pdf:
-                        try:
-                            from utils.history_index import mark_downloaded
-                            mark_downloaded(self.base_dir, str(fax_id))
-                            try:
-                                queue_post(self.base_dir, str(fax_id))
-                            except Exception:
-                                pass
-                        except Exception:
-                            try:
-                                self.log.debug("Failed to mark downloaded for existing PDF", exc_info=True)
-                            except Exception:
-                                pass
-
-                    # If all requested outputs are already present, mark as downloaded and skip work.
-                    if ((not need_pdf or already_have_pdf) and
-                        (not need_jpg or existing_jpgs) and
-                        (not need_tiff or os.path.exists(tiff_path))):
-                        try:
-                            from utils.history_index import mark_downloaded
-                            mark_downloaded(self.base_dir, str(fax_id))
-                            try:
-                                queue_post(self.base_dir, str(fax_id))
-                            except Exception:
-                                pass
-                        except Exception:
-                            try:
-                                self.log.debug("Failed to mark downloaded in skip path", exc_info=True)
-                            except Exception:
-                                pass
-                        continue
-
                     # Download PDF if needed (conversion requires PDF)
                     if not already_have_pdf:
                         r = requests.get(pdf_url, headers=headers, timeout=60)
@@ -399,16 +365,6 @@ class FaxReceiver(QThread):
                         with open(pdf_path, "wb") as f:
                             f.write(r.content)
                         self.log.info(f"Downloaded fax {fax_id} -> {pdf_path}")
-                        try:
-                            from utils.history_index import mark_downloaded
-
-                            mark_downloaded(self.base_dir, str(fax_id))
-                            try:
-                                queue_post(self.base_dir, str(fax_id))
-                            except Exception:
-                                pass
-                        except Exception:
-                            pass
 
                     # --- LibertyRx forwarding (if enabled) ---
                     liberty_delivered_ok = False
@@ -635,6 +591,17 @@ class FaxReceiver(QThread):
                                 pass
                     except Exception:
                         pass
+
+                    # MARK DOWNLOADED ONLY AFTER ALL SUCCESSFUL SIDE EFFECTS
+                    try:
+                        from utils.history_index import mark_downloaded
+                        mark_downloaded(self.base_dir, str(fax_id))
+                        try:
+                            queue_post(self.base_dir, str(fax_id))
+                        except Exception:
+                            pass
+                    except Exception:
+                        self.log.exception("Failed to mark downloaded at end of processing loop")
 
                     processed += 1
                 except Exception as ie:

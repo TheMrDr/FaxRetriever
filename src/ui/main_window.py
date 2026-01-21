@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QFileDialog, QGridLayout,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMenuBar,
                              QMessageBox, QPushButton, QSizePolicy, QSplitter,
-                             QStatusBar, QScrollArea, QSystemTrayIcon, QVBoxLayout, QWidget, QTabWidget)
+                             QStatusBar, QScrollArea, QSystemTrayIcon, QVBoxLayout, QWidget, QTabWidget, QInputDialog)
 
 from core.address_book import AddressBookManager
 from core.app_state import app_state
@@ -36,6 +36,11 @@ from ui.number_correction_dialog import NumberCorrectionDialog
 from utils.logging_utils import get_logger
 from utils.document_utils import convert_pdf_to_jpgs
 from version import __version__
+# LibertyRx local listener MVP
+from integrations.libertyrx_store import LibertyStore
+from integrations.libertyrx_listener import LibertyRxListener
+from integrations.libertyrx_worker import LibertyWorker
+from utils.firewall_utils import resolve_hostname, ensure_firewall_rule, try_elevated_firewall_rule, build_rule_name
 
 
 class MainWindow(QMainWindow):
@@ -43,6 +48,11 @@ class MainWindow(QMainWindow):
     Main application window for FaxRetriever.
     Orchestrates menu, central layout, tray, and modal dialogs.
     """
+
+    # --- LibertyRx listener state ---
+    _liberty_store = None
+    _liberty_listener = None
+    _liberty_worker = None
 
     # Auto-update signals are handled via worker instances
 
@@ -1222,6 +1232,15 @@ class MainWindow(QMainWindow):
             self.splitter.setVisible(True)
         self.limited_logo_label.setVisible(False)
 
+        # Ensure LibertyRx listener state according to current settings
+        try:
+            self._ensure_libertyrx_listener()
+        except Exception:
+            try:
+                self.log.debug("LibertyRx listener start failed", exc_info=True)
+            except Exception:
+                pass
+
         self.tools_menu.menuAction().setVisible(True)
         self.token_bar.setVisible(True)
         if hasattr(self, "fax_history_panel"):
@@ -1547,8 +1566,17 @@ class MainWindow(QMainWindow):
                 else:
                     event.ignore()
                     return
+            # Stop LibertyRx listener/worker if running
+            try:
+                self._stop_libertyrx_listener()
+            except Exception:
+                pass
             event.accept()
         except Exception:
+            try:
+                self._stop_libertyrx_listener()
+            except Exception:
+                pass
             event.accept()
 
     def resizeEvent(self, event):
@@ -1713,3 +1741,139 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Update failed.", 5000)
         except Exception:
             pass
+
+
+    # --- LibertyRx local listener helpers ---
+    def _compute_libertyrx_outbox_dir(self) -> str | None:
+        try:
+            # Preferred: {exe_dir}\LibertyRx\Outbox
+            pref = os.path.join(self.exe_dir, "LibertyRx", "Outbox")
+            try:
+                os.makedirs(pref, exist_ok=True)
+                return pref
+            except Exception:
+                pass
+            # Fallback: %LOCALAPPDATA%\Clinic Networking, LLC\FaxRetriever\LibertyRx\Outbox
+            local = os.environ.get("LOCALAPPDATA") or ""
+            if local:
+                alt = os.path.join(local, "Clinic Networking, LLC", "FaxRetriever", "LibertyRx", "Outbox")
+                try:
+                    os.makedirs(alt, exist_ok=True)
+                    return alt
+                except Exception:
+                    pass
+        except Exception:
+            try:
+                self.log.debug("Outbox dir compute failed", exc_info=True)
+            except Exception:
+                pass
+        return None
+
+    def _stop_libertyrx_listener(self):
+        try:
+            if getattr(self, "_liberty_worker", None):
+                try:
+                    self._liberty_worker.stop()
+                except Exception:
+                    pass
+                self._liberty_worker = None
+            if getattr(self, "_liberty_listener", None):
+                try:
+                    self._liberty_listener.stop()
+                except Exception:
+                    pass
+                self._liberty_listener = None
+            # store is lightweight; keep it
+        except Exception:
+            try:
+                self.log.debug("Failed to stop Liberty listener", exc_info=True)
+            except Exception:
+                pass
+
+    def _ensure_libertyrx_listener(self):
+        try:
+            enabled = (device_config.get("Integrations", "libertyrx_enabled", "No") or "No").strip().lower() == "yes"
+            port = int(device_config.get("Integrations", "libertyrx_port", 18761) or 18761)
+        except Exception:
+            enabled, port = False, 18761
+        if not enabled:
+            # Stop if running
+            self._stop_libertyrx_listener()
+            return
+        # Ensure firewall rule (best-effort)
+        try:
+            rule_name = build_rule_name(port)
+            ok, msg = ensure_firewall_rule(rule_name, port, "Any")
+            if not ok and msg == "elevation_required":
+                # Prompt for elevation
+                try:
+                    box = QMessageBox(self)
+                    box.setWindowTitle("Administrator Privileges Required")
+                    box.setIcon(QMessageBox.Warning)
+                    box.setText(
+                        "FaxRetriever needs to create a Windows Firewall rule to allow LibertyRx to connect.\n"
+                        "Click Continue to approve with administrator privileges."
+                    )
+                    cont = box.addButton("Continue", QMessageBox.AcceptRole)
+                    cancel = box.addButton("Cancel", QMessageBox.RejectRole)
+                    box.exec_()
+                    if box.clickedButton() == cont:
+                        _ok2, _ = try_elevated_firewall_rule(rule_name, port, "Any")
+                        # We cannot know success immediately; continue start regardless
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # Compute Outbox
+        outbox = self._compute_libertyrx_outbox_dir()
+        if not outbox:
+            self.status_bar.showMessage("LibertyRx listener: Outbox path could not be created.", 7000)
+            self._stop_libertyrx_listener()
+            return
+        # Create store if not exists or path changed
+        try:
+            if (not getattr(self, "_liberty_store", None)) or (self._liberty_store.outbox_dir != outbox):
+                self._liberty_store = LibertyStore(outbox)
+        except Exception:
+            try:
+                self.log.exception("Failed to initialize Liberty store")
+            except Exception:
+                pass
+            self._stop_libertyrx_listener()
+            return
+        # Restart listener/worker
+        self._stop_libertyrx_listener()
+        try:
+            if port < 1024:
+                self.log.info(f"Attempting to start LibertyRx listener on privileged port {port}")
+            self._liberty_listener = LibertyRxListener(
+                host="0.0.0.0",
+                port=port,
+                store=self._liberty_store,
+                max_pdf_bytes=int((device_config.get("Integrations", "libertyrx_max_mb", 25) or 25) * 1024 * 1024),
+                retention_hours=int(device_config.get("Integrations", "libertyrx_retention_hours", 72) or 72),
+            )
+            self._liberty_listener.start()
+            self._liberty_worker = LibertyWorker(self._liberty_store, base_dir=self.base_dir)
+            self._liberty_worker.start()
+            try:
+                if port == 80:
+                    self.status_bar.showMessage("LibertyRx listener active on port 80", 6000)
+                else:
+                    self.status_bar.showMessage(f"LibertyRx listener active on port {port}", 6000)
+            except Exception:
+                pass
+        except Exception as e:
+            try:
+                self.log.exception("Failed to start Liberty listener")
+                if "Permission denied" in str(e) or (hasattr(e, "errno") and e.errno == 13):
+                    QMessageBox.critical(
+                        self,
+                        "Port Access Denied",
+                        f"Failed to start LibertyRx listener on port {port}.\n\n"
+                        "Ports below 1024 (like port 80) typically require Administrator privileges on Windows.\n"
+                        "Please restart FaxRetriever as Administrator or choose a port above 1024."
+                    )
+            except Exception:
+                pass
+            self._stop_libertyrx_listener()
