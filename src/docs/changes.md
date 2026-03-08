@@ -4,6 +4,17 @@ This changelog explains updates in simple, user‑friendly terms. For step‑by�
 
 ---
 
+## 2.7.0 — Upgrade Bridge (2026-03-08)
+What's new
+- Prepares FaxRetriever for the upcoming v3.0 release with an all-new modern interface.
+- When v3.0 becomes available, the update will install automatically — no extra steps required.
+- No changes to faxing, receiving, or integrations in this release.
+
+Why it matters
+- This is a one-time housekeeping update so existing installations can transition smoothly to v3.0 when it ships.
+
+---
+
 ## 2.6.8 - Receiver Reliability Improvement (2026-01-21)
 What's new
 - Improved the reliability of the automatic fax retrieval process.

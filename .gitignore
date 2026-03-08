@@ -1,3 +1,5 @@
+.env
+__pycache__/
 /dist/
 /build/
 /log/
@@ -35,3 +37,4 @@
 /address_book.json
 /shared/config/config.json
 /shared/history/downloaded_faxes.log
+/images/PS/

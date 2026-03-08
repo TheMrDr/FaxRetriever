@@ -285,17 +285,11 @@ async def request_assignments(
         if assigned:
             results[n] = {"status": "allowed", "owner": jwt_device_id}
         else:
+            # Atomic claim failed — read current owner to determine reason
             fresh = get_client_by_uuid(domain_uuid) or {}
             owner = (fresh.get("retriever_assignments") or {}).get(n)
-
-            # Treat None, empty string, or "<unknown>" as unassigned
-            if owner in (None, "", "<unknown>"):
-                assigned = claim_retriever_number(domain_uuid, n, jwt_device_id)
-                if assigned:
-                    results[n] = {"status": "allowed", "owner": jwt_device_id}
-                    continue
-
             if owner == jwt_device_id:
+                # We already own it (idempotent)
                 results[n] = {"status": "allowed", "owner": jwt_device_id}
             else:
                 results[n] = {"status": "denied", "owner": owner or "<unknown>"}

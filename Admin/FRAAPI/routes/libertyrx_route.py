@@ -45,21 +45,8 @@ from config import SYSTEM_ACTOR
 router = APIRouter()
 
 
-# ---- Admin auth (mirrors routes/admin_route.require_admin) ----
-
-def _admin_key() -> Optional[str]:
-    return os.environ.get("ADMIN_API_KEY")
-
-
-def require_admin(request: Request):
-    key = _admin_key()
-    if not key:
-        return  # dev mode: allow
-    provided = request.headers.get("X-Admin-Key")
-    if not provided or provided != key:
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED, detail="Admin authentication required"
-        )
+# ---- Admin auth (shared with admin_route) ----
+from routes.admin_route import require_admin  # noqa: E402
 
 
 # ---- Models ----

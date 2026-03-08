@@ -56,12 +56,12 @@ class SendFaxPanel(QWidget):
         main_layout = QVBoxLayout(self)
         # Header
         header = QLabel("Send a Fax")
-        header.setStyleSheet("font-weight: bold; font-size: 12pt;")
+        header.setObjectName("panelHeader")
         main_layout.addWidget(header)
 
         # Recipient Row
         recipient_group = QGroupBox("Recipient")
-        recipient_group.setStyleSheet("font-size: 11pt;")
+        recipient_group.setObjectName("recipientGroup")
         recipient_layout = QGridLayout()
         recipient_layout.setContentsMargins(10, 8, 10, 8)
         recipient_layout.setHorizontalSpacing(8)
@@ -157,11 +157,11 @@ class SendFaxPanel(QWidget):
         fax_row_h.setContentsMargins(0, 0, 0, 0)
         fax_row_h.setSpacing(6)
         cc_lbl = QLabel("+1")
-        cc_lbl.setStyleSheet("color: #555;")
+        cc_lbl.setObjectName("hint")
         dash1 = QLabel("-")
         dash2 = QLabel("-")
-        dash1.setStyleSheet("color: #555;")
-        dash2.setStyleSheet("color: #555;")
+        dash1.setObjectName("hint")
+        dash2.setObjectName("hint")
         fax_row_h.addWidget(cc_lbl)
         fax_row_h.addWidget(self.fax_area)
         fax_row_h.addWidget(dash1)
@@ -247,7 +247,7 @@ class SendFaxPanel(QWidget):
         right_preview_layout = QVBoxLayout()
 
         self.preview_view = QGraphicsView()
-        self.preview_view.setStyleSheet("border: 1px solid #ccc; background: white;")
+        self.preview_view.setObjectName("pdfPreview")
         self.preview_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.preview_view.setDragMode(QGraphicsView.ScrollHandDrag)

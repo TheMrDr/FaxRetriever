@@ -6,11 +6,12 @@ from typing import Iterable, List, Set
 
 from utils.logging_utils import get_logger
 from utils.history_index import load_index, save_index
-from core.sync_client import list_page, post_ids, MAX_PAGE
+from core.sync_client import list_page, post_ids, delete_ids, MAX_PAGE
 
 log = get_logger("history_sync")
 
 _QUEUE_FILE = os.path.join("cache", "history_sync_queue.json")
+_PRUNE_QUEUE_FILE = os.path.join("cache", "history_prune_queue.json")
 
 
 def _ensure_cache_dir(base_dir: str) -> str:
@@ -120,6 +121,82 @@ def queue_post(base_dir: str, fax_id: str) -> None:
             _write_queue(base_dir, q)
         except Exception:
             pass
+
+
+def _prune_queue_path(base_dir: str) -> str:
+    _ensure_cache_dir(base_dir)
+    return os.path.join(base_dir, _PRUNE_QUEUE_FILE)
+
+
+def _read_prune_queue(base_dir: str) -> List[str]:
+    path = _prune_queue_path(base_dir)
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return [str(x) for x in data if str(x).strip()]
+    except Exception:
+        pass
+    return []
+
+
+def _write_prune_queue(base_dir: str, ids: Iterable[str]) -> None:
+    path = _prune_queue_path(base_dir)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(list(dict.fromkeys([str(x).strip() for x in ids if str(x).strip()])), f)
+    except Exception:
+        pass
+
+
+def queue_prune(base_dir: str, fax_ids: list[str]) -> None:
+    """Remove IDs from server history; on failure, queue for later flush."""
+    clean = [str(x).strip() for x in fax_ids if str(x).strip()]
+    if not clean:
+        return
+    try:
+        res = delete_ids(clean)
+        if res.get("server_unsupported"):
+            log.info("Server does not support /sync/prune; skipping queue")
+            return
+        if res.get("error"):
+            q = _read_prune_queue(base_dir)
+            q.extend(clean)
+            _write_prune_queue(base_dir, q)
+            log.warning("Queued %d fax IDs for later prune", len(clean))
+    except Exception:
+        try:
+            q = _read_prune_queue(base_dir)
+            q.extend(clean)
+            _write_prune_queue(base_dir, q)
+        except Exception:
+            pass
+
+
+def flush_prune_queue(base_dir: str) -> None:
+    """Attempt to POST queued prune IDs in batches of 500 until delivered."""
+    try:
+        pending = _read_prune_queue(base_dir)
+        if not pending:
+            return
+        sent_any = False
+        while pending:
+            batch = pending[:MAX_PAGE]
+            res = delete_ids(batch)
+            if res.get("server_unsupported"):
+                _write_prune_queue(base_dir, [])
+                log.info("Cleared prune queue; server does not support /sync/prune")
+                return
+            if res.get("error"):
+                break
+            pending = pending[MAX_PAGE:]
+            sent_any = True
+        if sent_any:
+            _write_prune_queue(base_dir, pending)
+            log.info("Flushed some queued prune IDs; remaining=%d", len(pending))
+    except Exception:
+        log.exception("flush_prune_queue failed")
 
 
 def reconcile(base_dir: str) -> None:

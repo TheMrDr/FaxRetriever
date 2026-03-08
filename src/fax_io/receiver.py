@@ -236,7 +236,7 @@ class FaxReceiver(QThread):
 
             # Ensure remote history doc exists and is reconciled with local cache before processing
             try:
-                from core.history_sync import pull_if_missing, reconcile, flush_queue
+                from core.history_sync import pull_if_missing, reconcile, flush_queue, flush_prune_queue
                 try:
                     # If local history is empty, rebuild it from FRAAPI (no-op if already present)
                     pull_if_missing(self.base_dir)
@@ -251,6 +251,10 @@ class FaxReceiver(QThread):
                 try:
                     # Attempt to flush any queued history posts
                     flush_queue(self.base_dir)
+                except Exception:
+                    pass
+                try:
+                    flush_prune_queue(self.base_dir)
                 except Exception:
                     pass
             except Exception:
@@ -299,6 +303,7 @@ class FaxReceiver(QThread):
                 pass
 
             processed = 0
+            deleted_from_skyswitch: set[str] = set()
             for fax in all_faxes:
                 try:
                     fax_id = fax.get("id")
@@ -310,14 +315,7 @@ class FaxReceiver(QThread):
                     if not fax_id or not pdf_url or not created_at:
                         continue
 
-                    # If we've already downloaded/processed this fax (via UI download or prior receiver run), skip.
-                    try:
-                        if is_downloaded(self.base_dir, str(fax_id)):
-                            continue
-                    except Exception:
-                        self.log.exception("Failed to check history_index.is_downloaded")
-
-                    # Parse timestamp (assume Zulu ISO)
+                    # Parse timestamp FIRST (assume Zulu ISO)
                     try:
                         if "." in created_at:
                             ts = datetime.strptime(
@@ -331,10 +329,19 @@ class FaxReceiver(QThread):
                         self.log.exception(f"Failed to parse timestamp: created_at='{created_at}'")
                         ts = datetime.now(timezone.utc)
 
-                    # Server retention delete: if older than cutoff, delete and skip processing
+                    # Retention check BEFORE download check — ensures expired faxes
+                    # are deleted from SkySwitch even if already downloaded
                     if ts < cutoff_dt:
-                        self._delete_server_fax(base_url, fax_user, fax_id, headers)
+                        if self._delete_server_fax(base_url, fax_user, fax_id, headers):
+                            deleted_from_skyswitch.add(str(fax_id))
                         continue
+
+                    # If we've already downloaded/processed this fax, skip.
+                    try:
+                        if is_downloaded(self.base_dir, str(fax_id)):
+                            continue
+                    except Exception:
+                        self.log.exception("Failed to check history_index.is_downloaded")
 
                     # Build filename
                     file_base = self._build_filename(fax_id, caller_id, ts)
@@ -608,9 +615,24 @@ class FaxReceiver(QThread):
                     self.log.exception("Error processing fax item")
 
             try:
-                self._cleanup_server_outbound(base_url, fax_user, headers, cutoff_dt)
+                outbound_deleted = self._cleanup_server_outbound(base_url, fax_user, headers, cutoff_dt)
+                deleted_from_skyswitch.update(outbound_deleted)
             except Exception as oe:
                 self.log.exception("Outbound cleanup encountered an error")
+
+            # Prune deleted fax IDs from local and server history
+            if deleted_from_skyswitch:
+                try:
+                    from utils.history_index import remove_ids
+                    remove_ids(self.base_dir, deleted_from_skyswitch)
+                except Exception:
+                    self.log.exception("Failed to prune local history")
+                try:
+                    from core.history_sync import queue_prune
+                    queue_prune(self.base_dir, list(deleted_from_skyswitch))
+                except Exception:
+                    self.log.exception("Failed to queue server history prune")
+                self.log.info(f"Pruned {len(deleted_from_skyswitch)} expired fax ID(s) from history.")
 
             # Local inbox cleanup (delete old downloaded files)
             try:
@@ -1005,23 +1027,27 @@ class FaxReceiver(QThread):
 
     def _delete_server_fax(
         self, base_url: str, fax_user: str, fax_id: str, headers: dict
-    ):
+    ) -> bool:
         try:
             del_url = f"{base_url}/users/{fax_user}/faxes/{fax_id}/delete"
             resp = requests.post(del_url, headers=headers, timeout=15)
             if resp.status_code == 200:
                 self.log.info(f"Deleted server fax {fax_id} per retention policy.")
+                return True
             else:
                 self.log.warning(
                     f"Failed to delete server fax {fax_id}: HTTP {resp.status_code}"
                 )
+                return False
         except Exception as e:
             self.log.exception(f"Delete server fax error for {fax_id}")
+            return False
 
     def _cleanup_server_outbound(
         self, base_url: str, fax_user: str, headers: dict, cutoff_dt: datetime
-    ):
-        """List outbound faxes and delete those older than cutoff_dt."""
+    ) -> set[str]:
+        """List outbound faxes and delete those older than cutoff_dt. Returns set of deleted IDs."""
+        deleted: set[str] = set()
         try:
             list_url = f"{base_url}/users/{fax_user}/faxes/outbound"
             next_url = list_url
@@ -1052,7 +1078,8 @@ class FaxReceiver(QThread):
                         except Exception:
                             ts = datetime.now(timezone.utc)
                         if ts < cutoff_dt:
-                            self._delete_server_fax(base_url, fax_user, fax_id, headers)
+                            if self._delete_server_fax(base_url, fax_user, fax_id, headers):
+                                deleted.add(str(fax_id))
                             total_deleted += 1
                     except Exception as ie:
                         self.log.exception("Error evaluating outbound fax for deletion")
@@ -1067,6 +1094,7 @@ class FaxReceiver(QThread):
                 )
         except Exception as e:
             self.log.exception("Outbound cleanup error")
+        return deleted
 
     def _cleanup_local_inbox(self, inbox_path: str, cutoff_dt: datetime):
         """Delete local inbox files (PDF/JPG) older than cutoff_dt based on file mtime."""

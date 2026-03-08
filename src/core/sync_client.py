@@ -93,6 +93,55 @@ def post_ids(ids: List[str]) -> Dict[str, Any]:
     return {"error": "retry_exhausted"}
 
 
+def delete_ids(ids: List[str]) -> Dict[str, Any]:
+    """Remove fax IDs from server history (pruning after SkySwitch deletion)."""
+    if not ids:
+        return {"ok": True, "removed": 0, "total": 0}
+    url = f"{fra_api_base_url()}/sync/prune"
+    payload = {"ids": list(dict.fromkeys([str(x).strip() for x in ids if str(x).strip()]))}
+    if not payload["ids"]:
+        return {"ok": True, "removed": 0, "total": 0}
+
+    attempts = 0
+    while attempts < 5:
+        attempts += 1
+        jwt = _jwt()
+        if not jwt:
+            if not _refresh_jwt():
+                return {"error": "jwt_missing"}
+            jwt = _jwt()
+            if not jwt:
+                return {"error": "jwt_missing"}
+        try:
+            r = requests.post(url, headers=_auth_header(jwt), json=payload, timeout=TIMEOUTS)
+        except requests.RequestException as e:
+            log.warning(f"/sync/prune network error: {e}")
+            _backoff_sleep(attempts)
+            continue
+        if r.status_code == 200:
+            try:
+                return r.json() or {"ok": True}
+            except Exception:
+                return {"ok": True}
+        if r.status_code == 404:
+            log.info("/sync/prune not available on server (404); skipping")
+            return {"ok": True, "removed": 0, "server_unsupported": True}
+        if r.status_code in (401, 403):
+            if _refresh_jwt():
+                continue
+            return {"error": "unauthorized", "status": r.status_code}
+        if 500 <= r.status_code < 600:
+            _backoff_sleep(attempts)
+            continue
+        try:
+            data = r.json()
+            msg = (data or {}).get("detail") if isinstance(data, dict) else None
+        except Exception:
+            msg = None
+        return {"error": msg or f"HTTP {r.status_code}", "status": r.status_code}
+    return {"error": "retry_exhausted"}
+
+
 def list_page(offset: int = 0, limit: int = MAX_PAGE) -> Tuple[List[str], int | None, int]:
     url = f"{fra_api_base_url()}/sync/list"
     payload = {"offset": max(0, int(offset or 0)), "limit": min(MAX_PAGE, max(1, int(limit or MAX_PAGE)))}

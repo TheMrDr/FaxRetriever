@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import QApplication
 
 from ui.main_window import MainWindow
 from utils.logging_utils import get_logger, set_global_logging_level
-from core.config_loader import global_config
+from core.config_loader import device_config, global_config
 
 def main():
     # Apply persisted logging level as early as possible
@@ -38,6 +38,14 @@ def main():
 
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
+
+    # Apply UI theme before any widgets are created
+    from ui.theme import set_theme
+    try:
+        theme_pref = device_config.get("UserSettings", "theme", "light") or "light"
+    except Exception:
+        theme_pref = "light"
+    set_theme(theme_pref)
 
     window = MainWindow(base_dir=BASE_DIR, exe_dir=EXE_DIR)
     window.show()

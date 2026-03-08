@@ -5,8 +5,10 @@ Embedded HTTP listener for Liberty Software outbound fax POSTs.
 - POST /liberty/fax -> { id }
 - GET  /liberty/faxstatus/{id} or /liberty/faxstatus?id=...
 
-Security (MVP per spec):
-- No auth; restrict by source IP allowlist (single Liberty server IP).
+Security:
+- Source IP allowlist enforced on every request. Only IPs in the allowlist
+  are permitted. If no allowlist is configured, ALL requests are rejected
+  (fail-closed).
 - Bind on configurable host/port; default host '0.0.0.0', port 18761.
 
 Persistence:
@@ -17,13 +19,14 @@ This module avoids UI; start/stop is managed by MainWindow lifecycle.
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
 import re
 import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
-from typing import Optional
+from typing import Optional, Set
 
 from utils.logging_utils import get_logger
 from integrations.libertyrx_store import LibertyStore
@@ -39,6 +42,28 @@ class _LibertyHandler(BaseHTTPRequestHandler):
     # type hints for attributes we attach on server
     store: LibertyStore  # type: ignore[assignment]
     max_pdf_bytes: int  # type: ignore[assignment]
+
+    def _check_ip_allowed(self) -> bool:
+        """Fail-closed IP allowlist check. Returns True only if client IP is allowed."""
+        allowed: Set[str] = getattr(self.server, "_allowed_ips", set())  # type: ignore[attr-defined]
+        if not allowed:
+            # No allowlist configured — reject all requests (fail-closed)
+            log.warning(f"Liberty request REJECTED: no IP allowlist configured. Source: {self.address_string()}")
+            self._send_json(403, {"error": "forbidden", "message": "No IP allowlist configured"})
+            return False
+        client_ip = self.client_address[0]
+        # Normalize IPv4-mapped IPv6 (e.g., ::ffff:127.0.0.1 → 127.0.0.1)
+        try:
+            addr = ipaddress.ip_address(client_ip)
+            if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+                client_ip = str(addr.ipv4_mapped)
+        except ValueError:
+            pass
+        if client_ip not in allowed:
+            log.warning(f"Liberty request REJECTED from unauthorized IP {client_ip}")
+            self._send_json(403, {"error": "forbidden"})
+            return False
+        return True
 
     def _send_json(self, status: int, payload: dict):
         try:
@@ -67,6 +92,8 @@ class _LibertyHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         log.debug(f"Liberty POST request: {self.path} from {self.address_string()}")
+        if not self._check_ip_allowed():
+            return
         path = self.path or ""
         clean_path = path.split("?")[0].strip("/")
         
@@ -105,6 +132,9 @@ class _LibertyHandler(BaseHTTPRequestHandler):
             self._send_json(415, {"error": "unsupported_media_type"})
             return
         digits = re.sub(DIGITS_RE, "", fax_number)
+        # Strip leading country code '1' for US/CA numbers (Liberty expects 10 digits)
+        if len(digits) == 11 and digits.startswith("1"):
+            digits = digits[1:]
         if not digits:
             log.warning(f"Liberty POST: missing or invalid faxNumber from {self.address_string()}. Keys: {list(body.keys())}")
             self._send_json(400, {"error": "invalid_number"})
@@ -144,6 +174,8 @@ class _LibertyHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):  # noqa: N802
         log.debug(f"Liberty GET request: {self.path} from {self.address_string()}")
+        if not self._check_ip_allowed():
+            return
         path = self.path or ""
         # Normalize path for matching: remove leading/trailing slashes and query string
         parsed_url = urlparse(path)
@@ -203,27 +235,53 @@ class _LibertyHandler(BaseHTTPRequestHandler):
 
 
 class LibertyRxListener:
-    def __init__(self, host: str, port: int, store: LibertyStore, max_pdf_bytes: int = 25 * 1024 * 1024, retention_hours: int = 72):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        store: LibertyStore,
+        allowed_ips: Optional[list[str]] = None,
+        max_pdf_bytes: int = 25 * 1024 * 1024,
+        retention_hours: int = 72,
+    ):
         self.host = host
         self.port = port
         self.store = store
         self.max_pdf_bytes = max_pdf_bytes
         self.retention_hours = retention_hours
+        # Normalize allowed IPs — strip whitespace, resolve IPv4-mapped
+        self._allowed_ips: Set[str] = set()
+        for ip in (allowed_ips or []):
+            ip = ip.strip()
+            if ip:
+                try:
+                    addr = ipaddress.ip_address(ip)
+                    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+                        ip = str(addr.ipv4_mapped)
+                except ValueError:
+                    pass
+                self._allowed_ips.add(ip)
         self._server: Optional[ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
 
     def start(self):
         if self._server:
             return
+        if not self._allowed_ips:
+            log.warning(
+                "LibertyRx listener starting with NO IP allowlist — all requests will be rejected (fail-closed). "
+                "Configure allowed_ips to permit Liberty server connections."
+            )
         server = ThreadingHTTPServer((self.host, self.port), _LibertyHandler)
         # Attach shared state
         setattr(server, "store", self.store)
         setattr(server, "max_pdf_bytes", int(self.max_pdf_bytes))
         setattr(server, "retention_hours", int(self.retention_hours))
+        setattr(server, "_allowed_ips", self._allowed_ips)
         self._server = server
         self._thread = threading.Thread(target=server.serve_forever, name=f"LibertyRxListener:{self.port}", daemon=True)
         self._thread.start()
-        log.info(f"LibertyRx listener started on {self.host}:{self.port}")
+        log.info(f"LibertyRx listener started on {self.host}:{self.port} (allowed IPs: {self._allowed_ips or 'NONE — all rejected'})")
 
     def stop(self):
         try:

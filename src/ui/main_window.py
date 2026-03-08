@@ -70,9 +70,17 @@ class MainWindow(QMainWindow):
 
         self.log = get_logger("ui")
         self.setWindowTitle(f"FaxRetriever {__version__}")
-        # Allow resizable window for single-pane layout
-        # Lowered minimum height to support smaller displays while keeping width
-        self.setMinimumSize(1100, 600)
+        # Fluid sizing: use 75% of screen, respecting a reasonable minimum
+        self.setMinimumSize(800, 600)
+        try:
+            screen = QApplication.primaryScreen()
+            if screen:
+                avail = screen.availableGeometry()
+                w = max(800, int(avail.width() * 0.75))
+                h = max(600, int(avail.height() * 0.75))
+                self.resize(w, h)
+        except Exception:
+            self.resize(1024, 768)
         # self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         self.setWindowFlags(self.windowFlags() | Qt.WindowMinimizeButtonHint)
         self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
@@ -159,7 +167,8 @@ class MainWindow(QMainWindow):
             # Create dim scrim over the main window
             scrim = QWidget(self)
             scrim.setObjectName("overlayScrim")
-            scrim.setStyleSheet("#overlayScrim { background: rgba(0,0,0,160); }")
+            from ui.theme import get_theme as _get_theme
+            scrim.setStyleSheet(f"#overlayScrim {{ background: {_get_theme()['scrim']}; }}")
             scrim.setGeometry(self.rect())
             scrim.setAttribute(Qt.WA_TransparentForMouseEvents, False)
             scrim.show()
@@ -169,10 +178,13 @@ class MainWindow(QMainWindow):
             dialog.setWindowModality(Qt.ApplicationModal)
             dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
             dialog.setAttribute(Qt.WA_TranslucentBackground, True)
-            # Ensure the dialog and its children have an opaque background and visible border
+            # Ensure the dialog has an opaque background and visible border.
+            # Do NOT use `* { background-color }` — it overrides QPushButton
+            # backgrounds and makes buttons invisible.
             dialog.setAutoFillBackground(True)
+            _ot = _get_theme()
             dialog.setStyleSheet(
-                "QDialog { background: #ffffff; border: 1px solid rgba(0,0,0,90); border-radius: 10px; } * { background-color: #ffffff; }"
+                f"QDialog {{ background: {_ot['surface']}; border: 1px solid {_ot['border']}; border-radius: 10px; }}"
             )
         except Exception:
             # Fallback to normal modal if anything fails
@@ -207,6 +219,18 @@ class MainWindow(QMainWindow):
         opt_action = QAction("Options", self)
         opt_action.triggered.connect(self._show_options_dialog)
         self.system_menu.addAction(opt_action)
+
+        self.dark_mode_action = QAction("Dark Mode", self)
+        self.dark_mode_action.setCheckable(True)
+        try:
+            cur_theme = device_config.get("UserSettings", "theme", "light") or "light"
+        except Exception:
+            cur_theme = "light"
+        self.dark_mode_action.setChecked(cur_theme == "dark")
+        self.dark_mode_action.triggered.connect(self._toggle_dark_mode)
+        self.system_menu.addAction(self.dark_mode_action)
+
+        self.system_menu.addSeparator()
 
         close_action = QAction("Close", self)
         close_action.triggered.connect(self.close)
@@ -253,6 +277,100 @@ class MainWindow(QMainWindow):
         menu_bar.addMenu(self.system_menu)
         menu_bar.addMenu(self.tools_menu)
         menu_bar.addMenu(self.help_menu)
+
+    def _toggle_dark_mode(self, checked: bool):
+        """Switch between light and dark themes and persist the choice."""
+        from ui.theme import set_theme
+        name = "dark" if checked else "light"
+        set_theme(name)
+        try:
+            device_config.set("UserSettings", "theme", name)
+            device_config.save()
+        except Exception:
+            pass
+        self._force_full_theme_refresh()
+
+    def _force_full_theme_refresh(self):
+        """Force the entire widget tree to pick up the new theme.
+
+        Inline setStyleSheet() calls bake in theme tokens at construction
+        time and override the global QSS.  We need to:
+          1. Clear stale inline stylesheets from ALL child widgets.
+          2. Force Qt to unpolish/polish the widget tree so it re-reads QSS.
+          3. Rebuild dynamically-styled content (fax cards, etc.).
+          4. Re-apply any conditional styling (retrieval gray-out).
+          5. Force a full repaint.
+        """
+        app = QApplication.instance()
+        if not app:
+            return
+        # 1. Walk the entire widget tree and clear inline styles so the
+        #    global QSS takes over.  Widgets that need dynamic per-item
+        #    colors (cards) will get them back in step 3.
+        for w in self.findChildren(QWidget):
+            try:
+                if w.styleSheet():
+                    w.setStyleSheet("")
+            except Exception:
+                pass
+        # 2. Force Qt to re-read the stylesheet for this window and all
+        #    its children (unpolish tears down cached style, polish rebuilds).
+        try:
+            style = self.style()
+            style.unpolish(self)
+            style.polish(self)
+            for w in self.findChildren(QWidget):
+                try:
+                    style.unpolish(w)
+                    style.polish(w)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # 3. Rebuild fax history cards (they set per-card theme colors)
+        try:
+            if hasattr(self, "fax_history_panel") and self.fax_history_panel:
+                self.fax_history_panel.repopulate()
+        except Exception:
+            pass
+        # 4. Rebuild outbox cards
+        try:
+            if hasattr(self, "outbox_panel") and self.outbox_panel:
+                if hasattr(self.outbox_panel, "repopulate"):
+                    self.outbox_panel.repopulate()
+        except Exception:
+            pass
+        # 5. Re-apply retrieval-section gray-out state
+        try:
+            self._update_retrieval_interactables()
+        except Exception:
+            pass
+        # 6. Force repaint on the entire window
+        self.update()
+        self.repaint()
+        app.processEvents()
+
+    def _toggle_history_panel(self):
+        """Show/hide the history panel by collapsing/expanding the splitter."""
+        try:
+            sizes = self.splitter.sizes()
+            if self._history_visible:
+                # Remember current sizes, then collapse right panel
+                self._saved_splitter_sizes = list(sizes)
+                self.splitter.setSizes([sum(sizes), 0])
+                self._history_visible = False
+                self._toggle_history_btn.setText("Show History")
+            else:
+                # Restore previous sizes (or default 55/45 split)
+                if hasattr(self, "_saved_splitter_sizes") and self._saved_splitter_sizes:
+                    self.splitter.setSizes(self._saved_splitter_sizes)
+                else:
+                    total = sum(sizes) or self.width()
+                    self.splitter.setSizes([int(total * 0.55), int(total * 0.45)])
+                self._history_visible = True
+                self._toggle_history_btn.setText("Hide History")
+        except Exception:
+            pass
 
     def _open_markdown_viewer(self, title: str, preferred_path: str):
         """Open a Markdown document in a modeless viewer; prefer src\docs then fallback to top-level docs."""
@@ -415,6 +533,13 @@ class MainWindow(QMainWindow):
             pass
         self.banner.setAlignment(Qt.AlignLeft)
         self.banner.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        # Lock the banner to its pixmap size so it never resizes
+        try:
+            pm = self.banner.pixmap()
+            if pm and not pm.isNull():
+                self.banner.setFixedSize(pm.size())
+        except Exception:
+            self.banner.setFixedSize(160, 152)
 
     def _build_main_controls(self):
         """Main content: left control pane + embedded Send Fax + right history panel in a splitter."""
@@ -493,29 +618,27 @@ class MainWindow(QMainWindow):
         top_row.addWidget(self.stop_retrieval_button)
         rb_v.addLayout(top_row)
 
-        # Row 2: stack the progress bars vertically for legibility and width
+        # Row 2: progress bars (token bar kept alive for auto-refresh but hidden)
         try:
-            self.token_bar.setFixedHeight(18)
             self.poll_bar.setFixedHeight(18)
         except Exception:
             pass
-        bars_v = QVBoxLayout()
-        bars_v.setContentsMargins(0, 0, 0, 0)
-        bars_v.setSpacing(4)
-        self.token_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.poll_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        bars_v.addWidget(self.token_bar)
-        bars_v.addWidget(self.poll_bar)
-        rb_v.addLayout(bars_v)
+        rb_v.addWidget(self.poll_bar)
+        # Token bar must be in the layout (parented) before hiding,
+        # otherwise Qt treats it as a top-level window.
+        self.token_bar.setFixedHeight(0)
+        self.token_bar.setMaximumHeight(0)
+        rb_v.addWidget(self.token_bar)
+        self.token_bar.setVisible(False)
 
         header_h.addWidget(retrieval_box, 1)
 
-        # Splitter: left (SendFax) and right (History)
+        # Right side: History / Outbox in a tab widget (collapsible)
         right_container = QWidget()
         right_v = QVBoxLayout(right_container)
         right_v.setContentsMargins(0, 0, 0, 0)
         right_v.setSpacing(6)
-        # Outbox tab: dedicated panel for outbound jobs
         try:
             self.outbox_panel = OutboxPanel(self.base_dir, self.app_state, self)
             try:
@@ -527,18 +650,33 @@ class MainWindow(QMainWindow):
             self.tabs.addTab(self.outbox_panel, "Outbox")
             right_v.addWidget(self.tabs, 1)
         except Exception:
-            # Fallback: if OutboxPanel fails to initialize, keep history only
             right_v.addWidget(self.fax_history_panel, 1)
 
+        # Splitter: left (Send Fax — primary) + right (History — collapsible)
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(left_container)
         splitter.addWidget(right_container)
         splitter.setCollapsible(0, False)
-        splitter.setCollapsible(1, False)
+        splitter.setCollapsible(1, True)
         splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 1)
-        total_w = max(self.width(), 1000)
-        splitter.setSizes([int(total_w * 0.65), int(total_w * 0.35)])
+        splitter.setStretchFactor(1, 2)
+        total_w = max(self.width(), 900)
+        splitter.setSizes([int(total_w * 0.55), int(total_w * 0.45)])
+        self._history_visible = True
+
+        # Toggle button in the header row
+        self._toggle_history_btn = QPushButton("Hide History")
+        self._toggle_history_btn.clicked.connect(self._toggle_history_panel)
+        top_row.addWidget(self._toggle_history_btn)
+
+        # Let header buttons shrink gracefully on small/high-DPI screens
+        for btn in [self.select_folder_button, self.setup_retrieval_button,
+                     self.poll_button, self.stop_retrieval_button,
+                     self._toggle_history_btn]:
+            try:
+                btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+            except Exception:
+                pass
 
         # Place header on top (row 0), splitter below (row 1)
         self.main_layout.addWidget(header, 0, 0, 1, 3)
@@ -1242,12 +1380,13 @@ class MainWindow(QMainWindow):
                 pass
 
         self.tools_menu.menuAction().setVisible(True)
-        self.token_bar.setVisible(True)
+        # Token bar stays hidden (user-facing display removed) but its
+        # internal timer keeps running for auto-refresh.
+        self.token_bar.restart_progress()
         if hasattr(self, "fax_history_panel"):
             self.fax_history_panel.setVisible(True)
         if hasattr(self, "send_fax_panel"):
             self.send_fax_panel.setVisible(True)
-        self.token_bar.restart_progress()
 
         # Default visibility for retrieval header controls
         show_configure = True
@@ -1427,8 +1566,10 @@ class MainWindow(QMainWindow):
             # Visual gray-out
             if hasattr(self, "retrieval_section") and self.retrieval_section:
                 if not is_allowed:
+                    from ui.theme import get_theme as _gt
+                    _tt = _gt()
                     self.retrieval_section.setStyleSheet(
-                        "#retrievalSection{background-color:#f5f5f5;} QWidget{color:#888;}"
+                        f"#retrievalSection{{background-color:{_tt['background']};}} QWidget{{color:{_tt['text_muted']};}}"
                     )
                 else:
                     self.retrieval_section.setStyleSheet("")
@@ -1846,10 +1987,44 @@ class MainWindow(QMainWindow):
         try:
             if port < 1024:
                 self.log.info(f"Attempting to start LibertyRx listener on privileged port {port}")
+            # IP allowlist: always include 127.0.0.1, auto-resolve "libertyserver",
+            # fall back to saved config, and prompt user if nothing is resolvable.
+            allowed_ips: list[str] = ["127.0.0.1"]
+            raw_allowlist = str(device_config.get("Integrations", "libertyrx_allowed_ips", "") or "").strip()
+            if raw_allowlist:
+                for ip in raw_allowlist.split(","):
+                    ip = ip.strip()
+                    if ip and ip not in allowed_ips:
+                        allowed_ips.append(ip)
+            # Auto-resolve "libertyserver" hostname
+            resolved_ip = resolve_hostname("libertyserver")
+            if resolved_ip:
+                self.log.info(f"LibertyRx: 'libertyserver' resolved to {resolved_ip}")
+                if resolved_ip not in allowed_ips:
+                    allowed_ips.append(resolved_ip)
+            else:
+                # If no manually configured IPs beyond localhost, prompt the user
+                if len(allowed_ips) <= 1:
+                    self.log.warning("LibertyRx: 'libertyserver' hostname not found and no IPs configured — prompting user.")
+                    user_ip, ok = QInputDialog.getText(
+                        self,
+                        "LibertyRx Server Address",
+                        "Could not resolve 'libertyserver' on this network.\n"
+                        "Enter the IP address of the Liberty Rx server\n"
+                        "(leave blank to allow local connections only):",
+                    )
+                    if ok and user_ip and user_ip.strip():
+                        user_ip = user_ip.strip()
+                        allowed_ips.append(user_ip)
+                        # Persist so we don't prompt every restart
+                        device_config.set("Integrations", "libertyrx_allowed_ips", user_ip)
+                        device_config.save()
+                        self.log.info(f"LibertyRx: User provided IP {user_ip}, saved to config.")
             self._liberty_listener = LibertyRxListener(
                 host="0.0.0.0",
                 port=port,
                 store=self._liberty_store,
+                allowed_ips=allowed_ips,
                 max_pdf_bytes=int((device_config.get("Integrations", "libertyrx_max_mb", 25) or 25) * 1024 * 1024),
                 retention_hours=int(device_config.get("Integrations", "libertyrx_retention_hours", 72) or 72),
             )

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from auth.crypto_utils import CryptoError, decrypt_blob, encrypt_blob
 from config import (COL_BEARERS, COL_CLIENTS, COL_LOGS, COL_RESELLERS, DB_NAME,
-                    MONGO_URI, SYSTEM_ACTOR, COL_DOWNLOAD_HISTORY)
+                    MONGO_URI, SYSTEM_ACTOR, COL_DOWNLOAD_HISTORY, COL_FAX_TAGS)
 from pymongo import ASCENDING, DESCENDING, MongoClient, ReturnDocument
 from pymongo.collection import Collection
 
@@ -20,6 +20,7 @@ clients: Collection = db[COL_CLIENTS]
 bearers: Collection = db[COL_BEARERS]
 logs: Collection = db[COL_LOGS]
 downloads: Collection = db[COL_DOWNLOAD_HISTORY]
+fax_tags: Collection = db[COL_FAX_TAGS]
 
 BEARER_REFRESH_OFFSET = timedelta(hours=1)
 
@@ -760,6 +761,45 @@ def add_downloaded_ids(domain_uuid: str, ids: list[str]) -> dict:
     return {"inserted": len(to_add), "total": len(norm)}
 
 
+def remove_downloaded_ids(domain_uuid: str, ids: list[str]) -> dict:
+    """Remove fax IDs from the download history for a domain.
+
+    Used when faxes are deleted from SkySwitch per retention policy.
+    Returns dict: {"removed": int, "total": int}
+    """
+    if not ids:
+        return {"removed": 0, "total": 0}
+
+    norm: set[str] = set()
+    for fid in ids:
+        s = (str(fid) or "").strip()
+        if s:
+            norm.add(s)
+
+    if not norm:
+        return {"removed": 0, "total": 0}
+
+    now = datetime.now(timezone.utc)
+
+    doc = downloads.find_one(
+        {"domain_uuid": domain_uuid, "doc_type": "history"}, {"ids": 1}
+    ) or {}
+    existing = set(doc.get("ids") or []) if isinstance(doc, dict) else set()
+    actually_removed = norm & existing
+
+    if actually_removed:
+        downloads.update_one(
+            {"domain_uuid": domain_uuid, "doc_type": "history"},
+            {
+                "$pull": {"ids": {"$in": list(actually_removed)}},
+                "$set": {"updated_at": now},
+            },
+        )
+
+    new_total = len(existing) - len(actually_removed)
+    return {"removed": len(actually_removed), "total": max(0, new_total)}
+
+
 def list_downloaded_ids(domain_uuid: str, skip: int = 0, limit: int = 500) -> list[str]:
     """Return a page (list[str]) of fax IDs for the domain.
 
@@ -796,3 +836,73 @@ def count_downloaded_ids(domain_uuid: str) -> int:
         return 0
     except Exception:
         return 0
+
+
+# ─── Fax source tags ─────────────────────────────────────────────────
+
+
+def upsert_fax_tags(domain_uuid: str, tags: list[dict]) -> dict:
+    """Upsert integration source tags for fax IDs.
+
+    Each tag: {"fax_id": "12345", "source": "crx"|"lrx", "device_id": "...", ...}
+
+    Document schema per domain:
+      {domain_uuid, doc_type: "tags", tags: {<fax_id>: {source, device_id, tagged_at, ...}}}
+
+    Returns {"upserted": <count>}.
+    """
+    if not tags:
+        return {"upserted": 0}
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    set_ops = {}
+    for t in tags:
+        fid = str(t.get("fax_id", "")).strip()
+        if not fid:
+            continue
+        entry = {
+            "source": t.get("source", ""),
+            "device_id": t.get("device_id", ""),
+            "tagged_at": now,
+        }
+        # Preserve extra fields (record_id, etc.)
+        for k, v in t.items():
+            if k not in ("fax_id", "source", "device_id"):
+                entry[k] = v
+        set_ops[f"tags.{fid}"] = entry
+
+    if not set_ops:
+        return {"upserted": 0}
+
+    try:
+        fax_tags.update_one(
+            {"domain_uuid": domain_uuid, "doc_type": "tags"},
+            {"$set": set_ops, "$setOnInsert": {"domain_uuid": domain_uuid, "doc_type": "tags"}},
+            upsert=True,
+        )
+        return {"upserted": len(set_ops)}
+    except Exception:
+        return {"upserted": 0}
+
+
+def get_fax_tags(domain_uuid: str, fax_ids: list[str] | None = None) -> dict[str, dict]:
+    """Get source tags for fax IDs.
+
+    If fax_ids is None, returns all tags for the domain.
+    Returns {<fax_id>: {source, device_id, tagged_at, ...}}.
+    """
+    try:
+        doc = fax_tags.find_one(
+            {"domain_uuid": domain_uuid, "doc_type": "tags"},
+            {"tags": 1},
+        )
+        if not doc or not isinstance(doc.get("tags"), dict):
+            return {}
+
+        all_tags = doc["tags"]
+        if fax_ids is None:
+            return all_tags
+
+        return {fid: all_tags[fid] for fid in fax_ids if fid in all_tags}
+    except Exception:
+        return {}

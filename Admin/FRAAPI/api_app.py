@@ -27,6 +27,7 @@ from routes.bearer_route import router as bearer_router
 from routes.init_route import router as init_router
 from routes.libertyrx_route import router as libertyrx_router
 from routes.sync_route import router as sync_router
+from routes.faxtags_route import router as faxtags_router
 
 app = FastAPI(title="FaxRetrieverAdmin", version="2.3")
 
@@ -39,12 +40,21 @@ app.include_router(
 app.include_router(admin_router, prefix="/admin")
 app.include_router(libertyrx_router, prefix="/integrations/libertyrx")
 app.include_router(sync_router, prefix="/sync")
+app.include_router(faxtags_router, prefix="/faxtags")
 
 
 # Health endpoint for service readiness checks
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "FaxRetrieverAdmin API", "version": "2.3"}
+    mongo_ok = False
+    try:
+        from db.mongo_interface import client as mongo_client
+        mongo_client.admin.command("ping")
+        mongo_ok = True
+    except Exception:
+        pass
+    status = "ok" if mongo_ok else "degraded"
+    return {"status": status, "service": "FaxRetrieverAdmin API", "version": "2.3", "mongo": mongo_ok}
 
 
 # Startup initialization: schedule DB index creation in background (non-blocking)

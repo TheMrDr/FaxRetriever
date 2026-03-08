@@ -199,6 +199,12 @@ class UpdateInstaller(QThread):
                 except Exception:
                     pass
 
+            # Detect major version upgrade (e.g. 2.x → 3.x)
+            # Major upgrades ship as NSIS installers, not binary-swap .exe files
+            current_major = _parse_version(get_current_version())[0]
+            new_major = _parse_version(self.version)[0]
+            is_major_upgrade = new_major > current_major
+
             # Create timestamped backup directory
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_dir = os.path.join(self.exe_dir, "backup", ts)
@@ -209,41 +215,70 @@ class UpdateInstaller(QThread):
             self.progress.emit("Preparing installer...")
             bat_path = os.path.join(self.exe_dir, f"update_{ts}.bat")
             exe_name = os.path.basename(current_exe)
-            bat_lines = [
-                "@echo off",
-                "setlocal enableextensions",
-                "rem Use robust quoting for all path variables",
-                f'set "CURRENT={current_exe}"',
-                f'set "TMPFILE={tmp_path}"',
-                f'set "BACKUPDIR={backup_dir}"',
-                f'set "BACKUPEXE={backup_exe}"',
-                "rem Script directory (installation directory)",
-                'set "SCRIPT_DIR=%~dp0"',
-                "echo Stopping FaxRetriever...",
-                f"taskkill /f /im {os.path.basename(current_exe)} >nul 2>&1",
-                ":waitloop",
-                f'tasklist /fi "IMAGENAME eq {os.path.basename(current_exe)}" | find /i "{os.path.basename(current_exe)}" >nul',
-                "if errorlevel 1 goto do_update",
-                "timeout /t 1 >nul",
-                "goto waitloop",
-                ":do_update",
-                "echo Backing up current version...",
-                'if not exist "%BACKUPDIR%" mkdir "%BACKUPDIR%"',
-                'copy /y "%CURRENT%" "%BACKUPEXE%" >nul',
-                "echo Installing update...",
-                'move /y "%TMPFILE%" "%CURRENT%" >nul',
-                "if errorlevel 1 goto restore",
-                "echo Update successful. Restarting...",
-                'pushd "%SCRIPT_DIR%"',
-                'start "" "%CURRENT%"',
-                "popd",
-                "goto end",
-                ":restore",
-                "echo Update failed. Restoring backup...",
-                'copy /y "%BACKUPEXE%" "%CURRENT%" >nul',
-                ":end",
-                'del "%~f0"',
-            ]
+
+            if is_major_upgrade:
+                # Major version upgrade: run downloaded file as NSIS installer
+                log.info(f"Major upgrade detected ({current_major}.x → {new_major}.x), using NSIS installer mode")
+                bat_lines = [
+                    "@echo off",
+                    "setlocal enableextensions",
+                    f'set "TMPFILE={tmp_path}"',
+                    f'set "BACKUPDIR={backup_dir}"',
+                    f'set "CURRENT={current_exe}"',
+                    f'set "BACKUPEXE={backup_exe}"',
+                    "echo Stopping FaxRetriever...",
+                    f"taskkill /f /im {exe_name} >nul 2>&1",
+                    ":waitloop",
+                    f'tasklist /fi "IMAGENAME eq {exe_name}" | find /i "{exe_name}" >nul',
+                    "if errorlevel 1 goto do_install",
+                    "timeout /t 1 >nul",
+                    "goto waitloop",
+                    ":do_install",
+                    "echo Backing up current version...",
+                    'if not exist "%BACKUPDIR%" mkdir "%BACKUPDIR%"',
+                    'copy /y "%CURRENT%" "%BACKUPEXE%" >nul',
+                    "echo Installing FaxRetriever v" + self.version + "...",
+                    'start /wait "" "%TMPFILE%" /S',
+                    'del "%TMPFILE%" >nul 2>&1',
+                    'del "%~f0"',
+                ]
+            else:
+                # Minor/patch upgrade: existing binary-swap logic
+                bat_lines = [
+                    "@echo off",
+                    "setlocal enableextensions",
+                    "rem Use robust quoting for all path variables",
+                    f'set "CURRENT={current_exe}"',
+                    f'set "TMPFILE={tmp_path}"',
+                    f'set "BACKUPDIR={backup_dir}"',
+                    f'set "BACKUPEXE={backup_exe}"',
+                    "rem Script directory (installation directory)",
+                    'set "SCRIPT_DIR=%~dp0"',
+                    "echo Stopping FaxRetriever...",
+                    f"taskkill /f /im {exe_name} >nul 2>&1",
+                    ":waitloop",
+                    f'tasklist /fi "IMAGENAME eq {exe_name}" | find /i "{exe_name}" >nul',
+                    "if errorlevel 1 goto do_update",
+                    "timeout /t 1 >nul",
+                    "goto waitloop",
+                    ":do_update",
+                    "echo Backing up current version...",
+                    'if not exist "%BACKUPDIR%" mkdir "%BACKUPDIR%"',
+                    'copy /y "%CURRENT%" "%BACKUPEXE%" >nul',
+                    "echo Installing update...",
+                    'move /y "%TMPFILE%" "%CURRENT%" >nul',
+                    "if errorlevel 1 goto restore",
+                    "echo Update successful. Restarting...",
+                    'pushd "%SCRIPT_DIR%"',
+                    'start "" "%CURRENT%"',
+                    "popd",
+                    "goto end",
+                    ":restore",
+                    "echo Update failed. Restoring backup...",
+                    'copy /y "%BACKUPEXE%" "%CURRENT%" >nul',
+                    ":end",
+                    'del "%~f0"',
+                ]
             with open(bat_path, "w", encoding="utf-8") as bf:
                 bf.write("\r\n".join(bat_lines) + "\r\n")
 

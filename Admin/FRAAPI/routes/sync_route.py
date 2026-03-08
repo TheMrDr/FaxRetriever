@@ -15,6 +15,7 @@ from db.mongo_interface import (
     add_downloaded_ids,
     list_downloaded_ids,
     count_downloaded_ids,
+    remove_downloaded_ids,
 )
 
 router = APIRouter()
@@ -46,6 +47,26 @@ class PostBody(BaseModel):
             return out or None
         except Exception:
             return None
+
+
+class PruneBody(BaseModel):
+    ids: List[str] = []
+
+    @validator("ids", pre=True)
+    def _normalize_ids(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            v = [v]
+        try:
+            out = []
+            for x in v:
+                s = (str(x) or "").strip()
+                if s:
+                    out.append(s)
+            return out
+        except Exception:
+            return []
 
 
 class ListBody(BaseModel):
@@ -159,3 +180,44 @@ async def list_downloaded(request: Request, body: ListBody, authorization: str =
     )
 
     return {"ids": ids, "offset": body.offset, "limit": body.limit, "total": total, "next_offset": next_offset}
+
+
+@router.post("/prune")
+async def prune_downloaded(request: Request, body: PruneBody, authorization: str = Header(None)):
+    ip = request.client.host
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Missing or malformed Authorization header",
+        )
+
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload = decode_jwt_token(token)
+        require_scopes(payload, ["history.sync"])
+    except TokenError as e:
+        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    domain_uuid = payload.get("sub")
+    device_id = payload.get("device_id")
+
+    ids = list(dict.fromkeys([s for s in (body.ids or []) if s]))
+    if not ids:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="No ids provided")
+
+    res = remove_downloaded_ids(domain_uuid, ids)
+
+    log_event_v2(
+        event_type="history_prune",
+        domain_uuid=domain_uuid,
+        device_id=device_id,
+        note=f"Pruned {res.get('removed')} ids from history",
+        actor_component=SYSTEM_ACTOR,
+        actor_function="prune_downloaded",
+        object_type="download_history",
+        object_operation="prune",
+        payload={"requested": len(ids), "removed": res.get("removed"), "total": res.get("total")},
+        audit=False,
+    )
+
+    return {"ok": True, **res}

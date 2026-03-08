@@ -5,6 +5,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QToolButton, QMenu
 
 from core.address_book import AddressBookManager
+from ui.theme import get_theme, color_for_status, color_for_direction
 from .pdf_viewer_dialog import open_pdf_viewer
 
 
@@ -13,6 +14,8 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     Build a single fax entry UI card.
     Delegates thumbnailing to thumb_helper and viewing/downloading to panel methods and open_pdf_viewer.
     """
+    t = get_theme()
+
     # Container for filter handling + divider
     row = QWidget()
     row_lay = QVBoxLayout(row)
@@ -23,10 +26,10 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     card = QFrame()
     card.setFrameShape(QFrame.NoFrame)
     direction = (entry.get("direction", "") or "").lower()
-    bg = "#f5fbff" if direction == "inbound" else "#fff8f5"
+    bg = color_for_direction(direction)
     card.setStyleSheet(
-        f"QFrame {{ background: {bg}; border: 1px solid #e5e5e5; border-radius: 8px; }}"
-        "QFrame:hover { border-color: #c9d4e8; }"
+        f"QFrame {{ background: {bg}; border: 1px solid {t['border']}; border-radius: 8px; }}"
+        f"QFrame:hover {{ border-color: {t['border_hover']}; }}"
     )
     lay = QVBoxLayout(card)
     lay.setContentsMargins(10, 10, 10, 10)
@@ -36,26 +39,17 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     top = QHBoxLayout()
     lbl_dir = QLabel(entry.get("direction", ""))
     lbl_dir.setStyleSheet(
-        "padding: 2px 8px; border-radius: 10px; font-weight: bold; background: rgba(0,0,0,0.06);"
+        f"padding: 2px 8px; border-radius: 10px; font-weight: bold; background: {t['background']};"
     )
     top.addWidget(lbl_dir)
     top.addStretch()
     if entry.get("unread", False):
         lbl_new = QLabel("NEW")
-        lbl_new.setStyleSheet("color: #1a73e8; font-weight: bold;")
+        lbl_new.setStyleSheet(f"color: {t['badge_new']}; font-weight: bold;")
         top.addWidget(lbl_new)
     # Status label with colored indicator
     status_text = str(entry.get("status", ""))
-    status_lc = status_text.lower()
-    # Map common statuses to colors
-    if any(k in status_lc for k in ["fail", "error", "undeliv"]):
-        status_color = "#b71c1c"  # red
-    elif any(k in status_lc for k in ["pend", "queue", "sending", "process"]):
-        status_color = "#b58900"  # yellow
-    elif any(k in status_lc for k in ["deliv", "success", "sent", "ok"]):
-        status_color = "#2e7d32"  # green
-    else:
-        status_color = "#555"      # default/unknown
+    status_color = color_for_status(status_text)
     lbl_status = QLabel(status_text)
     lbl_status.setStyleSheet(f"color: {status_color}; font-weight: bold;")
     top.addWidget(lbl_status)
@@ -105,11 +99,11 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
 
     # Build rich text for meta1
     if name_from:
-        from_part = f"From: <a href='contact:{link_from}'>{name_from}</a> ({from_num})"
+        from_part = f"From: <a href='contact:{link_from}' style='color:{t['link']}'>{name_from}</a> ({from_num})"
     else:
         from_part = f"From: {from_num}"
     if name_to:
-        to_part = f"To: <a href='contact:{link_to}'>{name_to}</a> ({to_num})"
+        to_part = f"To: <a href='contact:{link_to}' style='color:{t['link']}'>{name_to}</a> ({to_num})"
     else:
         to_part = f"To: {to_num}"
     meta1 = QLabel(f"{from_part}    {to_part}")
@@ -121,8 +115,7 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     except Exception:
         pass
     meta2 = QLabel(f"Time: {ts_local}    Pages: {entry.get('pages', '')}")
-    meta1.setStyleSheet("color: #333;")
-    meta2.setStyleSheet("color: #666;")
+    meta2.setStyleSheet(f"color: {t['text_secondary']};")
     lay.addWidget(meta1)
     lay.addWidget(meta2)
 
@@ -134,9 +127,11 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     mid = QHBoxLayout()
     mid.setSpacing(10)
 
+    no_preview_style = f"background:{t['background']}; color:{t['text_muted']}; border: 1px dashed {t['border']}; border-radius: 4px;"
+
     preview = QLabel()
     preview.setAlignment(Qt.AlignCenter)
-    preview.setStyleSheet("background:#fff; color:#555; border: none; border-radius: 4px;")
+    preview.setStyleSheet(f"background:{t['surface']}; color:{t['text_secondary']}; border: none; border-radius: 4px;")
     preview.setToolTip("Click to open full preview")
     preview.setCursor(Qt.PointingHandCursor)
     try:
@@ -154,7 +149,7 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
             preview.mousePressEvent = lambda _e, ent=entry, p=pdf_path: open_pdf_viewer(panel, ent, p, panel.app_state, panel.base_dir, panel.exe_dir)
         else:
             preview.setText("No preview")
-            preview.setStyleSheet("background:#fafafa; color:#888; border: 1px dashed #ddd; border-radius: 4px;")
+            preview.setStyleSheet(no_preview_style)
     else:
         thumb_url = entry.get("thumbnail") or thumb_helper.thumbnail_url_for(entry)
         if thumb_url:
@@ -162,7 +157,7 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
             preview.mousePressEvent = lambda _e, ent=entry: open_pdf_viewer(panel, ent, None, panel.app_state, panel.base_dir, panel.exe_dir)
         else:
             preview.setText("No preview")
-            preview.setStyleSheet("background:#fafafa; color:#888; border: 1px dashed #ddd; border-radius: 4px;")
+            preview.setStyleSheet(no_preview_style)
     mid.addWidget(preview, 0)
 
     # Actions column
@@ -178,13 +173,13 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
 
     if not available:
         lbl_dl = QLabel("Unavailable")
-        lbl_dl.setStyleSheet("color: #b58900;")
+        lbl_dl.setStyleSheet(f"color: {t['warning']};")
     elif downloaded_logged or has_local:
         lbl_dl = QLabel("Downloaded")
-        lbl_dl.setStyleSheet("color: #2e7d32;")
+        lbl_dl.setStyleSheet(f"color: {t['success']};")
     else:
         lbl_dl = QLabel("Not downloaded")
-        lbl_dl.setStyleSheet("color: #b71c1c;")
+        lbl_dl.setStyleSheet(f"color: {t['error']};")
     actions_col.addWidget(lbl_dl)
 
     btn_view = QPushButton("View")
@@ -230,7 +225,7 @@ def create_fax_card(panel, entry: dict, thumb_helper) -> QWidget:
     divider = QFrame()
     divider.setFrameShape(QFrame.HLine)
     divider.setFrameShadow(QFrame.Sunken)
-    divider.setStyleSheet("color: #e9ecef; background: #e9ecef;")
+    divider.setStyleSheet(f"color: {t['separator']}; background: {t['separator']};")
     divider.setFixedHeight(1)
     row_lay.addWidget(divider)
 

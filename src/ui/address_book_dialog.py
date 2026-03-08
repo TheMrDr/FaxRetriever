@@ -178,7 +178,7 @@ class AddressBookDialog(QDialog):
         # If searching and nothing matched, display a helpful message.
         if has_query and not filtered:
             msg = QLabel("No matches found.")
-            msg.setStyleSheet("color:#666; padding: 12px;")
+            msg.setObjectName("hint")
             self.grid_layout_contacts.addWidget(msg, 0, 0, 1, 2)
             self.contacts_container.setUpdatesEnabled(True)
             return
@@ -326,7 +326,7 @@ class AddressBookDialog(QDialog):
         # If searching and nothing matched, display a helpful message.
         if has_query and not filtered:
             msg = QLabel("No matches found.")
-            msg.setStyleSheet("color:#666; padding: 12px;")
+            msg.setObjectName("hint")
             self.vbox_companies.addWidget(msg)
             self.vbox_companies.addStretch()
             try:
@@ -364,7 +364,7 @@ class AddressBookDialog(QDialog):
 
             # Group header
             header = QLabel(f"<b>{gname}</b>")
-            header.setStyleSheet("font-size: 12pt; color: #222; padding: 2px 4px;")
+            header.setObjectName("sectionHeader")
             self.vbox_companies.addWidget(header)
 
             grid = QGridLayout()
@@ -403,8 +403,10 @@ class AddressBookDialog(QDialog):
         # Outer container (card)
         outer = QWidget()
         is_placeholder = contact.get("is_placeholder", False)
+        from ui.theme import get_theme as _gt
+        _ct = _gt()
         outer.setStyleSheet(
-            "QWidget { border: 1px solid #d9d9d9; border-radius: 8px; }"
+            f"QWidget {{ border: 1px solid {_ct['border']}; border-radius: 8px; }}"
         )
         outer_layout = QVBoxLayout(outer)
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -413,7 +415,7 @@ class AddressBookDialog(QDialog):
         # Header with avatar/initials and name/company
         header = QWidget()
         header.setStyleSheet(
-            "QWidget { background: #fafafa; border-top-left-radius: 8px; border-top-right-radius: 8px; }"
+            f"QWidget {{ background: {_ct['background']}; border-top-left-radius: 8px; border-top-right-radius: 8px; }}"
         )
         h = QHBoxLayout(header)
         h.setContentsMargins(10, 10, 10, 10)
@@ -436,7 +438,7 @@ class AddressBookDialog(QDialog):
         avatar.setAlignment(Qt.AlignCenter)
         avatar.setFixedSize(36, 36)
         avatar.setStyleSheet(
-            "QLabel { background: #1976d2; color: white; font-weight: bold; border-radius: 18px; }"
+            f"QLabel {{ background: {_ct['primary']}; color: {_ct['text_on_primary']}; font-weight: bold; border-radius: 18px; }}"
         )
         h.addWidget(avatar)
 
@@ -450,7 +452,7 @@ class AddressBookDialog(QDialog):
         name_lbl.setContentsMargins(0, 0, 0, 0)
         company = contact.get("company", "")
         comp_lbl = QLabel(company)
-        comp_lbl.setStyleSheet("color:#666;")
+        comp_lbl.setStyleSheet(f"color:{_ct['text_secondary']};")
         title_box.addWidget(name_lbl)
         if company:
             title_box.addWidget(comp_lbl)
@@ -458,7 +460,7 @@ class AddressBookDialog(QDialog):
             note = (contact.get("notes") or "") if is_placeholder else ""
             if note:
                 hint = QLabel(note)
-                hint.setStyleSheet("color:#777; font-style: italic;")
+                hint.setStyleSheet(f"color:{_ct['text_muted']}; font-style: italic;")
                 title_box.addWidget(hint)
         # Compact spacing: no stretch between header and body
         h.addLayout(title_box, 1)
@@ -500,7 +502,7 @@ class AddressBookDialog(QDialog):
                 smart_notes.append("Email looks invalid")
         if smart_notes:
             warn = QLabel(" \u26A0\uFE0F  " + " • ".join(smart_notes))
-            warn.setStyleSheet("color:#b26a00;")
+            warn.setStyleSheet(f"color:{_ct['warning']};")
             body_layout.addWidget(warn)
 
         # Footer buttons
@@ -546,8 +548,8 @@ class AddressBookDialog(QDialog):
                 _btn.setIconSize(QSize(18, 18))
                 _btn.setMinimumSize(36, 28)
                 _btn.setStyleSheet(
-                    "QPushButton { padding: 6px; border: 1px solid #d9d9d9; border-radius: 6px; background-color: #ffffff; }"
-                    "QPushButton:hover { background-color: #f3f3f3; }"
+                    f"QPushButton {{ padding: 6px; border: 1px solid {_ct['border']}; border-radius: 6px; background-color: {_ct['surface']}; }}"
+                    f"QPushButton:hover {{ background-color: {_ct['background']}; }}"
                 )
             except Exception:
                 pass

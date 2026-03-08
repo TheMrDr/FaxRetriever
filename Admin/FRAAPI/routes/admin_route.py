@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from typing import Any, Dict, List, Optional
 
@@ -26,16 +27,18 @@ router = APIRouter()
 
 
 def _admin_key() -> Optional[str]:
-    # Prefer env var; could be extended to read from config.py if desired.
     return os.environ.get("ADMIN_API_KEY")
 
 
 def require_admin(request: Request):
     key = _admin_key()
     if not key:
-        return  # dev mode: allow
-    provided = request.headers.get("X-Admin-Key")
-    if not provided or provided != key:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Admin authentication not configured. Set ADMIN_API_KEY environment variable.",
+        )
+    provided = request.headers.get("X-Admin-Key") or ""
+    if not hmac.compare_digest(provided.encode(), key.encode()):
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED, detail="Admin authentication required"
         )

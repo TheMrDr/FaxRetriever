@@ -38,7 +38,7 @@ class FaxHistoryPanel(QWidget):
         # Header row with right-side actions (injected by MainWindow)
         header_row = QHBoxLayout()
         title = QLabel("Fax History")
-        title.setStyleSheet("font-weight: bold; font-size: 12pt;")
+        title.setObjectName("panelHeader")
         header_row.addWidget(title)
         header_row.addStretch()
         self.header_actions = QHBoxLayout()

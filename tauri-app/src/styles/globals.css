@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* ── FaxRetriever Theme Tokens ── */
+
+@theme {
+  --color-primary: #2C3E50;
+  --color-primary-hover: #34495E;
+  --color-primary-pressed: #1A252F;
+  --color-primary-light: #E0F2F1;
+  --color-accent: #0D7377;
+  --color-accent-hover: #0A5C5F;
+
+  --color-success: #2E7D32;
+  --color-error: #C62828;
+  --color-warning: #E65100;
+
+  --color-surface: #FFFFFF;
+  --color-background: #F5F7F8;
+  --color-border: #DDE3E6;
+
+  --color-text-primary: #1A2B33;
+  --color-text-secondary: #546E7A;
+  --color-text-muted: #90A4AE;
+  --color-text-on-primary: #FFFFFF;
+
+  --color-inbound-bg: #F0FAFA;
+  --color-outbound-bg: #FFF8F5;
+
+  --color-badge-new: #2980B9;
+}
+
+/* ── Dark Theme ── */
+
+[data-theme="dark"] {
+  --color-primary: #D5E8F0;
+  --color-primary-hover: #B8D4E3;
+  --color-primary-pressed: #A0C4D6;
+  --color-primary-light: #1E3A3A;
+  --color-accent: #4DB6AC;
+  --color-accent-hover: #80CBC4;
+
+  --color-success: #66BB6A;
+  --color-error: #EF5350;
+  --color-warning: #FFA726;
+
+  --color-surface: #1E1E1E;
+  --color-background: #121212;
+  --color-border: #333333;
+
+  --color-text-primary: #ECEFF1;
+  --color-text-secondary: #B0BEC5;
+  --color-text-muted: #607D8B;
+  --color-text-on-primary: #1A252F;
+
+  --color-inbound-bg: #1A2E2E;
+  --color-outbound-bg: #2E2420;
+
+  --color-badge-new: #4DB6AC;
+}
+
+/* ── Base Styles ── */
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Prevent text selection during drag operations */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}

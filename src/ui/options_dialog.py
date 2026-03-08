@@ -7,15 +7,15 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import requests
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtPrintSupport import QPrintDialog, QPrinter, QPrinterInfo
 from PyQt5.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog,
-                             QDialogButtonBox, QFileDialog, QFormLayout,
-                             QGroupBox, QHBoxLayout, QInputDialog, QLabel,
+                             QFileDialog, QFormLayout,
+                             QGroupBox, QHBoxLayout, QLabel,
                              QLineEdit, QListWidget, QListWidgetItem,
                              QMessageBox, QPushButton, QRadioButton, QSpinBox,
-                             QVBoxLayout, QWidget, QSizePolicy)
+                             QStackedWidget, QVBoxLayout, QWidget, QSizePolicy)
 
 from core.config_loader import device_config, global_config
 from core.license_client import initialize_session, retrieve_skyswitch_token
@@ -60,16 +60,22 @@ def _jwt_is_valid(token: str) -> bool:
 
 
 class OptionsDialog(QDialog):
+    # Page indices for the sidebar / stacked widget
+    PAGE_GENERAL = 0
+    PAGE_PRINTING = 1
+    PAGE_INTEGRATIONS = 2
+    PAGE_ACCOUNT = 3
+    PAGE_LOGGING = 4
+
     def __init__(self, base_dir, app_state, main_window=None):
         super().__init__(main_window)
         self.setWindowTitle("Options")
         self.base_dir = base_dir
         self.setWindowIcon(QIcon(os.path.join(self.base_dir, "images", "logo.ico")))
         self.setModal(True)
-        # Make dialog resizable and DPI-friendly
         self.setSizeGripEnabled(True)
-        self.setMinimumSize(700, 420)
-        self.resize(900, 500)
+        self.setMinimumSize(750, 500)
+        self.resize(850, 550)
 
         self.log = get_logger("options_dialog")
         self.app_state = app_state
@@ -78,83 +84,49 @@ class OptionsDialog(QDialog):
         self._account_flash_done = False
         self._account_flash_timer = None
 
-        layout = QVBoxLayout(self)
-        layout.addLayout(self._build_header())
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        content = QHBoxLayout()
-        left_col = self._build_left_column()
-        right_col = self._build_right_column()
-        content.addWidget(left_col, 1)
-        content.addWidget(right_col, 2)  # Enforce 1:2 ratio (left:right)
-        layout.addLayout(content, 1)  # Let main content take vertical stretch
+        # Body: sidebar + stacked pages
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
 
-        layout.addLayout(self._build_buttons())
+        self.sidebar = QListWidget()
+        self.sidebar.setObjectName("optionsSidebar")
+        self.sidebar.setFixedWidth(180)
+        for label in ["General", "Printing", "Integrations", "Account", "Logging"]:
+            item = QListWidgetItem(label)
+            item.setSizeHint(QSize(180, 44))
+            self.sidebar.addItem(item)
+        self.sidebar.setCurrentRow(0)
+
+        self.pages = QStackedWidget()
+        self.pages.addWidget(self._build_general_page())
+        self.pages.addWidget(self._build_printing_page())
+        self.pages.addWidget(self._build_integrations_page())
+        self.pages.addWidget(self._build_account_page())
+        self.pages.addWidget(self._build_logging_page())
+
+        self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
+
+        body.addWidget(self.sidebar)
+        body.addWidget(self.pages, 1)
+        root.addLayout(body, 1)
+
+        # Buttons
+        root.addLayout(self._build_buttons())
 
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
-    def _build_header(self):
-        header = QVBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        header.setSpacing(2)
-        title = QLabel("<b style='font-size: 16pt'>FaxRetriever</b>")
-        subtitle = QLabel(
-            "<b style='font-size: 10pt'>developed by Clinic Networking, LLC</b>"
-        )
-        title.setAlignment(Qt.AlignCenter)
-        subtitle.setAlignment(Qt.AlignCenter)
-        # Lock the title and subtitle heights so they don't change
-        try:
-            from PyQt5.QtWidgets import QSizePolicy as _QSP
-            title.setSizePolicy(_QSP.Preferred, _QSP.Fixed)
-            subtitle.setSizePolicy(_QSP.Preferred, _QSP.Fixed)
-        except Exception:
-            pass
-        try:
-            th = title.sizeHint().height()
-            sh = subtitle.sizeHint().height()
-            title.setMinimumHeight(th)
-            title.setMaximumHeight(th)
-            subtitle.setMinimumHeight(sh)
-            subtitle.setMaximumHeight(sh)
-        except Exception:
-            # Fallback: at least prevent vertical growth
-            try:
-                title.setMaximumHeight(28)
-                subtitle.setMaximumHeight(22)
-            except Exception:
-                pass
-        header.addWidget(title)
-        header.addWidget(subtitle)
-        return header
-
-    def _build_left_column(self):
-        left = QVBoxLayout()
-        left.setSpacing(8)
-        left.addWidget(self._retrieval_group())
-        left.addStretch(1)
-        return self._wrap_group(left)
-
-    def _build_right_column(self):
-        right = QVBoxLayout()
-        right.setSpacing(8)
-        right.addWidget(self._logging_section())
-        right.addWidget(self._integrations_section())
-        right.addWidget(self._account_section())
-        right.addStretch(1)
-        return self._wrap_group(right)
-
-    def _wrap_group(self, layout):
-        wrapper = QWidget()
-        wrapper.setLayout(layout)
-        # Prevent vertical over-expansion of grouped sections; allow horizontal growth
-        try:
-            wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        except Exception:
-            pass
-        return wrapper
+    # ------------------------------------------------------------------
+    # Buttons
+    # ------------------------------------------------------------------
 
     def _build_buttons(self):
         row = QHBoxLayout()
+        row.setContentsMargins(12, 8, 12, 12)
         row.addStretch()
         save = QPushButton("Save")
         cancel = QPushButton("Cancel")
@@ -164,11 +136,20 @@ class OptionsDialog(QDialog):
         row.addWidget(cancel)
         return row
 
-    def _retrieval_group(self):
-        group = QGroupBox("Fax Retrieval Settings")
-        layout = QVBoxLayout()
-        layout.setSpacing(8)
-        layout.setContentsMargins(8, 8, 8, 8)
+    # ------------------------------------------------------------------
+    # Page builders
+    # ------------------------------------------------------------------
+
+    def _build_general_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        # --- Fax Retrieval group ---
+        group = QGroupBox("Fax Retrieval")
+        g_lay = QVBoxLayout()
+        g_lay.setSpacing(8)
 
         polling_row = QHBoxLayout()
         polling_row.addWidget(QLabel("Polling Frequency (minutes):"))
@@ -178,9 +159,10 @@ class OptionsDialog(QDialog):
             device_config.get("Fax Options", "polling_frequency", 15) or 15
         )
         polling_row.addWidget(self.polling_frequency_spinbox)
-        layout.addLayout(polling_row)
+        polling_row.addStretch()
+        g_lay.addLayout(polling_row)
 
-        layout.addWidget(QLabel("Download Format:"))
+        g_lay.addWidget(QLabel("Download Format:"))
         download_format_row = QHBoxLayout()
         self.download_pdf_checkbox = QCheckBox("PDF")
         self.download_jpg_checkbox = QCheckBox("JPG")
@@ -188,7 +170,8 @@ class OptionsDialog(QDialog):
         download_format_row.addWidget(self.download_pdf_checkbox)
         download_format_row.addWidget(self.download_jpg_checkbox)
         download_format_row.addWidget(self.download_tiff_checkbox)
-        layout.addLayout(download_format_row)
+        download_format_row.addStretch()
+        g_lay.addLayout(download_format_row)
 
         # Load and map legacy values
         raw_method = device_config.get("Fax Options", "download_method", "PDF")
@@ -206,13 +189,14 @@ class OptionsDialog(QDialog):
         self.download_jpg_checkbox.setChecked("JPG" in selected)
         self.download_tiff_checkbox.setChecked("TIFF" in selected)
 
-        layout.addWidget(QLabel("File Naming:"))
+        g_lay.addWidget(QLabel("File Naming:"))
         naming_format_row = QHBoxLayout()
         self.naming_cid_radio = QRadioButton("Use CID-DDMM-HHMM")
         self.naming_faxid_radio = QRadioButton("Use Fax ID")
         naming_format_row.addWidget(self.naming_cid_radio)
         naming_format_row.addWidget(self.naming_faxid_radio)
-        layout.addLayout(naming_format_row)
+        naming_format_row.addStretch()
+        g_lay.addLayout(naming_format_row)
 
         self.naming_group = QButtonGroup()
         self.naming_group.addButton(self.naming_cid_radio)
@@ -222,60 +206,11 @@ class OptionsDialog(QDialog):
             == "cid"
         )
 
-        # Before the print_row widgets
-        self.selected_printer_label = QLabel(
-            device_config.get("Fax Options", "printer_name", "")
-        )
-        self.selected_printer_label.setStyleSheet("padding-left: 10px; color: #444;")
-
-        self.print_checkbox = QCheckBox("Print Faxes")
-        self.print_checkbox.setChecked(
-            (self.app_state.device_cfg.print_faxes or "").lower() == "yes"
-        )
-        self.print_checkbox.stateChanged.connect(self._handle_print_checkbox_toggle)
-
-        print_row = QHBoxLayout()
-        print_row.addWidget(self.print_checkbox)
-        print_row.addWidget(self.selected_printer_label)
-        print_row.addStretch()
-
-        layout.addLayout(print_row)
-
-        # Notifications + Close to Tray row
-        notif_row = QHBoxLayout()
-        self.notifications_checkbox = QCheckBox("Enable Notifications")
-        self.notifications_checkbox.setChecked(
-            (
-                (self.app_state.device_cfg.notifications_enabled or "Yes").lower()
-                == "yes"
-            )
-        )
-        notif_row.addWidget(self.notifications_checkbox)
-        self.close_to_tray_checkbox = QCheckBox("Close to Tray")
-        self.close_to_tray_checkbox.setChecked(
-            ((self.app_state.device_cfg.close_to_tray or "No").lower() == "yes")
-        )
-        notif_row.addWidget(self.close_to_tray_checkbox)
-        notif_row.addStretch()
-        layout.addLayout(notif_row)
-
-        # Start with System row
-        start_row = QHBoxLayout()
-        self.start_with_system_checkbox = QCheckBox("Start with System")
-        self.start_with_system_checkbox.setChecked(
-            ((self.app_state.device_cfg.start_with_system or "No").lower() == "yes")
-        )
-        start_row.addWidget(self.start_with_system_checkbox)
-        start_row.addStretch()
-        layout.addLayout(start_row)
-
-        # Archival is always enabled; provide only server retention selector
+        # Server retention
         archive_row = QHBoxLayout()
         archive_row.addWidget(QLabel("Server Retention:"))
-
         self.retention_input = QComboBox()
         self.retention_input.addItems(["15", "30", "60", "90", "180", "365"])
-        # Coerce any previous invalid/legacy values to a safe bound
         try:
             cur_val = int(self.app_state.device_cfg.archive_duration or 365)
             if cur_val > 365:
@@ -285,34 +220,81 @@ class OptionsDialog(QDialog):
             self.retention_input.setCurrentText(str(cur_val))
         except Exception:
             self.retention_input.setCurrentText("365")
-
         archive_row.addWidget(self.retention_input)
         archive_row.addWidget(QLabel("days"))
         archive_row.addStretch()
-        layout.addLayout(archive_row)
+        g_lay.addLayout(archive_row)
 
-        group.setLayout(layout)
-        return group
+        group.setLayout(g_lay)
+        layout.addWidget(group)
 
-    def _logging_section(self):
-        group = QGroupBox("Logging")
-        layout = QVBoxLayout()
-        layout.setSpacing(8)
-        layout.setContentsMargins(8, 8, 8, 8)
-        self.logging_combo = QComboBox()
-        self.logging_combo.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
-        self.logging_combo.setCurrentText(
-            self.app_state.global_cfg.logging_level or "Info"
+        # --- Behavior group ---
+        beh_group = QGroupBox("Behavior")
+        beh_lay = QVBoxLayout()
+        beh_lay.setSpacing(8)
+
+        self.notifications_checkbox = QCheckBox("Enable Notifications")
+        self.notifications_checkbox.setChecked(
+            ((self.app_state.device_cfg.notifications_enabled or "Yes").lower() == "yes")
         )
-        layout.addWidget(self.logging_combo)
-        group.setLayout(layout)
-        return group
+        beh_lay.addWidget(self.notifications_checkbox)
 
-    def _integrations_section(self):
-        group = QGroupBox("Integrations")
-        layout = QVBoxLayout()
-        layout.setSpacing(8)
-        layout.setContentsMargins(8, 8, 8, 8)
+        self.close_to_tray_checkbox = QCheckBox("Close to Tray")
+        self.close_to_tray_checkbox.setChecked(
+            ((self.app_state.device_cfg.close_to_tray or "No").lower() == "yes")
+        )
+        beh_lay.addWidget(self.close_to_tray_checkbox)
+
+        self.start_with_system_checkbox = QCheckBox("Start with System")
+        self.start_with_system_checkbox.setChecked(
+            ((self.app_state.device_cfg.start_with_system or "No").lower() == "yes")
+        )
+        beh_lay.addWidget(self.start_with_system_checkbox)
+
+        beh_group.setLayout(beh_lay)
+        layout.addWidget(beh_group)
+
+        layout.addStretch()
+        return page
+
+    def _build_printing_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        group = QGroupBox("Print Settings")
+        g_lay = QVBoxLayout()
+        g_lay.setSpacing(8)
+
+        self.print_checkbox = QCheckBox("Print Faxes")
+        self.print_checkbox.setChecked(
+            (self.app_state.device_cfg.print_faxes or "").lower() == "yes"
+        )
+        self.print_checkbox.stateChanged.connect(self._handle_print_checkbox_toggle)
+        g_lay.addWidget(self.print_checkbox)
+
+        self.selected_printer_label = QLabel(
+            device_config.get("Fax Options", "printer_name", "")
+        )
+        self.selected_printer_label.setObjectName("hint")
+        g_lay.addWidget(self.selected_printer_label)
+
+        group.setLayout(g_lay)
+        layout.addWidget(group)
+        layout.addStretch()
+        return page
+
+    def _build_integrations_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        group = QGroupBox("Third-Party Integrations")
+        g_lay = QVBoxLayout()
+        g_lay.setSpacing(8)
+
         # Prefer device-level settings; fallback to global
         dev_settings = self.app_state.device_cfg.integration_settings or {}
         glob_settings = self.app_state.global_cfg.integration_settings or {}
@@ -322,15 +304,18 @@ class OptionsDialog(QDialog):
         self.integration_checkbox.setChecked(
             (settings.get("enable_third_party", "") or "").lower() == "yes"
         )
-        layout.addWidget(self.integration_checkbox)
+        g_lay.addWidget(self.integration_checkbox)
 
         # Software selector
+        sw_row = QHBoxLayout()
+        sw_row.addWidget(QLabel("Software:"))
         self.integration_combo = QComboBox()
         self.integration_combo.addItems(["None", "Computer-Rx", "LibertyRx"])
         self.integration_combo.setCurrentText(
             settings.get("integration_software", "") or "None"
         )
-        layout.addWidget(self.integration_combo)
+        sw_row.addWidget(self.integration_combo, 1)
+        g_lay.addLayout(sw_row)
 
         # WinRx path row (visible only for Computer-Rx)
         path_row = QHBoxLayout()
@@ -353,7 +338,14 @@ class OptionsDialog(QDialog):
         path_row.addWidget(QLabel("WinRx Path:"))
         path_row.addWidget(self.winrx_path_input, 1)
         path_row.addWidget(browse_btn)
-        layout.addLayout(path_row)
+        g_lay.addLayout(path_row)
+
+        # Collect path row widgets for visibility toggling
+        self._crx_path_widgets = []
+        for i in range(path_row.count()):
+            w = path_row.itemAt(i).widget()
+            if w:
+                self._crx_path_widgets.append(w)
 
         # LibertyRx form section (visible only when LibertyRx is selected)
         self.liberty_container = QWidget()
@@ -399,14 +391,13 @@ class OptionsDialog(QDialog):
         # Helper URL label
         self.liberty_url_label = QLineEdit("")
         self.liberty_url_label.setReadOnly(True)
-        self.liberty_url_label.setStyleSheet("background-color: #f0f0f0; border: 1px solid #ccc;")
         lib_form.addRow("Endpoint URL:", self.liberty_url_label)
         self.liberty_url_hint = QLabel("Copy this exact URL into Liberty's Fax Settings (POST Endpoint).")
         self.liberty_url_hint.setObjectName("hint")
         lib_form.addRow("", self.liberty_url_hint)
 
         lib_form.addRow(self.liberty_note_label)
-        layout.addWidget(self.liberty_container)
+        g_lay.addWidget(self.liberty_container)
 
         def update_url_label():
             import socket
@@ -429,32 +420,32 @@ class OptionsDialog(QDialog):
             software = self.integration_combo.currentText()
             show_crx = enabled and software == "Computer-Rx"
             show_lib = enabled and software == "LibertyRx"
-            for i in range(path_row.count()):
-                w = path_row.itemAt(i).widget()
-                if w:
-                    w.setVisible(show_crx)
+            for w in self._crx_path_widgets:
+                w.setVisible(show_crx)
             # Toggle Liberty container visibility as a block
             if hasattr(self, "liberty_container"):
                 self.liberty_container.setVisible(show_lib)
-            # Adjust dialog size to fit newly visible/hidden widgets
-            try:
-                self.adjustSize()
-            except Exception:
-                pass
 
         self.integration_checkbox.toggled.connect(lambda _: toggle_visibility())
         self.integration_combo.currentTextChanged.connect(lambda _: toggle_visibility())
         QTimer.singleShot(0, toggle_visibility)
 
-        group.setLayout(layout)
-        return group
+        group.setLayout(g_lay)
+        layout.addWidget(group)
+        layout.addStretch()
+        return page
 
-    def _account_section(self):
+    def _build_account_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
         group = QGroupBox("Account")
         group.setObjectName("accountGroup")
-        layout = QFormLayout()
-        layout.setVerticalSpacing(8)
-        layout.setContentsMargins(8, 8, 8, 8)
+        form = QFormLayout()
+        form.setVerticalSpacing(8)
+
         self.client_domain_input = QLineEdit(self.app_state.global_cfg.fax_user or "")
         self.client_domain_input.setPlaceholderText("100@sample.12345.service")
         self.auth_token_input = QLineEdit()
@@ -466,13 +457,54 @@ class OptionsDialog(QDialog):
         self.change_account_button = QPushButton("Change Account")
         self.change_account_button.clicked.connect(self.toggle_account_settings)
         self.change_account_button.setEnabled(False)
-        layout.addRow("Fax User", self.client_domain_input)
-        layout.addRow("Authentication Token", self.auth_token_input)
-        layout.addRow(self.change_account_button)
-        group.setLayout(layout)
+        form.addRow("Fax User", self.client_domain_input)
+        form.addRow("Authentication Token", self.auth_token_input)
+        form.addRow(self.change_account_button)
+        group.setLayout(form)
         # Keep a reference for subtle attention cues
         self.account_group = group
-        return group
+
+        layout.addWidget(group)
+        layout.addStretch()
+        return page
+
+    def _build_logging_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        group = QGroupBox("Log Level")
+        g_lay = QVBoxLayout()
+        g_lay.setSpacing(8)
+
+        self.logging_combo = QComboBox()
+        self.logging_combo.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
+        self.logging_combo.setCurrentText(
+            self.app_state.global_cfg.logging_level or "Info"
+        )
+        g_lay.addWidget(self.logging_combo)
+
+        view_btn = QPushButton("Open Log Folder")
+        view_btn.setProperty("flat", True)
+        view_btn.clicked.connect(self._open_log_folder)
+        g_lay.addWidget(view_btn)
+
+        group.setLayout(g_lay)
+        layout.addWidget(group)
+        layout.addStretch()
+        return page
+
+    def _open_log_folder(self):
+        log_dir = os.path.join(self.base_dir, "logs")
+        if os.path.isdir(log_dir):
+            os.startfile(log_dir)
+        else:
+            QMessageBox.information(self, "Logs", f"Log folder not found:\n{log_dir}")
+
+    # ------------------------------------------------------------------
+    # Printer helpers
+    # ------------------------------------------------------------------
 
     def _apply_saved_printer_settings(self, qprinter: QPrinter):
         try:
@@ -591,6 +623,10 @@ class OptionsDialog(QDialog):
             device_config.set("Fax Options", "printer_name", "")
             device_config.set("Fax Options", "printer_settings", {})
 
+    # ------------------------------------------------------------------
+    # Account helpers
+    # ------------------------------------------------------------------
+
     def _format_token_live(self):
         raw = self.auth_token_input.text()
         formatted = format_auth_token(raw)
@@ -685,14 +721,20 @@ class OptionsDialog(QDialog):
 
             self._account_flash_done = True
 
+            # Switch to Account page so the flash is visible
+            if hasattr(self, "sidebar"):
+                self.sidebar.setCurrentRow(self.PAGE_ACCOUNT)
+
             # Prepare a short, subtle flash using border and title color
+            from ui.theme import get_theme as _gt
+            _ft = _gt()
             highlight_a = (
-                "QGroupBox#accountGroup { border: 2px solid #f1c40f; border-radius: 4px; margin-top: 6px; } "
-                "QGroupBox#accountGroup::title { subcontrol-origin: margin; left: 8px; color: #d35400; }"
+                f"QGroupBox#accountGroup {{ border: 2px solid {_ft['warning']}; border-radius: 4px; margin-top: 6px; }} "
+                f"QGroupBox#accountGroup::title {{ subcontrol-origin: margin; left: 8px; color: {_ft['warning']}; }}"
             )
             highlight_b = (
-                "QGroupBox#accountGroup { border: 2px solid #e67e22; border-radius: 4px; margin-top: 6px; } "
-                "QGroupBox#accountGroup::title { subcontrol-origin: margin; left: 8px; color: #e67e22; }"
+                f"QGroupBox#accountGroup {{ border: 2px solid {_ft['primary']}; border-radius: 4px; margin-top: 6px; }} "
+                f"QGroupBox#accountGroup::title {{ subcontrol-origin: margin; left: 8px; color: {_ft['primary']}; }}"
             )
             base_style = self.account_group.styleSheet() or ""
 
@@ -726,6 +768,10 @@ class OptionsDialog(QDialog):
         except Exception:
             # Never block UI on cosmetic issues
             pass
+
+    # ------------------------------------------------------------------
+    # Save / Load
+    # ------------------------------------------------------------------
 
     def _save_settings(self):
         try:

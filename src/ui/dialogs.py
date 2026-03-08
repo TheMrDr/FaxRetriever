@@ -239,7 +239,7 @@ class MarkdownViewer(QDialog):
         body_font.setPointSize(10)
         self.viewer.document().setDefaultFont(body_font)
         # Light styling for readability
-        self.viewer.setStyleSheet("QTextBrowser { padding: 12px; }")
+        self.viewer.setObjectName("markdownViewer")
         layout.addWidget(self.viewer)
         self.setLayout(layout)
 

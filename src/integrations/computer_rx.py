@@ -89,6 +89,12 @@ class CRxIntegration2(QThread):
                 pass
         finally:
             try:
+                if self._http_session is not None:
+                    self._http_session.close()
+                    self._http_session = None
+            except Exception:
+                pass
+            try:
                 self.finished.emit()
             except Exception:
                 pass

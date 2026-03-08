@@ -4,6 +4,7 @@
 import json
 import os
 import sys
+import threading
 from typing import Any, Optional
 
 from utils.logging_utils import get_logger
@@ -104,38 +105,43 @@ class BaseConfigLoader:
         self.path = path
         self.label = label
         self.config = {}
+        self._lock = threading.Lock()
         self.log = get_logger(label)
         self._load()
 
     def _load(self):
-        try:
-            if os.path.exists(self.path):
-                with open(self.path, "r", encoding="utf-8") as f:
-                    self.config = json.load(f)
-                    self.log.info(f"{self.label} config loaded.")
-            else:
-                self.log.warning(f"{self.label} config file not found; using defaults.")
+        with self._lock:
+            try:
+                if os.path.exists(self.path):
+                    with open(self.path, "r", encoding="utf-8") as f:
+                        self.config = json.load(f)
+                        self.log.info(f"{self.label} config loaded.")
+                else:
+                    self.log.warning(f"{self.label} config file not found; using defaults.")
+                    self.config = {}
+            except Exception as e:
+                self.log.exception(f"Failed to load {self.label} config: {e}")
                 self.config = {}
-        except Exception as e:
-            self.log.exception(f"Failed to load {self.label} config: {e}")
-            self.config = {}
 
     def get(self, section: str, key: str, fallback: Optional[Any] = None) -> Any:
-        return self.config.get(section, {}).get(key, fallback)
+        with self._lock:
+            return self.config.get(section, {}).get(key, fallback)
 
     def set(self, section: str, key: str, value: Any):
-        if section not in self.config:
-            self.config[section] = {}
-        self.config[section][key] = value
+        with self._lock:
+            if section not in self.config:
+                self.config[section] = {}
+            self.config[section][key] = value
 
     def save(self):
-        try:
-            os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            with open(self.path, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, indent=2)
-            self.log.info(f"{self.label} config saved.")
-        except Exception as e:
-            self.log.exception(f"Failed to save {self.label} config: {e}")
+        with self._lock:
+            try:
+                os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                with open(self.path, "w", encoding="utf-8") as f:
+                    json.dump(self.config, f, indent=2)
+                self.log.info(f"{self.label} config saved.")
+            except Exception as e:
+                self.log.exception(f"Failed to save {self.label} config: {e}")
 
 
 class GlobalConfigLoader(BaseConfigLoader):

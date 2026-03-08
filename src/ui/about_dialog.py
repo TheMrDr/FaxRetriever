@@ -34,7 +34,7 @@ class AboutDialog(QDialog):
                 )
             )
         title = QLabel("FaxRetriever – Developed by Clinic Networking, LLC")
-        title.setStyleSheet("font-weight: bold; font-size: 14pt")
+        title.setObjectName("dialogTitle")
         header.addWidget(logo)
         header.addWidget(title)
         header.addStretch()
